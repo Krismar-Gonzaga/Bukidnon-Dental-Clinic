@@ -1,44 +1,81 @@
 <?php
+
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Clinic extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
-        'name', 'slug', 'description', 'address', 'city', 'province',
-        'contact_number', 'email', 'image', 'rating', 'is_featured',
-        'is_verified', 'opening_time', 'closing_time', 'services_offered', 'dentists'
+        'name',
+        'address',
+        'city',
+        'province',
+        'contact_number',
+        'email',
+        'description',
+        'logo',
+        'rating',
+        'review_count',
+        'verified_at',
+        'latitude',
+        'longitude',
+        'is_active'
     ];
 
     protected $casts = [
-        'services_offered' => 'array',
-        'dentists' => 'array',
-        'is_featured' => 'boolean',
-        'is_verified' => 'boolean',
-        'rating' => 'decimal:1'
+        'rating' => 'decimal:2',
+        'verified_at' => 'datetime',
+        'is_active' => 'boolean'
     ];
 
-    public function serviceRates(): HasMany
+    // Relationships
+    public function branches()
     {
-        return $this->hasMany(ServiceRate::class);
+        return $this->hasMany(ClinicBranch::class);
     }
 
-    public function appointments(): HasMany
+    public function dentists()
+    {
+        return $this->hasMany(Dentist::class);
+    }
+
+    public function services()
+    {
+        return $this->hasMany(Service::class);
+    }
+
+    public function specializations()
+    {
+        return $this->belongsToMany(Specialization::class, 'clinic_specializations');
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    public function appointments()
     {
         return $this->hasMany(Appointment::class);
     }
 
-    // Scope for featured clinics
-    public function scopeFeatured($query)
+    // Accessors
+    public function getFullAddressAttribute()
     {
-        return $query->where('is_featured', true);
+        return "{$this->address}, {$this->city}, {$this->province}";
     }
 
-    // Scope for verified clinics
-    public function scopeVerified($query)
+    public function getRatingStarsAttribute()
     {
-        return $query->where('is_verified', true);
+        return number_format($this->rating ?? 0, 1);
+    }
+
+    public function getIsVerifiedAttribute()
+    {
+        return !is_null($this->verified_at);
     }
 }

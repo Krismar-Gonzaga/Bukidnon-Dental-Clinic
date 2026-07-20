@@ -1,27 +1,41 @@
 <?php
+
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Service extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
-        'name', 'slug', 'description', 'icon_name', 'color', 'is_popular', 'sort_order'
+        'clinic_id',
+        'name',
+        'description',
+        'price_min',
+        'price_max',
+        'duration_minutes',
+        'is_active'
     ];
 
     protected $casts = [
-        'is_popular' => 'boolean'
+        'price_min' => 'decimal:2',
+        'price_max' => 'decimal:2',
+        'duration_minutes' => 'integer',
+        'is_active' => 'boolean'
     ];
 
-    public function serviceRates(): HasMany
+    public function clinic()
     {
-        return $this->hasMany(ServiceRate::class);
+        return $this->belongsTo(Clinic::class);
     }
 
-    // Scope for popular services
-    public function scopePopular($query)
+    public function getPriceRangeAttribute()
     {
-        return $query->where('is_popular', true)->orderBy('sort_order');
+        if ($this->price_min === $this->price_max) {
+            return "₱" . number_format($this->price_min, 2);
+        }
+        return "₱" . number_format($this->price_min, 2) . " - ₱" . number_format($this->price_max, 2);
     }
 }

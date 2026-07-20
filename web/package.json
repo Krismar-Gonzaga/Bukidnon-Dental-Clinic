@@ -3,13 +3,31 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@react-native-async-storage/async-storage": "^3.1.1",
+    "@react-native-firebase/app": "^25.1.0",
+    "@react-native-firebase/messaging": "^25.1.0",
+    "@react-navigation/native": "^7.3.11",
+    "@react-navigation/stack": "^7.10.14",
+    "@reduxjs/toolkit": "^2.12.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.18.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "react-hook-form": "^7.82.0",
+    "react-native-geocoding": "^0.5.0",
+    "react-native-image-picker": "^8.2.1",
+    "react-native-maps": "^1.29.0",
+    "react-native-paper": "^5.15.3",
+    "react-native-safe-area-context": "^5.8.0",
+    "react-native-screens": "^4.26.2",
+    "react-native-sqlite-storage": "^6.0.1",
+    "react-native-vector-icons": "^10.3.0",
+    "react-redux": "^9.3.0",
     "react-scripts": "5.0.1",
+    "redux": "^5.0.1",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
@@ -35,5 +53,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@testing-library/react-native": "^14.0.1"
   }
 }
