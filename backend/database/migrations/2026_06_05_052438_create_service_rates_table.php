@@ -1,4 +1,3 @@
-// database/migrations/xxxx_xx_xx_000003_create_service_rates_table.php
 <?php
 
 use Illuminate\Database\Migrations\Migration;

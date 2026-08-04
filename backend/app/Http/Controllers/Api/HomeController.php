@@ -17,8 +17,7 @@ class HomeController extends Controller
     public function index(Request $request)
     {
         $featuredClinics = Clinic::with(['specializations', 'branches'])
-            ->where('is_active', true)
-            ->whereNotNull('verified_at')
+            ->where('is_verified', true)
             ->orderBy('rating', 'desc')
             ->limit(4)
             ->get()
@@ -29,8 +28,7 @@ class HomeController extends Controller
                     'address' => $clinic->full_address,
                     'city' => $clinic->city,
                     'rating' => $clinic->rating_stars,
-                    'review_count' => $clinic->review_count ?? 0,
-                    'logo' => $clinic->logo,
+                    'logo' => $clinic->image,
                     'specializations' => $clinic->specializations->pluck('name')->take(2),
                     'is_verified' => $clinic->is_verified
                 ];
@@ -47,9 +45,7 @@ class HomeController extends Controller
                 ];
             });
 
-        $popularServices = Service::with('clinic')
-            ->where('is_active', true)
-            ->orderBy('id', 'desc')
+        $popularServices = Service::orderBy('sort_order')
             ->limit(6)
             ->get()
             ->map(function ($service) {
@@ -57,12 +53,12 @@ class HomeController extends Controller
                     'id' => $service->id,
                     'name' => $service->name,
                     'description' => $service->description,
-                    'price_range' => $service->price_range,
-                    'clinic_name' => $service->clinic->name ?? null
+                    'icon' => $service->icon_name,
+                    'color' => $service->color,
                 ];
             });
 
-        $recentReviews = Review::with(['clinic', 'patient'])
+        $recentReviews = Review::with(['clinic', 'patient.user'])
             ->where('status', 'approved')
             ->orderBy('created_at', 'desc')
             ->limit(6)
@@ -70,7 +66,7 @@ class HomeController extends Controller
             ->map(function ($review) {
                 return [
                     'id' => $review->id,
-                    'patient_name' => $review->patient->name ?? 'Anonymous',
+                    'patient_name' => $review->patient?->user?->name ?? 'Anonymous',
                     'clinic_name' => $review->clinic->name ?? null,
                     'rating' => $review->rating,
                     'comment' => $review->comment,
@@ -79,7 +75,7 @@ class HomeController extends Controller
             });
 
         $stats = [
-            'verified_clinics' => Clinic::whereNotNull('verified_at')->count(),
+            'verified_clinics' => Clinic::where('is_verified', true)->count(),
             'total_reviews' => Review::where('status', 'approved')->count(),
             'total_specializations' => Specialization::where('is_active', true)->count()
         ];
@@ -106,8 +102,7 @@ class HomeController extends Controller
     public function searchClinics(Request $request)
     {
         $query = Clinic::with(['specializations', 'branches'])
-            ->where('is_active', true)
-            ->whereNotNull('verified_at');
+            ->where('is_verified', true);
 
         // Search by name
         if ($request->has('search')) {
@@ -148,10 +143,10 @@ class HomeController extends Controller
      */
     public function clinicDetails($id)
     {
+        // Note: dentists/services aren't clinic-scoped in the current schema
+        // (no clinic_id column on either table), so they're left out here.
         $clinic = Clinic::with([
             'branches',
-            'dentists',
-            'services',
             'specializations',
             'reviews' => function ($q) {
                 $q->where('status', 'approved')->limit(5);
@@ -172,7 +167,7 @@ class HomeController extends Controller
         $specializations = Specialization::where('is_active', true)
             ->select('id', 'name', 'description', 'icon')
             ->get();
-        
+
         return response()->json([
             'success' => true,
             'data' => $specializations
@@ -184,13 +179,12 @@ class HomeController extends Controller
      */
     public function getCities()
     {
-        $cities = Clinic::where('is_active', true)
-            ->whereNotNull('verified_at')
+        $cities = Clinic::where('is_verified', true)
             ->distinct()
             ->pluck('city')
             ->filter()
             ->values();
-        
+
         return response()->json([
             'success' => true,
             'data' => $cities

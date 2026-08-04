@@ -23,14 +23,15 @@ jest.mock('@react-navigation/bottom-tabs', () => ({
   }),
 }));
 
-jest.mock('../src/screens/ClinicsScreen', () => ({__esModule: true, default: 'ClinicsScreen'}), { virtual: true });
-jest.mock('../src/screens/ClinicDetailsScreen', () => ({__esModule: true, default: 'ClinicDetailsScreen'}), { virtual: true });
-jest.mock('../src/screens/AppointmentsScreen', () => ({__esModule: true, default: 'AppointmentsScreen'}), { virtual: true });
-jest.mock('../src/screens/ProfileScreen', () => ({__esModule: true, default: 'ProfileScreen'}), { virtual: true });
+jest.mock('../src/screens/patient/PatientHomeScreen', () => ({__esModule: true, default: 'PatientHomeScreen'}), { virtual: true });
+jest.mock('../src/screens/patient/ClinicsScreen', () => ({__esModule: true, default: 'ClinicsScreen'}), { virtual: true });
+jest.mock('../src/screens/patient/ClinicDetailsScreen', () => ({__esModule: true, default: 'ClinicDetailsScreen'}), { virtual: true });
+jest.mock('../src/screens/patient/AppointmentsScreen', () => ({__esModule: true, default: 'AppointmentsScreen'}), { virtual: true });
+jest.mock('../src/screens/patient/ProfileScreen', () => ({__esModule: true, default: 'ProfileScreen'}), { virtual: true });
 jest.mock('../src/screens/auth/LoginScreen', () => ({__esModule: true, default: 'LoginScreen'}), { virtual: true });
 jest.mock('../src/screens/auth/RegisterScreen', () => ({__esModule: true, default: 'RegisterScreen'}), { virtual: true });
-jest.mock('../src/screens/BookAppointmentScreen', () => ({__esModule: true, default: 'BookAppointmentScreen'}), { virtual: true });
-jest.mock('../src/screens/FeedbackScreen', () => ({__esModule: true, default: 'FeedbackScreen'}), { virtual: true });
+jest.mock('../src/screens/patient/BookAppointmentScreen', () => ({__esModule: true, default: 'BookAppointmentScreen'}), { virtual: true });
+jest.mock('../src/screens/patient/FeedbackScreen', () => ({__esModule: true, default: 'FeedbackScreen'}), { virtual: true });
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(),
   setItem: jest.fn(),

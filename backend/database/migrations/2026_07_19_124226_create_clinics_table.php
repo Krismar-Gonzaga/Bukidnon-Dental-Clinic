@@ -4,6 +4,9 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+// Superseded by 2026_06_05_052422_create_clinics_table.php, which already creates
+// the full `clinics` table. Kept as a guarded no-op so existing migration history
+// (this file already ran on some environments) doesn't break `migrate`.
 return new class extends Migration
 {
     /**
@@ -11,10 +14,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('clinics', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('clinics')) {
+            Schema::create('clinics', function (Blueprint $table) {
+                $table->id();
+                $table->timestamps();
+            });
+        }
     }
 
     /**
@@ -22,6 +27,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('clinics');
+        // No-op: dropping `clinics` here could also drop the table owned by
+        // 2026_06_05_052422_create_clinics_table.php.
     }
 };

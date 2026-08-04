@@ -13,7 +13,7 @@ import {
   Share,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { homeService } from '../services/api';
+import { homeService } from '../../services/api';
 
 type Clinic = {
   id: number | string;

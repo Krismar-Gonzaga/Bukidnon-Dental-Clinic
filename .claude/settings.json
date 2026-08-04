@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"/c/Program Files/Android/Android Studio/jbr/bin/java\" -version)",
+      "Bash(powershell.exe -NoProfile -Command \"[Environment]::GetEnvironmentVariable\\('ANDROID_HOME','User'\\); [Environment]::GetEnvironmentVariable\\('Path','User'\\)\")",
+      "Bash(powershell.exe -NoProfile -Command \"Write-Output \\('ANDROID_HOME=' + [Environment]::GetEnvironmentVariable\\('ANDROID_HOME','User'\\)\\); Write-Output \\('JAVA_HOME=' + [Environment]::GetEnvironmentVariable\\('JAVA_HOME','User'\\)\\)\")",
+      "Bash(powershell.exe -NoProfile -Command ' *)",
+      "WebSearch",
+      "Bash(npx install-expo-modules@latest --yes)",
+      "Bash(npx install-expo-modules@latest)",
+      "Bash(yes)",
+      "Bash(npx expo *)",
+      "Bash(tasklist //FI \"PID eq 7492\" //FO LIST)",
+      "PowerShell(Stop-Process -Id 7492 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8081 -State Listen -ErrorAction SilentlyContinue)"
+    ]
+  }
+}

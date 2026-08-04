@@ -11,7 +11,10 @@ import {
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { patientService } from '../services/api';
+import { patientService } from '../../services/api';
+import AppHeader from '../../components/navigation/AppHeader';
+import SideDrawer from '../../components/navigation/SideDrawer';
+import BottomNav from '../../components/navigation/BottomNav';
 
 type Appointment = {
   id: number | string;
@@ -28,6 +31,8 @@ const AppointmentsScreen = ({ navigation }: { navigation: any }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('upcoming');
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const toggleDrawer = () => setDrawerVisible((v) => !v);
 
   useEffect(() => {
     fetchAppointments();
@@ -174,7 +179,9 @@ const AppointmentsScreen = ({ navigation }: { navigation: any }) => {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.screenRoot}>
+      <AppHeader onMenuPress={toggleDrawer} onAvatarPress={() => navigation.navigate('Profile')} />
+      <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Appointments</Text>
         <TouchableOpacity
@@ -235,11 +242,17 @@ const AppointmentsScreen = ({ navigation }: { navigation: any }) => {
           </View>
         }
       />
+      </View>
+      <BottomNav activeTab="Appointments" />
+      <SideDrawer visible={drawerVisible} onClose={toggleDrawer} activeItem="Appointments" />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  screenRoot: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',

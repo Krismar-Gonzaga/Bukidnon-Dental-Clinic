@@ -12,9 +12,12 @@ import {
   Switch,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
-import { patientService } from '../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { patientService } from '../../services/api';
+import AppHeader from '../../components/navigation/AppHeader';
+import SideDrawer from '../../components/navigation/SideDrawer';
+import BottomNav from '../../components/navigation/BottomNav';
 
 const ProfileScreen = ({ navigation }: { navigation: any }) => {
   const { user, logout } = useAuth();
@@ -27,6 +30,8 @@ const ProfileScreen = ({ navigation }: { navigation: any }) => {
     phone: '',
     address: '',
   });
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const toggleDrawer = () => setDrawerVisible((v) => !v);
 
   useEffect(() => {
     fetchProfile();
@@ -113,7 +118,9 @@ const ProfileScreen = ({ navigation }: { navigation: any }) => {
   ];
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.screenRoot}>
+      <AppHeader onMenuPress={toggleDrawer} onAvatarPress={() => setEditing(!editing)} />
+      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <View style={styles.profileImageContainer}>
           <View style={styles.profileImage}>
@@ -229,11 +236,17 @@ const ProfileScreen = ({ navigation }: { navigation: any }) => {
       <View style={styles.versionContainer}>
         <Text style={styles.versionText}>Version 1.0.0</Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+      <BottomNav activeTab="Profile" />
+      <SideDrawer visible={drawerVisible} onClose={toggleDrawer} activeItem="Profile" />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  screenRoot: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',

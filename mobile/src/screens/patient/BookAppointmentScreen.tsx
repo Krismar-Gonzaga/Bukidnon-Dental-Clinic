@@ -14,8 +14,8 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { patientService } from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { patientService } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 type Dentist = {
   id: number | string;

@@ -1,22 +1,56 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-const API_BASE_URL = 'http://10.0.2.2:8000/api';
+// Set extra.apiUrl in app.json (e.g. your machine's LAN IP) to test on a
+// physical device, where neither emulator loopback address is reachable.
+const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl ||
+  Platform.select({
+    android: 'http://127.0.0.1:8000/api',  // Android emulator
+    ios: 'http://127.0.0.1:8000/api',      // iOS simulator
+    default: 'http://127.0.0.1:8000/api'
+  });
+
+console.log('API URL:', API_BASE_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    Accept: 'application/json',
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
   },
+  timeout: 30000,
 });
 
-api.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+api.interceptors.request.use(
+  async (config) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    } catch (error) {
+      console.error('Error getting token:', error);
+      return config;
+    }
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('user');
+      // You might want to navigate to login screen here
+    }
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
 export default api;
 

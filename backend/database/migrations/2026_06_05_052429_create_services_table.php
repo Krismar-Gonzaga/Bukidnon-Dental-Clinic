@@ -1,4 +1,3 @@
-// database/migrations/xxxx_xx_xx_000002_create_services_table.php
 <?php
 
 use Illuminate\Database\Migrations\Migration;

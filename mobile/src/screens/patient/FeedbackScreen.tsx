@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { patientService } from '../services/api';
+import { patientService } from '../../services/api';
 
 const FeedbackScreen = ({ route, navigation }: { route: any; navigation: any }) => {
   const { appointmentId } = route.params || {};

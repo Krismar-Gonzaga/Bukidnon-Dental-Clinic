@@ -1,4 +1,3 @@
-// database/migrations/xxxx_xx_xx_000001_create_clinics_table.php
 <?php
 
 use Illuminate\Database\Migrations\Migration;

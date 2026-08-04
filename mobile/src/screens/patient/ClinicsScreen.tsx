@@ -16,8 +16,11 @@ import {
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { homeService } from '../services/api';
-import { useTheme } from '../context/ThemeContext';
+import { homeService } from '../../services/api';
+import { useTheme } from '../../context/ThemeContext';
+import AppHeader from '../../components/navigation/AppHeader';
+import SideDrawer from '../../components/navigation/SideDrawer';
+import BottomNav from '../../components/navigation/BottomNav';
 
 type ClinicListItem = {
   id: number | string;
@@ -51,8 +54,10 @@ const ClinicsScreen = ({ navigation, route }: { navigation: any; route: any }) =
   const [loadingMore, setLoadingMore] = useState(false);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [cities, setCities] = useState<string[]>([]);
-  
+  const [drawerVisible, setDrawerVisible] = useState(false);
+
   const { colors } = useTheme();
+  const toggleDrawer = () => setDrawerVisible((v) => !v);
 
   // Get route params for initial search
   useEffect(() => {
@@ -193,7 +198,7 @@ const ClinicsScreen = ({ navigation, route }: { navigation: any; route: any }) =
             <Text style={[styles.clinicName, { color: colors.text }]} numberOfLines={1}>
               {item.name}
             </Text>
-            {item.distance && (
+            {Boolean(item.distance) && (
               <Text style={styles.distanceText}>{item.distance} km</Text>
             )}
           </View>
@@ -228,7 +233,7 @@ const ClinicsScreen = ({ navigation, route }: { navigation: any; route: any }) =
 
           <View style={styles.clinicFooter}>
             <View style={styles.contactIcons}>
-              {item.contact_number && (
+              {Boolean(item.contact_number) && (
                 <TouchableOpacity 
                   style={styles.contactIcon}
                   onPress={() => {
@@ -238,7 +243,7 @@ const ClinicsScreen = ({ navigation, route }: { navigation: any; route: any }) =
                   <Icon name="call-outline" size={18} color="#667eea" />
                 </TouchableOpacity>
               )}
-              {item.email && (
+              {Boolean(item.email) && (
                 <TouchableOpacity 
                   style={styles.contactIcon}
                   onPress={() => {
@@ -415,7 +420,9 @@ const ClinicsScreen = ({ navigation, route }: { navigation: any; route: any }) =
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.screenRoot}>
+      <AppHeader onMenuPress={toggleDrawer} onAvatarPress={() => navigation.navigate('Profile')} />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Search Header */}
       <View style={[styles.searchHeader, { backgroundColor: colors.card }]}>
         <View style={styles.searchContainer}>
@@ -444,16 +451,16 @@ const ClinicsScreen = ({ navigation, route }: { navigation: any; route: any }) =
             size={24} 
             color={showFilters ? '#fff' : '#667eea'} 
           />
-          {(selectedCity || selectedSpecialization) && (
+          {Boolean(selectedCity || selectedSpecialization) && (
             <View style={styles.filterBadge} />
           )}
         </TouchableOpacity>
       </View>
 
       {/* Active Filters */}
-      {(selectedCity || selectedSpecialization) && (
+      {Boolean(selectedCity || selectedSpecialization) && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.activeFilters}>
-          {selectedCity && (
+          {Boolean(selectedCity) && (
             <View style={styles.activeFilterChip}>
               <Text style={styles.activeFilterText}>{selectedCity}</Text>
               <TouchableOpacity onPress={() => setSelectedCity('')}>
@@ -461,7 +468,7 @@ const ClinicsScreen = ({ navigation, route }: { navigation: any; route: any }) =
               </TouchableOpacity>
             </View>
           )}
-          {selectedSpecialization && (
+          {Boolean(selectedSpecialization) && (
             <View style={styles.activeFilterChip}>
               <Text style={styles.activeFilterText}>
                 {specializations.find(s => s.id === selectedSpecialization)?.name || 'Specialization'}
@@ -502,11 +509,17 @@ const ClinicsScreen = ({ navigation, route }: { navigation: any; route: any }) =
 
       {/* Filter Modal */}
       {renderFilterModal()}
+      </View>
+      <BottomNav activeTab="Clinics" />
+      <SideDrawer visible={drawerVisible} onClose={toggleDrawer} activeItem="Clinics" />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  screenRoot: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',

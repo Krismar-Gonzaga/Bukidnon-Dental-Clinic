@@ -11,25 +11,27 @@ class Clinic extends Model
 
     protected $fillable = [
         'name',
+        'slug',
+        'description',
         'address',
         'city',
         'province',
         'contact_number',
         'email',
-        'description',
-        'logo',
+        'image',
         'rating',
-        'review_count',
-        'verified_at',
-        'latitude',
-        'longitude',
-        'is_active'
+        'is_featured',
+        'is_verified',
+        'opening_time',
+        'closing_time',
+        'services_offered',
     ];
 
     protected $casts = [
         'rating' => 'decimal:2',
-        'verified_at' => 'datetime',
-        'is_active' => 'boolean'
+        'is_featured' => 'boolean',
+        'is_verified' => 'boolean',
+        'services_offered' => 'array',
     ];
 
     // Relationships
@@ -72,10 +74,5 @@ class Clinic extends Model
     public function getRatingStarsAttribute()
     {
         return number_format($this->rating ?? 0, 1);
-    }
-
-    public function getIsVerifiedAttribute()
-    {
-        return !is_null($this->verified_at);
     }
 }
