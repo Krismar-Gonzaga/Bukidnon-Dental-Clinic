@@ -32,7 +32,12 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "extra": {},
+    "extra": {
+      "apiUrl": "http://192.168.0.102:8000/api",
+      "eas": {
+        "projectId": "61160752-ceaa-4d00-a628-20f2327f4748"
+      }
+    },
     "plugins": [
       "expo-sqlite",
       "@react-native-community/datetimepicker"

@@ -41,7 +41,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  
+  
+  
   const login = async (email: string, password: string): Promise<AuthResult> => {
     try {
       setLoading(true);

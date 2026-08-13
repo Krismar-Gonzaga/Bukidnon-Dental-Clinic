@@ -14,6 +14,7 @@ import ProfileScreen from '../screens/patient/ProfileScreen';
 import FeedbackScreen from '../screens/patient/FeedbackScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
+import ClinicRequirementsScreen from '../screens/auth/ClinicRequirementsScreen';
 
 // Import Context
 import { useAuth } from '../context/AuthContext';
@@ -73,6 +74,16 @@ export default function AppNavigator() {
             <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
           </>
         )}
+
+        {/* Available in both auth states: clinic_admin registration flips isAuthenticated to
+            true before the user taps "Continue" on the post-register alert, which unmounts the
+            unauthenticated stack. Keeping this screen outside the ternary means it's always
+            reachable regardless of which stack was active when navigate() was called. */}
+        <Stack.Screen
+          name="ClinicRequirements"
+          component={ClinicRequirementsScreen}
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

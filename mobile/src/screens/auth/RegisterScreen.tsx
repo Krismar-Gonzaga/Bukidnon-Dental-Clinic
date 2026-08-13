@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../../context/AuthContext';
+import { clinicVerificationService } from '../../services/api';
+import { ClinicRequirementsData, buildClinicVerificationFormData } from '../../types/clinicVerification';
 
 type RegisterFormData = {
   name: string;
@@ -29,10 +31,17 @@ type RegisterFormData = {
 type RegisterErrors = Partial<Record<keyof RegisterFormData | 'terms', string>>;
 
 type RegisterScreenProps = {
-  navigation: { navigate: (screen: string) => void };
+  navigation: { navigate: (screen: string, params?: any) => void };
+  route?: {
+    params?: {
+      role?: 'patient' | 'clinic_admin';
+      prefill?: Partial<RegisterFormData>;
+      clinicRequirements?: ClinicRequirementsData;
+    };
+  };
 };
 
-const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
+const RegisterScreen = ({ navigation, route }: RegisterScreenProps) => {
   const { width } = useWindowDimensions();
   const isCompact = width < 360;
 
@@ -50,6 +59,9 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<RegisterErrors>({});
   const [agreeToTerms, setAgreeToTerms] = useState(false);
+  const [clinicRequirements, setClinicRequirements] = useState<ClinicRequirementsData | undefined>(
+    route?.params?.clinicRequirements
+  );
   const { register } = useAuth();
 
   const emailRef = useRef<TextInput>(null);
@@ -57,6 +69,24 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
   const addressRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const confirmPasswordRef = useRef<TextInput>(null);
+
+  // React Navigation keeps this screen mounted and just updates params when
+  // ClinicRequirementsScreen navigates back here, so state has to be resynced
+  // from params on every change rather than only read once at mount.
+  useEffect(() => {
+    const params = route?.params;
+    if (!params) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      ...(params.prefill ?? {}),
+      ...(params.role ? { role: params.role } : {}),
+    }));
+
+    if (params.clinicRequirements) {
+      setClinicRequirements(params.clinicRequirements);
+    }
+  }, [route?.params]);
 
   const validateForm = () => {
     const newErrors: RegisterErrors = {};
@@ -101,29 +131,62 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
 
   const handleRegister = async () => {
     if (!validateForm()) {
-      return;
+        return;
+    }
+
+    // Clinic admins must collect their requirements before we create the account.
+    if (formData.role === 'clinic_admin' && !clinicRequirements) {
+        navigation.navigate('ClinicRequirements', {
+            fromRegister: true,
+            prefill: formData,
+        });
+        return;
     }
 
     setLoading(true);
-    const result = await register(formData);
-    setLoading(false);
+    try {
+        const result = await register(formData);
 
-    if (!result.success) {
-      const err = result.error;
-      if (err && typeof err === 'object') {
-        const errorMessages = Object.values(err).flat();
-        Alert.alert('Registration Failed', String(errorMessages[0] ?? 'Please check your information'));
-      } else {
-        Alert.alert('Registration Failed', (err as string) || 'An error occurred. Please try again.');
-      }
-    } else {
-      Alert.alert(
-        'Registration Successful',
-        'Your account has been created! Welcome to BukidnonDental.',
-        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-      );
+        if (!result.success) {
+            const err = result.error;
+            if (err && typeof err === 'object') {
+                const errorMessages = Object.values(err).flat();
+                Alert.alert('Registration Failed', String(errorMessages[0] ?? 'Please check your information'));
+            } else {
+                Alert.alert('Registration Failed', (err as string) || 'An error occurred. Please try again.');
+            }
+            return;
+        }
+
+        // Registration logs the user in immediately, so AppNavigator swaps to the
+        // authenticated stack on its own — no manual navigation needed here.
+        if (formData.role === 'clinic_admin' && clinicRequirements) {
+            try {
+                await clinicVerificationService.submitVerification(
+                    buildClinicVerificationFormData(clinicRequirements)
+                );
+                Alert.alert(
+                    'Registration Successful',
+                    'Your account has been created and your clinic documents were submitted for verification. We will notify you once the review is complete.'
+                );
+            } catch (verificationError) {
+                console.error('Verification submission error:', verificationError);
+                Alert.alert(
+                    'Account Created',
+                    'Your account was created, but we could not submit your clinic documents. Please try again once you sign in.'
+                );
+            }
+            return;
+        }
+
+        Alert.alert(
+            'Registration Successful',
+            'Your account has been created! Welcome to BukidnonDental.'
+        );
+    } finally {
+        setLoading(false);
     }
-  };
+};
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -167,7 +230,10 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
                     styles.roleOption,
                     formData.role === 'patient' && styles.roleOptionActive,
                   ]}
-                  onPress={() => setFormData({ ...formData, role: 'patient' })}
+                  onPress={() => {
+                    setClinicRequirements(undefined);
+                    setFormData({ ...formData, role: 'patient' });
+                  }}
                   activeOpacity={0.7}
                 >
                   <Icon
@@ -190,7 +256,17 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
                     styles.roleOption,
                     formData.role === 'clinic_admin' && styles.roleOptionActive,
                   ]}
-                  onPress={() => setFormData({ ...formData, role: 'clinic_admin' })}
+                  onPress={() => {
+                    if (clinicRequirements) {
+                      // Requirements already collected earlier — just switch the role back.
+                      setFormData({ ...formData, role: 'clinic_admin' });
+                      return;
+                    }
+                    navigation.navigate('ClinicRequirements', {
+                      fromRegister: true,
+                      prefill: { ...formData, role: 'clinic_admin' },
+                    });
+                  }}
                   activeOpacity={0.7}
                 >
                   <Icon
@@ -211,9 +287,30 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
               <View style={styles.roleNote}>
                 <Icon name="information-circle-outline" size={14} color="#727784" />
                 <Text style={styles.roleNoteText}>
-                  Clinic Admins will need to provide additional professional documentation.
+                  Clinic Admins will be asked for their clinic documents first, then their
+                  personal details.
                 </Text>
               </View>
+              {formData.role === 'clinic_admin' && clinicRequirements && (
+                <View style={styles.requirementsSummary}>
+                  <Icon name="checkmark-circle" size={16} color="#006c4f" />
+                  <Text style={styles.requirementsSummaryText} numberOfLines={1}>
+                    Documents attached for "{clinicRequirements.clinicName}"
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() =>
+                      navigation.navigate('ClinicRequirements', {
+                        fromRegister: true,
+                        prefill: { ...formData, role: 'clinic_admin' },
+                        existing: clinicRequirements,
+                      })
+                    }
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.requirementsEditLink}>Edit</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             {/* Full Name */}
@@ -628,6 +725,30 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#424752',
     lineHeight: 16,
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
+  },
+  requirementsSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,108,79,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,108,79,0.2)',
+  },
+  requirementsSummaryText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#006c4f',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
+  },
+  requirementsEditLink: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#003f87',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
   },
   // Form Inputs

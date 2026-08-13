@@ -7,6 +7,7 @@ use App\Http\Controllers\API\PatientController;
 use App\Http\Controllers\API\InventoryController;
 use App\Http\Controllers\API\BillingController;
 use App\Http\Controllers\API\FeedbackController;
+use App\Http\Controllers\API\ClinicVerificationController;
 use Illuminate\Support\Facades\Route;
 
 // Public Routes
@@ -58,6 +59,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/patients', [PatientController::class, 'dentistPatients']);
         Route::put('/patients/{id}/records', [PatientController::class, 'updateDentalRecords']);
     });
+
+
+    
+    // Clinic Verification Routes
+    Route::post('/clinic-verification', [ClinicVerificationController::class, 'store']);
+    Route::get('/clinic-verification/status', [ClinicVerificationController::class, 'status']);
+    Route::put('/clinic-verification/{id}', [ClinicVerificationController::class, 'update']);
+
 
     // Clinic Admin Routes
     Route::middleware('role:clinic_admin')->prefix('clinic-admin')->group(function () {

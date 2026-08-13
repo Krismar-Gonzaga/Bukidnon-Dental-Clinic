@@ -77,7 +77,6 @@ const ProfileScreen = ({ navigation }: { navigation: any }) => {
           style: 'destructive',
           onPress: async () => {
             await logout();
-            navigation.navigate('Login');
           },
         },
       ]

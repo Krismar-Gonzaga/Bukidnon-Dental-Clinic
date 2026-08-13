@@ -97,6 +97,20 @@ export const normalizeHomeData = (response: HomeApiResponse): HomeScreenData => 
   };
 };
 
+
+export const clinicVerificationService = {
+    submitVerification: (data: FormData) => {
+        return api.post('/clinic-verification', data, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+    },
+    getStatus: () => {
+        return api.get('/clinic-verification/status');
+    },
+};
+
 export const homeService = {
   getHomeData: () => api.get('/home'),
   searchClinics: (params: Record<string, unknown>) => api.get('/clinics/search', { params }),
