@@ -7,6 +7,7 @@ use App\Models\Clinic;
 use App\Models\Specialization;
 use App\Models\Service;
 use App\Models\Review;
+use App\Models\ServiceRate;
 use Illuminate\Http\Request;
 
 class HomeController extends Controller
@@ -16,7 +17,7 @@ class HomeController extends Controller
      */
     public function index(Request $request)
     {
-        $featuredClinics = Clinic::with(['specializations', 'branches'])
+        $featuredClinics = Clinic::with(['specializations'])
             ->where('is_verified', true)
             ->orderBy('rating', 'desc')
             ->limit(4)
@@ -58,6 +59,23 @@ class HomeController extends Controller
                 ];
             });
 
+        // Lowest available price per service across verified clinics
+        $serviceRates = ServiceRate::where('is_available', true)
+            ->whereHas('clinic', fn ($q) => $q->where('is_verified', true))
+            ->selectRaw('service_name, MIN(price) as starting_price, COUNT(DISTINCT clinic_id) as clinic_count, MAX(currency) as currency')
+            ->groupBy('service_name')
+            ->orderBy('starting_price')
+            ->limit(6)
+            ->get()
+            ->map(function ($rate) {
+                return [
+                    'service_name' => $rate->service_name,
+                    'starting_price' => (float) $rate->starting_price,
+                    'currency' => $rate->currency ?? 'PHP',
+                    'clinic_count' => (int) $rate->clinic_count,
+                ];
+            });
+
         $recentReviews = Review::with(['clinic', 'patient.user'])
             ->where('status', 'approved')
             ->orderBy('created_at', 'desc')
@@ -86,6 +104,7 @@ class HomeController extends Controller
                 'featured_clinics' => $featuredClinics,
                 'specializations' => $specializations,
                 'popular_services' => $popularServices,
+                'service_rates' => $serviceRates,
                 'recent_reviews' => $recentReviews,
                 'stats' => $stats,
                 'meta' => [
@@ -101,22 +120,27 @@ class HomeController extends Controller
      */
     public function searchClinics(Request $request)
     {
-        $query = Clinic::with(['specializations', 'branches'])
+        $query = Clinic::with(['specializations'])
             ->where('is_verified', true);
 
-        // Search by name
-        if ($request->has('search')) {
-            $query->where('name', 'LIKE', '%' . $request->search . '%')
-                ->orWhere('city', 'LIKE', '%' . $request->search . '%');
+        // Search by name, city or address (case-insensitive). Grouped so the
+        // OR can't bypass the is_verified constraint above.
+        if ($request->filled('search')) {
+            $term = '%' . mb_strtolower($request->search) . '%';
+            $query->where(function ($q) use ($term) {
+                $q->whereRaw('LOWER(name) LIKE ?', [$term])
+                    ->orWhereRaw('LOWER(city) LIKE ?', [$term])
+                    ->orWhereRaw('LOWER(address) LIKE ?', [$term]);
+            });
         }
 
-        // Filter by city
-        if ($request->has('city')) {
+        // Filter by city (filled() so an empty ?city= from the app is ignored)
+        if ($request->filled('city')) {
             $query->where('city', $request->city);
         }
 
         // Filter by specialization
-        if ($request->has('specialization_id')) {
+        if ($request->filled('specialization_id')) {
             $query->whereHas('specializations', function ($q) use ($request) {
                 $q->where('specialization_id', $request->specialization_id);
             });
@@ -146,7 +170,6 @@ class HomeController extends Controller
         // Note: dentists/services aren't clinic-scoped in the current schema
         // (no clinic_id column on either table), so they're left out here.
         $clinic = Clinic::with([
-            'branches',
             'specializations',
             'reviews' => function ($q) {
                 $q->where('status', 'approved')->limit(5);

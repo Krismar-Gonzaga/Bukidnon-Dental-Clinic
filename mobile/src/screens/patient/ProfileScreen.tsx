@@ -18,10 +18,13 @@ import { patientService } from '../../services/api';
 import AppHeader from '../../components/navigation/AppHeader';
 import SideDrawer from '../../components/navigation/SideDrawer';
 import BottomNav from '../../components/navigation/BottomNav';
+import { useSync } from '../../context/SyncContext';
+import { confirmLogout } from '../../utils/confirmLogout';
 
 const ProfileScreen = ({ navigation }: { navigation: any }) => {
   const { user, logout } = useAuth();
   const { isDark, toggleTheme, colors } = useTheme();
+  const { pendingCount, failedCount } = useSync();
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState({
@@ -56,8 +59,13 @@ const ProfileScreen = ({ navigation }: { navigation: any }) => {
   const handleUpdateProfile = async () => {
     setLoading(true);
     try {
-      await patientService.updateProfile(profile);
-      Alert.alert('Success', 'Profile updated successfully');
+      const response = await patientService.updateProfile(profile);
+      Alert.alert(
+        'Success',
+        response.data?.queued
+          ? "You're offline. Your changes are saved on this phone and will sync once you're back online."
+          : 'Profile updated successfully',
+      );
       setEditing(false);
     } catch {
       Alert.alert('Error', 'Failed to update profile');
@@ -67,20 +75,9 @@ const ProfileScreen = ({ navigation }: { navigation: any }) => {
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-          },
-        },
-      ]
-    );
+    confirmLogout(pendingCount + failedCount, () => {
+      logout();
+    });
   };
 
   const menuItems = [

@@ -17,7 +17,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../../context/AuthContext';
 
 type LoginScreenProps = {
-  navigation: { navigate: (screen: string) => void };
+  navigation: { navigate: (screen: string) => void; goBack?: () => void; canGoBack?: () => boolean };
 };
 
 const LoginScreen = ({ navigation }: LoginScreenProps) => {
@@ -61,6 +61,17 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Guests arrive from the landing page, so give them a way back to it. */}
+      {navigation.canGoBack?.() && (
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack?.()}
+          accessibilityLabel="Back"
+          hitSlop={8}
+        >
+          <Icon name="arrow-back" size={24} color="#003f87" />
+        </TouchableOpacity>
+      )}
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -191,6 +202,13 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
 };
 
 const styles = StyleSheet.create({
+  backButton: {
+    alignSelf: 'flex-start',
+    marginLeft: 12,
+    marginTop: 4,
+    padding: 8,
+    borderRadius: 9999,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f7f9ff',

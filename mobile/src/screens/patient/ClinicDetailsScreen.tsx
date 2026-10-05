@@ -13,7 +13,15 @@ import {
   Share,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { homeService } from '../../services/api';
+import { isNetworkError } from '../../services/api';
+import {
+  ClinicDetails,
+  ClinicReview,
+  ClinicSummary,
+  fetchClinicDetails as fetchClinicFromServer,
+  getCachedClinicDetails,
+} from '../../services/offline/publicRepository';
+import { formatClock } from '../../utils/format';
 
 type Clinic = {
   id: number | string;
@@ -37,6 +45,32 @@ type Clinic = {
   [key: string]: unknown;
 };
 
+// Adapts the offline repository's clinic to the shape this screen renders.
+const toScreenClinic = (clinic: ClinicSummary | ClinicDetails, reviews: ClinicReview[] | null): Clinic => {
+  const opening = formatClock(clinic.openingTime);
+  const closing = formatClock(clinic.closingTime);
+  return {
+    id: clinic.id,
+    name: clinic.name,
+    contact_number: clinic.contactNumber ?? undefined,
+    email: clinic.email ?? undefined,
+    cover_image: clinic.image ?? undefined,
+    is_verified: clinic.isVerified,
+    rating: clinic.rating,
+    review_count: reviews?.length ?? 0,
+    full_address: clinic.fullAddress,
+    description: clinic.description ?? undefined,
+    operating_hours: opening && closing ? `Daily: ${opening} - ${closing}` : undefined,
+    specializations: clinic.specializations.map((spec) => ({ name: spec.name })),
+    reviews: (reviews ?? []).map((review) => ({
+      patient: { name: review.patientName },
+      rating: review.rating,
+      comment: review.comment,
+      created_at: review.createdAt ?? undefined,
+    })),
+  };
+};
+
 const ClinicDetailsScreen = ({ route, navigation }: { route: any; navigation: any }) => {
   const { id } = route.params;
   const [clinic, setClinic] = useState<Clinic | null>(null);
@@ -48,13 +82,26 @@ const ClinicDetailsScreen = ({ route, navigation }: { route: any; navigation: an
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // Saved copy first (works offline), then the latest from the server if reachable.
   const fetchClinicDetails = async () => {
+    const cached = await getCachedClinicDetails(id);
+    if (cached) {
+      setClinic(toScreenClinic(cached.clinic, cached.reviews));
+      setLoading(false);
+    }
     try {
-      const response = await homeService.getClinicDetails(id);
-      setClinic(response.data.data);
+      const fresh = await fetchClinicFromServer(id);
+      setClinic(toScreenClinic(fresh, fresh.reviews));
     } catch (error) {
-      console.error('Error fetching clinic details:', error);
-      Alert.alert('Error', 'Failed to load clinic details');
+      if (!cached) {
+        console.error('Error fetching clinic details:', error);
+        Alert.alert(
+          'Error',
+          isNetworkError(error)
+            ? "You're offline and this clinic isn't saved on your device yet."
+            : 'Failed to load clinic details',
+        );
+      }
     } finally {
       setLoading(false);
     }

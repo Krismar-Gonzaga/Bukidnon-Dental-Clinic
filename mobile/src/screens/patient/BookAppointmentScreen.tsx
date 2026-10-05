@@ -85,10 +85,13 @@ const BookAppointmentScreen = ({ route, navigation }: { route: any; navigation: 
         patient_id: user?.id,
         appointment_date: formData.appointment_date.toISOString().split('T')[0],
       };
-      await patientService.createAppointment(appointmentData);
+      const response = await patientService.createAppointment(appointmentData);
+      const queued = Boolean(response.data?.queued);
       Alert.alert(
-        'Success',
-        'Appointment booked successfully! You will receive a confirmation shortly.',
+        queued ? 'Saved offline' : 'Success',
+        queued
+          ? "You're offline, so your booking is saved on this phone. It will be sent to the clinic automatically once you're back online."
+          : 'Appointment booked successfully! You will receive a confirmation shortly.',
         [
           {
             text: 'View Appointments',

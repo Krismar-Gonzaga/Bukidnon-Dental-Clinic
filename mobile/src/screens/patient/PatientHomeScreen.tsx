@@ -21,6 +21,7 @@ import { patientService } from '../../services/api';
 import AppHeader from '../../components/navigation/AppHeader';
 import SideDrawer from '../../components/navigation/SideDrawer';
 import BottomNav from '../../components/navigation/BottomNav';
+import { useSync } from '../../context/SyncContext';
 
 // Types
 interface Appointment {
@@ -61,9 +62,12 @@ const PatientHomeScreen = ({ navigation }: { navigation: any }) => {
     progress: 75,
   });
 
+  const { dataVersion, syncNow } = useSync();
+
+  // Re-read after each sync so offline bookings show their server status.
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [dataVersion]);
 
   const fetchDashboardData = async () => {
     try {
@@ -118,8 +122,9 @@ const PatientHomeScreen = ({ navigation }: { navigation: any }) => {
     }
   };
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
+    await syncNow();
     fetchDashboardData();
   };
 

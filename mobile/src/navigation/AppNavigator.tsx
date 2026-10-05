@@ -15,6 +15,9 @@ import FeedbackScreen from '../screens/patient/FeedbackScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import ClinicRequirementsScreen from '../screens/auth/ClinicRequirementsScreen';
+import GuestHomeScreen from '../screens/guest/GuestHomeScreen';
+import GuestClinicsScreen from '../screens/guest/GuestClinicsScreen';
+import GuestClinicDetailsScreen from '../screens/guest/GuestClinicDetailsScreen';
 
 // Import Context
 import { useAuth } from '../context/AuthContext';
@@ -70,6 +73,15 @@ export default function AppNavigator() {
           </>
         ) : (
           <>
+            {/* No active session: the guest landing page is the first screen. Guest
+                pages read from the on-device database, so they also work offline. */}
+            <Stack.Screen name="GuestHome" component={GuestHomeScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="GuestClinics" component={GuestClinicsScreen} options={{ headerShown: false }} />
+            <Stack.Screen
+              name="GuestClinicDetails"
+              component={GuestClinicDetailsScreen}
+              options={{ headerShown: false }}
+            />
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
           </>

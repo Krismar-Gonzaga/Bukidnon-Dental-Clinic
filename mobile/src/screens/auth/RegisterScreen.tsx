@@ -31,7 +31,11 @@ type RegisterFormData = {
 type RegisterErrors = Partial<Record<keyof RegisterFormData | 'terms', string>>;
 
 type RegisterScreenProps = {
-  navigation: { navigate: (screen: string, params?: any) => void };
+  navigation: {
+    navigate: (screen: string, params?: any) => void;
+    goBack?: () => void;
+    canGoBack?: () => boolean;
+  };
   route?: {
     params?: {
       role?: 'patient' | 'clinic_admin';
@@ -190,6 +194,17 @@ const RegisterScreen = ({ navigation, route }: RegisterScreenProps) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Guests arrive from the landing page, so give them a way back to it. */}
+      {navigation.canGoBack?.() && (
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack?.()}
+          accessibilityLabel="Back"
+          hitSlop={8}
+        >
+          <Icon name="arrow-back" size={24} color="#003f87" />
+        </TouchableOpacity>
+      )}
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -562,6 +577,13 @@ const RegisterScreen = ({ navigation, route }: RegisterScreenProps) => {
 };
 
 const styles = StyleSheet.create({
+  backButton: {
+    alignSelf: 'flex-start',
+    marginLeft: 12,
+    marginTop: 4,
+    padding: 8,
+    borderRadius: 9999,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f7f9ff',

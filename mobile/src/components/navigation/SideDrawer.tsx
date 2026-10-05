@@ -9,11 +9,12 @@ import {
   Pressable,
   Dimensions,
   Platform,
-  Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
+import { useSync } from '../../context/SyncContext';
+import { confirmLogout } from '../../utils/confirmLogout';
 
 const { width } = Dimensions.get('window');
 
@@ -32,6 +33,7 @@ interface MenuItem {
 const SideDrawer = ({ visible, onClose, activeItem = 'Home' }: SideDrawerProps) => {
   const navigation = useNavigation();
   const { user, logout } = useAuth();
+  const { pendingCount, failedCount } = useSync();
 
   const menuItems: MenuItem[] = [
     { icon: 'home-outline', label: 'Home', route: 'Home' },
@@ -49,16 +51,9 @@ const SideDrawer = ({ visible, onClose, activeItem = 'Home' }: SideDrawerProps) 
 
   const handleLogout = () => {
     onClose();
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: async () => {
-          await logout();
-        },
-      },
-    ]);
+    confirmLogout(pendingCount + failedCount, () => {
+      logout();
+    });
   };
 
   return (

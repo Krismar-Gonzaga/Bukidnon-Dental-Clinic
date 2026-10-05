@@ -10,6 +10,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
+import OfflineBanner from '../common/OfflineBanner';
 
 interface AppHeaderProps {
   showMenu?: boolean;
@@ -68,47 +69,51 @@ const AppHeader = ({
   };
 
   return (
-    <View style={styles.header}>
-      <View style={styles.headerLeft}>
-        {showMenu && (
-          <TouchableOpacity onPress={handleMenuPress} style={styles.menuButton}>
-            <Icon name="menu-outline" size={28} color="#003f87" />
-          </TouchableOpacity>
-        )}
-        <View style={styles.headerLogo}>
-          <Icon name="medkit-outline" size={24} color="#003f87" />
-          <Text style={styles.headerTitle}>{title}</Text>
+    <>
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          {showMenu && (
+            <TouchableOpacity onPress={handleMenuPress} style={styles.menuButton}>
+              <Icon name="menu-outline" size={28} color="#003f87" />
+            </TouchableOpacity>
+          )}
+          <View style={styles.headerLogo}>
+            <Icon name="medkit-outline" size={24} color="#003f87" />
+            <Text style={styles.headerTitle}>{title}</Text>
+          </View>
+        </View>
+        <View style={styles.headerRight}>
+          {showNotifications && (
+            <TouchableOpacity
+              style={styles.headerIconButton}
+              onPress={handleNotificationPress}
+            >
+              <Icon name="notifications-outline" size={24} color="#003f87" />
+            </TouchableOpacity>
+          )}
+          {showHelp && (
+            <TouchableOpacity
+              style={styles.headerIconButton}
+              onPress={handleHelpPress}
+            >
+              <Icon name="help-circle-outline" size={24} color="#003f87" />
+            </TouchableOpacity>
+          )}
+          {showAvatar && (
+            <TouchableOpacity
+              style={styles.headerAvatar}
+              onPress={handleAvatarPress}
+            >
+              <Text style={styles.headerAvatarText}>
+                {user?.name?.charAt(0) || 'M'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
-      <View style={styles.headerRight}>
-        {showNotifications && (
-          <TouchableOpacity
-            style={styles.headerIconButton}
-            onPress={handleNotificationPress}
-          >
-            <Icon name="notifications-outline" size={24} color="#003f87" />
-          </TouchableOpacity>
-        )}
-        {showHelp && (
-          <TouchableOpacity
-            style={styles.headerIconButton}
-            onPress={handleHelpPress}
-          >
-            <Icon name="help-circle-outline" size={24} color="#003f87" />
-          </TouchableOpacity>
-        )}
-        {showAvatar && (
-          <TouchableOpacity
-            style={styles.headerAvatar}
-            onPress={handleAvatarPress}
-          >
-            <Text style={styles.headerAvatarText}>
-              {user?.name?.charAt(0) || 'M'}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
+      {/* Offline / sync status for every patient page that uses this header */}
+      <OfflineBanner />
+    </>
   );
 };
 

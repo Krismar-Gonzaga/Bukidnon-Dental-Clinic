@@ -32,6 +32,22 @@ jest.mock('../src/screens/auth/LoginScreen', () => ({__esModule: true, default: 
 jest.mock('../src/screens/auth/RegisterScreen', () => ({__esModule: true, default: 'RegisterScreen'}), { virtual: true });
 jest.mock('../src/screens/patient/BookAppointmentScreen', () => ({__esModule: true, default: 'BookAppointmentScreen'}), { virtual: true });
 jest.mock('../src/screens/patient/FeedbackScreen', () => ({__esModule: true, default: 'FeedbackScreen'}), { virtual: true });
+jest.mock('../src/screens/auth/ClinicRequirementsScreen', () => ({__esModule: true, default: 'ClinicRequirementsScreen'}), { virtual: true });
+jest.mock('../src/screens/guest/GuestHomeScreen', () => ({__esModule: true, default: 'GuestHomeScreen'}), { virtual: true });
+jest.mock('../src/screens/guest/GuestClinicsScreen', () => ({__esModule: true, default: 'GuestClinicsScreen'}), { virtual: true });
+jest.mock('../src/screens/guest/GuestClinicDetailsScreen', () => ({__esModule: true, default: 'GuestClinicDetailsScreen'}), { virtual: true });
+jest.mock('expo-constants', () => ({ __esModule: true, default: { expoConfig: { extra: {} } } }));
+// The offline layer needs native SQLite; the smoke test only checks the app tree mounts.
+jest.mock('../src/context/SyncContext', () => ({
+  SyncProvider: ({ children }: { children: React.ReactNode }) => children,
+  useSync: () => ({}),
+}));
+jest.mock('../src/services/offline/database', () => ({
+  getDatabase: jest.fn(),
+  readCache: jest.fn(),
+  writeCache: jest.fn(),
+  deleteCacheByPrefix: jest.fn(),
+}));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(),
   setItem: jest.fn(),

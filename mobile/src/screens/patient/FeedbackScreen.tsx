@@ -34,14 +34,16 @@ const FeedbackScreen = ({ route, navigation }: { route: any; navigation: any }) 
 
     setLoading(true);
     try {
-      await patientService.submitFeedback({
+      const response = await patientService.submitFeedback({
         appointment_id: appointmentId,
         rating,
         comment,
       });
       Alert.alert(
         'Thank You!',
-        'Your feedback has been submitted successfully.',
+        response.data?.queued
+          ? "You're offline, so your feedback is saved and will be sent once you're back online."
+          : 'Your feedback has been submitted successfully.',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch {

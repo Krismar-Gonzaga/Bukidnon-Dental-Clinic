@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../services/api';
+import api, { isNetworkError } from '../services/api';
+import { clearUserOfflineData } from '../services/offline/patientRepository';
 
 export type User = {
   id: number | string;
@@ -24,7 +25,12 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const OFFLINE_MESSAGE = "You're offline. Connect to the internet to continue.";
+
 const getErrorMessage = (err: unknown, fallback: string) => {
+  if (isNetworkError(err)) {
+    return OFFLINE_MESSAGE;
+  }
   if (axiosIsErrorWithMessage(err)) {
     return err.response?.data?.message ?? fallback;
   }
@@ -41,12 +47,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  
-  
+
+  // Login/register don't touch `loading`: it only covers restoring the saved session
+  // on launch. Toggling it would unmount the navigator mid-login and, on failure,
+  // drop the user back on the guest home instead of the login form.
   const login = async (email: string, password: string): Promise<AuthResult> => {
     try {
-      setLoading(true);
       const response = await api.post('/login', { email, password });
       const { user: loggedInUser, token } = response.data.data;
 
@@ -60,14 +66,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const message = getErrorMessage(err, 'Login failed');
       setError(message);
       return { success: false, error: message };
-    } finally {
-      setLoading(false);
     }
   };
 
   const register = async (userData: Record<string, unknown>): Promise<AuthResult> => {
     try {
-      setLoading(true);
       const response = await api.post('/register', userData);
       const { user: registeredUser, token } = response.data.data;
 
@@ -82,8 +85,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setError(message);
       const errors = axiosIsErrorWithMessage(err) ? err.response?.data?.errors : undefined;
       return { success: false, error: errors ?? message };
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -91,8 +92,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await api.post('/logout');
     } catch (err) {
+      // Offline logout still signs out locally; the token simply expires server-side.
       console.error('Logout error:', err);
     } finally {
+      // Don't leave a patient's saved appointments/profile (or unsent changes) on a
+      // device someone else may use next.
+      if (user?.id != null) {
+        await clearUserOfflineData(String(user.id)).catch((err) =>
+          console.error('Failed to clear offline data:', err),
+        );
+      }
       await AsyncStorage.removeItem('token');
       await AsyncStorage.removeItem('user');
       setUser(null);

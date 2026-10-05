@@ -15,6 +15,7 @@ import { patientService } from '../../services/api';
 import AppHeader from '../../components/navigation/AppHeader';
 import SideDrawer from '../../components/navigation/SideDrawer';
 import BottomNav from '../../components/navigation/BottomNav';
+import { useSync } from '../../context/SyncContext';
 
 type Appointment = {
   id: number | string;
@@ -33,10 +34,12 @@ const AppointmentsScreen = ({ navigation }: { navigation: any }) => {
   const [activeFilter, setActiveFilter] = useState('upcoming');
   const [drawerVisible, setDrawerVisible] = useState(false);
   const toggleDrawer = () => setDrawerVisible((v) => !v);
+  const { dataVersion, syncNow } = useSync();
 
+  // Also re-read after each sync so queued bookings flip to their server versions.
   useEffect(() => {
     fetchAppointments();
-  }, [activeFilter]);
+  }, [activeFilter, dataVersion]);
 
   const fetchAppointments = async () => {
     try {
@@ -50,8 +53,9 @@ const AppointmentsScreen = ({ navigation }: { navigation: any }) => {
     }
   };
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
+    await syncNow();
     fetchAppointments();
   };
 
@@ -66,9 +70,14 @@ const AppointmentsScreen = ({ navigation }: { navigation: any }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await patientService.cancelAppointment(id);
+              const response = await patientService.cancelAppointment(id);
               fetchAppointments();
-              Alert.alert('Success', 'Appointment cancelled successfully');
+              Alert.alert(
+                'Success',
+                response.data?.queued
+                  ? "You're offline. The cancellation is saved and will be sent once you're back online."
+                  : 'Appointment cancelled successfully',
+              );
             } catch {
               Alert.alert('Error', 'Failed to cancel appointment');
             }
@@ -115,6 +124,20 @@ const AppointmentsScreen = ({ navigation }: { navigation: any }) => {
           <Text style={styles.statusText}>{getStatusBadge(item.status)}</Text>
         </View>
       </View>
+      {Boolean(item.sync_status) && (
+        <View style={styles.syncRow}>
+          <Icon
+            name={item.sync_status === 'failed' ? 'alert-circle-outline' : 'cloud-upload-outline'}
+            size={14}
+            color={item.sync_status === 'failed' ? '#ba1a1a' : '#727784'}
+          />
+          <Text style={[styles.syncText, item.sync_status === 'failed' && styles.syncTextFailed]}>
+            {item.sync_status === 'failed'
+              ? `Not synced: ${String(item.sync_error ?? 'rejected by the server')}`
+              : 'Saved offline · waiting to sync'}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.appointmentDetails}>
         <View style={styles.detailRow}>
@@ -352,6 +375,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#fff',
     fontWeight: '500',
+  },
+  syncRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: -4,
+    marginBottom: 8,
+  },
+  syncText: {
+    fontSize: 12,
+    color: '#727784',
+    flexShrink: 1,
+  },
+  syncTextFailed: {
+    color: '#ba1a1a',
   },
   appointmentDetails: {
     marginBottom: 12,

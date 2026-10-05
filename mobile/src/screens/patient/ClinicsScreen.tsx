@@ -16,7 +16,13 @@ import {
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { homeService } from '../../services/api';
+import { useSync } from '../../context/SyncContext';
+import {
+  ClinicSummary,
+  getCities,
+  getSpecializations,
+  queryClinics,
+} from '../../services/offline/publicRepository';
 import { useTheme } from '../../context/ThemeContext';
 import AppHeader from '../../components/navigation/AppHeader';
 import SideDrawer from '../../components/navigation/SideDrawer';
@@ -40,6 +46,19 @@ type ClinicListItem = {
 
 type Specialization = { id: number | string; name: string };
 
+const toListItem = (clinic: ClinicSummary): ClinicListItem => ({
+  id: clinic.id,
+  name: clinic.name,
+  logo: clinic.image ?? undefined,
+  is_verified: clinic.isVerified,
+  rating: clinic.rating,
+  address: clinic.fullAddress,
+  city: clinic.city,
+  contact_number: clinic.contactNumber ?? undefined,
+  email: clinic.email ?? undefined,
+  specializations: clinic.specializations.map((spec) => spec.name),
+});
+
 const ClinicsScreen = ({ navigation, route }: { navigation: any; route: any }) => {
   const [clinics, setClinics] = useState<ClinicListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +68,6 @@ const ClinicsScreen = ({ navigation, route }: { navigation: any; route: any }) =
   const [selectedCity, setSelectedCity] = useState('');
   const [selectedSpecialization, setSelectedSpecialization] = useState<number | string>('');
   const [sortBy, setSortBy] = useState('rating');
-  const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
@@ -57,6 +75,7 @@ const ClinicsScreen = ({ navigation, route }: { navigation: any; route: any }) =
   const [drawerVisible, setDrawerVisible] = useState(false);
 
   const { colors } = useTheme();
+  const { isReady, dataVersion, syncNow } = useSync();
   const toggleDrawer = () => setDrawerVisible((v) => !v);
 
   // Get route params for initial search
@@ -72,18 +91,20 @@ const ClinicsScreen = ({ navigation, route }: { navigation: any; route: any }) =
     }
   }, [route.params]);
 
-  // Fetch clinics on mount and when filters change
+  // Load on mount, when filters change, and after each background sync.
   useEffect(() => {
+    if (!isReady) {
+      return;
+    }
     fetchClinics(true);
     fetchSpecializations();
     fetchCities();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCity, selectedSpecialization, sortBy]);
+  }, [isReady, dataVersion, selectedCity, selectedSpecialization, sortBy]);
 
   const fetchSpecializations = async () => {
     try {
-      const response = await homeService.getSpecializations();
-      setSpecializations(response.data.data || []);
+      setSpecializations(await getSpecializations());
     } catch (error) {
       console.error('Error fetching specializations:', error);
     }
@@ -91,42 +112,25 @@ const ClinicsScreen = ({ navigation, route }: { navigation: any; route: any }) =
 
   const fetchCities = async () => {
     try {
-      const response = await homeService.getCities();
-      setCities(response.data.data || []);
+      setCities(await getCities());
     } catch (error) {
       console.error('Error fetching cities:', error);
     }
   };
 
-  const fetchClinics = async (reset = false) => {
+  // Searches the on-device clinic directory (kept fresh by SyncContext), so this
+  // works offline and returns everything at once — no paging needed.
+  const fetchClinics = async (_reset = false, search: string = searchTerm) => {
     try {
-      if (reset) {
-        setLoading(true);
-        setPage(1);
-      } else {
-        setLoadingMore(true);
-      }
-
-      const response = await homeService.searchClinics({
-        search: searchTerm,
-        city: selectedCity,
-        specialization_id: selectedSpecialization,
-        sort: sortBy,
-        page: reset ? 1 : page,
-        per_page: 10,
+      setLoading(true);
+      const results = await queryClinics({
+        search,
+        city: selectedCity || null,
+        specializationId: selectedSpecialization ? Number(selectedSpecialization) : null,
+        sort: sortBy === 'newest' ? 'newest' : 'rating',
       });
-
-      const data = response.data.data;
-      const newClinics = data.data || [];
-
-      if (reset) {
-        setClinics(newClinics);
-      } else {
-        setClinics(prev => [...prev, ...newClinics]);
-      }
-
-      setHasMore(newClinics.length > 0 && data.current_page < data.last_page);
-      setPage(data.current_page + 1);
+      setClinics(results.map(toListItem));
+      setHasMore(false);
     } catch (error) {
       console.error('Error fetching clinics:', error);
       Alert.alert('Error', 'Failed to load clinics. Please try again.');
@@ -137,8 +141,10 @@ const ClinicsScreen = ({ navigation, route }: { navigation: any; route: any }) =
     }
   };
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
+    // Pull the latest directory when online; either way, re-read the local copy.
+    await syncNow();
     fetchClinics(true);
   };
 
@@ -155,7 +161,7 @@ const ClinicsScreen = ({ navigation, route }: { navigation: any; route: any }) =
 
   const handleClearSearch = () => {
     setSearchTerm('');
-    fetchClinics(true);
+    fetchClinics(true, '');
   };
 
   const applyFilters = () => {
