@@ -1,0 +1,94 @@
+.home-hero {
+  background-color: var(--color-primary-soft);
+  /* Extra bottom space leaves room for the overlapping search panel */
+  padding: var(--space-8) 0 calc(var(--space-9) + var(--space-6));
+}
+
+.home-hero-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-8);
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+.home-hero-title {
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  margin-bottom: var(--space-5);
+}
+
+/* Desktop keeps the Figma two-line break; small screens wrap naturally */
+.home-hero-title-line {
+  display: block;
+}
+
+.home-hero-text {
+  max-width: 52ch;
+  font-size: var(--font-size-lg);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-6);
+}
+
+.home-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.home-hero-image {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-xl);
+  object-fit: cover;
+  box-shadow: var(--shadow-lg);
+}
+
+.home-hero-image-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  background-color: var(--color-placeholder);
+  color: var(--color-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+@media (max-width: 900px) {
+  .home-hero {
+    padding-top: var(--space-7);
+  }
+
+  .home-hero-inner {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+
+  .home-hero-title {
+    font-size: var(--font-size-3xl);
+  }
+}
+
+@media (max-width: 480px) {
+  .home-hero-inner {
+    padding: 0 var(--space-4);
+  }
+
+  .home-hero-title {
+    font-size: var(--font-size-2xl);
+  }
+
+  .home-hero-title-line {
+    display: inline;
+  }
+
+  .home-hero-actions .btn {
+    flex: 1 1 100%;
+  }
+}

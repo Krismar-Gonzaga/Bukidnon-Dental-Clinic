@@ -1,0 +1,71 @@
+/*
+ * Design tokens.
+ * Colors approximate the BukidnonDental Figma reference (deep blue brand,
+ * green search accent). Replace with exact Figma values when available.
+ * Components should reference these variables instead of hardcoding values.
+ */
+:root {
+  /* Colors */
+  --color-primary: #0b3b8c;
+  --color-primary-hover: #082d6b;
+  --color-primary-soft: #eaf0fb;
+  --color-on-primary: #ffffff;
+  --color-accent: #1e9e5a;
+  --color-accent-hover: #178049;
+  --color-on-accent: #ffffff;
+  --color-background: #f5f7fb;
+  --color-surface: #ffffff;
+  --color-text: #13213b;
+  --color-text-muted: #5a6680;
+  --color-border: #dde3ee;
+  --color-placeholder: #c9d3e6;
+  --color-rating: #f5a524;
+  --color-footer-bg: #0a2a5e;
+  --color-on-dark: #ffffff;
+  --color-on-dark-muted: rgba(255, 255, 255, 0.72);
+  --color-on-dark-border: rgba(255, 255, 255, 0.16);
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  /* Border radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 3px rgba(11, 59, 140, 0.08);
+  --shadow-md: 0 4px 16px rgba(11, 59, 140, 0.08);
+  --shadow-lg: 0 16px 40px rgba(11, 59, 140, 0.12);
+
+  /* Typography */
+  --font-family-base: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.5rem;
+  --font-size-2xl: 2rem;
+  --font-size-3xl: 2.75rem;
+  --font-size-4xl: 3.25rem;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.15;
+  --line-height-base: 1.6;
+
+  /* Layout */
+  --content-max-width: 1200px;
+  --header-height: 72px;
+  --control-height: 48px;
+}

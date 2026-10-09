@@ -1,0 +1,24 @@
+.home {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.home-main {
+  flex: 1;
+}
+
+/* Search panel overlaps the bottom of the hero */
+.home-search-wrap {
+  position: relative;
+  z-index: 1;
+  max-width: var(--content-max-width);
+  margin: calc(-1 * var(--space-9)) auto var(--space-8);
+  padding: 0 var(--space-5);
+}
+
+@media (max-width: 480px) {
+  .home-search-wrap {
+    padding: 0 var(--space-4);
+  }
+}
