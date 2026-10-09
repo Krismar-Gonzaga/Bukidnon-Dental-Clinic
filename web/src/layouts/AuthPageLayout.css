@@ -1,0 +1,13 @@
+.auth-page {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-5) var(--space-5) var(--space-7);
+}
+
+@media (max-width: 480px) {
+  .auth-page {
+    padding: var(--space-4) var(--space-4) var(--space-6);
+  }
+}

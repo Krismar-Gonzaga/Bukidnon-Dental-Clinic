@@ -1,0 +1,110 @@
+/* Register-specific pieces; shared card and field styles live in auth.css */
+.register-roles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  border: 0;
+}
+
+.register-role {
+  display: flex;
+  cursor: pointer;
+}
+
+.register-role-tile {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 80px;
+  padding: var(--space-3);
+  color: var(--color-text-muted);
+  background-color: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.register-role:hover .register-role-tile {
+  border-color: var(--color-primary);
+}
+
+.register-role-input:checked + .register-role-tile {
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+}
+
+.register-role-input:focus-visible + .register-role-tile {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.register-role-label {
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.register-info {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--color-text);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.register-info-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--color-text-muted);
+}
+
+.register-terms {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-1) 0 var(--space-4);
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.register-terms-checkbox {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.register-terms-link {
+  font-size: 1.0625rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.register-submit {
+  width: 100%;
+  min-height: 48px;
+  border-radius: var(--radius-sm);
+}
+
+.register-submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.register-submit:disabled:hover {
+  background-color: var(--color-primary);
+}

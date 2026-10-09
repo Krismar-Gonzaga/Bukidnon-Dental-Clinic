@@ -4,6 +4,8 @@ import DentistsPage from './pages/DentistsPage';
 import ServicesPage from './pages/ServicesPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 
 // TEMPORARY path switch until a router is approved and added.
 const PAGES_BY_PATH = {
@@ -12,6 +14,8 @@ const PAGES_BY_PATH = {
   '/services': ServicesPage,
   '/about': AboutPage,
   '/contact': ContactPage,
+  '/login': LoginPage,
+  '/register': RegisterPage,
 };
 
 function App() {
