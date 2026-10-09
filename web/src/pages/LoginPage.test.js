@@ -53,3 +53,12 @@ test('submitting shows a not-connected notice for the chosen role', () => {
   );
   expect(screen.getByRole('status')).not.toHaveTextContent('secret');
 });
+
+test('shows a Back to Home link and the brand above the form', () => {
+  render(<LoginPage />);
+  expect(screen.getByRole('link', { name: 'Back to Home' })).toHaveAttribute(
+    'href',
+    '/'
+  );
+  expect(screen.getByText('BukidnonDental')).toBeInTheDocument();
+});

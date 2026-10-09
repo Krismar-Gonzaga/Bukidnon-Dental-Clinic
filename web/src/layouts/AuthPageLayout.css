@@ -1,13 +1,96 @@
 .auth-page {
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  flex-direction: column;
   min-height: 100vh;
-  padding: var(--space-5) var(--space-5) var(--space-7);
+  /* Restrained brand glows in opposite corners of the page background */
+  background-color: var(--color-background);
+  background-image: radial-gradient(
+      ellipse 60% 50% at 0% 0%,
+      var(--color-glow-primary),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 55% 45% at 100% 100%,
+      var(--color-glow-accent),
+      transparent 70%
+    );
+}
+
+.auth-page-bar {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-5) 0;
+}
+
+.auth-page-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.auth-page-back:hover {
+  text-decoration: none;
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-soft);
+}
+
+.auth-page-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-5) var(--space-5) var(--space-8);
+}
+
+.auth-page-brand {
+  max-width: 446px;
+  margin-bottom: var(--space-5);
+  text-align: center;
+}
+
+.auth-page-wordmark {
+  font-size: 1.75rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.01em;
+  line-height: var(--line-height-tight);
+  color: var(--color-primary);
+}
+
+.auth-page-tagline {
+  margin-top: var(--space-2);
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
+.auth-page .auth-card {
+  box-shadow: var(--shadow-lg);
 }
 
 @media (max-width: 480px) {
-  .auth-page {
-    padding: var(--space-4) var(--space-4) var(--space-6);
+  .auth-page-bar {
+    padding: var(--space-4) var(--space-4) 0;
+  }
+
+  .auth-page-main {
+    padding: var(--space-5) var(--space-4) var(--space-7);
+  }
+
+  .auth-page-wordmark {
+    font-size: var(--font-size-xl);
+  }
+
+  .auth-page-tagline {
+    font-size: var(--font-size-sm);
   }
 }

@@ -85,3 +85,12 @@ test('submitting a valid form shows a not-connected notice', () => {
     'Registration is not connected yet. No account was created.'
   );
 });
+
+test('shows a Back to Home link and the brand above the form', () => {
+  render(<RegisterPage />);
+  expect(screen.getByRole('link', { name: 'Back to Home' })).toHaveAttribute(
+    'href',
+    '/'
+  );
+  expect(screen.getByText('BukidnonDental')).toBeInTheDocument();
+});
