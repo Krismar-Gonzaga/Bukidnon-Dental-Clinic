@@ -1,0 +1,12 @@
+.dentist-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 192px;
+  gap: var(--space-4);
+}
+
+@media (max-width: 560px) {
+  .dentist-filters {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+}

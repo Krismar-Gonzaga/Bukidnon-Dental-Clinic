@@ -1,0 +1,24 @@
+/* Narrower two-column grid, centered, as in the Figma services page */
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+  max-width: 1024px;
+  margin: var(--space-2) auto 0;
+  padding: 0;
+  list-style: none;
+}
+
+.services-grid > li {
+  display: flex;
+}
+
+.services-grid > li > * {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .services-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

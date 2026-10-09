@@ -1,0 +1,127 @@
+.directory-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.directory-page-main {
+  flex: 1;
+}
+
+.directory-page-container {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+.directory-page-intro {
+  padding: var(--space-7) 0 var(--space-8);
+}
+
+.directory-page-title {
+  font-size: 2.375rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.01em;
+  color: var(--color-primary);
+  margin-bottom: var(--space-3);
+}
+
+.directory-page-text {
+  font-size: var(--font-size-lg);
+  color: var(--color-text);
+}
+
+.directory-page-intro.is-centered {
+  text-align: center;
+}
+
+.directory-page-intro.is-centered .directory-page-text {
+  max-width: 50ch;
+  margin: 0 auto;
+}
+
+/* Filter bar stays reachable while scrolling results on larger screens */
+.directory-page-filter-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: var(--space-5) 0;
+  background-color: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.directory-page-results {
+  padding: var(--space-6) 0 var(--space-7);
+}
+
+/* Shared results pieces used by directory pages */
+.directory-count {
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  margin-bottom: var(--space-5);
+}
+
+.directory-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+  margin: 0 0 var(--space-7);
+  padding: 0;
+  list-style: none;
+}
+
+.directory-grid > li {
+  display: flex;
+}
+
+.directory-grid > li > * {
+  flex: 1;
+}
+
+.directory-empty {
+  padding: var(--space-8) var(--space-5);
+  margin-bottom: var(--space-7);
+  text-align: center;
+  color: var(--color-text-muted);
+  background-color: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+@media (max-width: 1080px) {
+  .directory-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  /* Stacked filters are too tall to pin on small screens */
+  .directory-page-filter-bar {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .directory-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .directory-page-container {
+    padding: 0 var(--space-4);
+  }
+
+  .directory-page-intro {
+    padding: var(--space-6) 0 var(--space-6);
+  }
+
+  .directory-page-title {
+    font-size: var(--font-size-2xl);
+  }
+
+  .directory-page-text {
+    font-size: var(--font-size-base);
+  }
+}

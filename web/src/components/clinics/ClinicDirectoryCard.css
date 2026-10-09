@@ -1,0 +1,168 @@
+.clinic-dir-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+
+/* TEMPORARY decorative header until clinic photos are available */
+.clinic-dir-card-media {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 192px;
+  color: var(--color-on-dark);
+}
+
+/* Header gradients estimated from the Figma screenshot */
+.clinic-dir-card-media--1 {
+  background: linear-gradient(135deg, #00c9a7 0%, #00957a 100%);
+}
+
+.clinic-dir-card-media--2 {
+  background: linear-gradient(135deg, #3f93ff 0%, #1b5cf5 100%);
+}
+
+.clinic-dir-card-media--3 {
+  background: linear-gradient(135deg, #c063f5 0%, #9b1cf2 100%);
+}
+
+.clinic-dir-card-media--4 {
+  background: linear-gradient(135deg, #ff5a7a 0%, #e8004d 100%);
+}
+
+.clinic-dir-card-media--5 {
+  background: linear-gradient(135deg, #ff8a00 0%, #f25a0c 100%);
+}
+
+.clinic-dir-card-media--6 {
+  background: linear-gradient(135deg, #00c2e8 0%, #0096c2 100%);
+}
+
+.clinic-dir-card-media-icon {
+  opacity: 0.32;
+}
+
+.clinic-dir-card-verified,
+.clinic-dir-card-rating {
+  position: absolute;
+  top: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background-color: var(--color-surface);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+}
+
+.clinic-dir-card-verified {
+  left: var(--space-3);
+  padding: 2px var(--space-2);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-success-text);
+}
+
+.clinic-dir-card-rating {
+  right: var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.clinic-dir-card-star {
+  color: var(--color-rating);
+  fill: currentColor;
+}
+
+.clinic-dir-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: var(--space-5);
+}
+
+.clinic-dir-card-name {
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary);
+  margin-bottom: var(--space-2);
+}
+
+.clinic-dir-card-location {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-3);
+}
+
+.clinic-dir-card-location svg {
+  flex-shrink: 0;
+}
+
+.clinic-dir-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  list-style: none;
+}
+
+.clinic-dir-card-tag {
+  padding: 2px var(--space-3);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.01em;
+  color: var(--color-success-text);
+  background-color: var(--color-success-soft);
+  border: 1px solid var(--color-success-border);
+  border-radius: 999px;
+}
+
+.clinic-dir-card-actions {
+  display: flex;
+  gap: var(--space-3);
+  /* Pin actions to the card bottom so rows of cards align */
+  margin-top: auto;
+}
+
+.clinic-dir-card-actions .btn {
+  min-height: 42px;
+  border-radius: var(--radius-sm);
+}
+
+.clinic-dir-card-actions .btn-primary {
+  flex: 1;
+}
+
+.clinic-dir-card-details {
+  padding: var(--space-2) var(--space-4);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.clinic-dir-card-details:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+@media (max-width: 480px) {
+  .clinic-dir-card-media {
+    height: 160px;
+  }
+
+  .clinic-dir-card-name {
+    font-size: var(--font-size-lg);
+  }
+}
