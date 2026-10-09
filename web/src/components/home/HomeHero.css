@@ -76,12 +76,29 @@
 }
 
 @media (max-width: 480px) {
+  .home-hero {
+    padding-top: var(--space-6);
+  }
+
   .home-hero-inner {
+    gap: var(--space-5);
     padding: 0 var(--space-4);
   }
 
   .home-hero-title {
     font-size: var(--font-size-2xl);
+    margin-bottom: var(--space-4);
+  }
+
+  .home-hero-text {
+    font-size: var(--font-size-base);
+    margin-bottom: var(--space-5);
+  }
+
+  /* Shorter media keeps the search panel closer to the hero copy */
+  .home-hero-image {
+    aspect-ratio: 16 / 10;
+    border-radius: var(--radius-lg);
   }
 
   .home-hero-title-line {

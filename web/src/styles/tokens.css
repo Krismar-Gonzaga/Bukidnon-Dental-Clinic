@@ -20,6 +20,29 @@
   --color-border: #dde3ee;
   --color-placeholder: #c9d3e6;
   --color-rating: #f5a524;
+  --color-error: #c62828;
+  --color-success-text: #13784a;
+  --color-success-soft: #ecfbf3;
+  --color-success-border: #b6e6cb;
+  --color-neutral-soft: #f1f3f7;
+  --color-mint: #62f0c2;
+  /* Sign-in role button accents, estimated from the Figma login page */
+  --color-role-dentist: #2f3747;
+  --color-role-staff: #18a05e;
+  --color-role-system: #7a1fc2;
+  --color-role-system-soft: #f6edfd;
+  --color-hero-gradient-start: #003b85;
+  --color-hero-gradient-end: #0058b8;
+  /* Soft background glows for the sign-in and registration pages */
+  --color-glow-primary: rgba(11, 59, 140, 0.12);
+  --color-glow-accent: rgba(30, 158, 90, 0.1);
+  /* Decorative avatar colors, estimated from the Figma dentist directory */
+  --color-avatar-1: #2f80f7;
+  --color-avatar-2: #0fbfa0;
+  --color-avatar-3: #a43ff0;
+  --color-avatar-4: #f2245a;
+  --color-avatar-5: #fb6b0a;
+  --color-avatar-6: #06b0d8;
   --color-footer-bg: #0a2a5e;
   --color-on-dark: #ffffff;
   --color-on-dark-muted: rgba(255, 255, 255, 0.72);

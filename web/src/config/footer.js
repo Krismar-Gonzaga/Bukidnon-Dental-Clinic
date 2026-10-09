@@ -1,6 +1,6 @@
-import { MAIN_NAV_ITEMS } from './navigation';
+import { LOGIN_HREF, MAIN_NAV_ITEMS, REGISTER_HREF } from './navigation';
 
-// Footer content. Hrefs are placeholders until routing is added.
+// Footer content. Hash hrefs are placeholders until those pages exist.
 export const FOOTER_TAGLINE =
   'Helping patients find trusted dental clinics and book appointments across Bukidnon.';
 
@@ -12,10 +12,10 @@ export const FOOTER_LINK_GROUPS = [
   {
     title: 'For Patients',
     links: [
-      { label: 'Find Clinics', href: '#find-clinics' },
+      { label: 'Find Clinics', href: '/clinics' },
       { label: 'Book Appointment', href: '#find-clinics' },
-      { label: 'Login', href: '#login' },
-      { label: 'Register', href: '#register' },
+      { label: 'Login', href: LOGIN_HREF },
+      { label: 'Register', href: REGISTER_HREF },
     ],
   },
 ];
