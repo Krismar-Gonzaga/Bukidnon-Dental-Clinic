@@ -1,0 +1,41 @@
+/* White content area below the intro band, as in the Figma contact page */
+.contact-content {
+  padding: var(--space-7) 0 var(--space-8);
+  background-color: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+}
+
+.contact-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 346fr) minmax(0, 540fr);
+  align-items: start;
+  gap: var(--space-6);
+  max-width: 928px;
+  margin: 0 auto;
+}
+
+.contact-methods {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 860px) {
+  .contact-grid {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 560px;
+  }
+
+  .contact-methods {
+    gap: var(--space-4);
+  }
+}
+
+@media (max-width: 480px) {
+  .contact-content {
+    padding: var(--space-6) 0 var(--space-7);
+  }
+}

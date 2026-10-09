@@ -1,0 +1,153 @@
+.about {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--color-surface);
+}
+
+.about-main {
+  flex: 1;
+}
+
+/* Narrower content column, as in the Figma about page */
+.about-container {
+  max-width: calc(928px + 2 * var(--space-5));
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+.about-hero {
+  padding: var(--space-8) 0 calc(var(--space-8) + var(--space-3));
+  text-align: center;
+  color: var(--color-on-dark);
+  background: linear-gradient(
+    120deg,
+    var(--color-hero-gradient-start) 0%,
+    var(--color-hero-gradient-end) 100%
+  );
+}
+
+.about-hero-title {
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.01em;
+  margin-bottom: var(--space-4);
+}
+
+.about-hero-text {
+  max-width: 34em;
+  margin: 0 auto;
+  font-size: 1.25rem;
+  line-height: 1.45;
+  color: var(--color-on-dark-muted);
+}
+
+.about-section-title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.about-mission {
+  padding: var(--space-8) 0 var(--space-7);
+}
+
+.about-mission-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-7);
+}
+
+.about-mission-copy .about-section-title {
+  margin-bottom: var(--space-5);
+}
+
+.about-mission-text {
+  color: var(--color-text);
+  line-height: 1.65;
+}
+
+.about-mission-text + .about-mission-text {
+  margin-top: var(--space-4);
+}
+
+.about-stats,
+.about-values-grid {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.about-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.about-stats > li,
+.about-values-grid > li {
+  display: flex;
+}
+
+.about-stats > li > *,
+.about-values-grid > li > * {
+  flex: 1;
+}
+
+.about-values {
+  padding: var(--space-5) 0 var(--space-8);
+}
+
+.about-values-title {
+  margin-bottom: var(--space-6);
+  text-align: center;
+}
+
+.about-values-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+@media (max-width: 900px) {
+  .about-mission-inner {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-6);
+  }
+
+  .about-values-grid {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 480px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .about-container {
+    padding: 0 var(--space-4);
+  }
+
+  .about-hero {
+    padding: var(--space-7) 0;
+  }
+
+  .about-hero-title {
+    font-size: var(--font-size-2xl);
+  }
+
+  .about-hero-text {
+    font-size: var(--font-size-base);
+  }
+
+  .about-section-title {
+    font-size: 1.625rem;
+  }
+
+  .about-mission {
+    padding-top: var(--space-7);
+  }
+
+  .about-stats {
+    gap: var(--space-3);
+  }
+}
