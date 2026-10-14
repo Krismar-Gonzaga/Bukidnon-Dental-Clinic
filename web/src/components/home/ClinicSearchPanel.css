@@ -1,0 +1,100 @@
+.clinic-search {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr auto;
+  align-items: end;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.search-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.search-field-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.search-field-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-field-icon,
+.search-field-chevron {
+  position: absolute;
+  pointer-events: none;
+  color: var(--color-text-muted);
+}
+
+.search-field-icon {
+  left: var(--space-3);
+}
+
+.search-field-chevron {
+  right: var(--space-3);
+}
+
+.search-field-input {
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 var(--space-3) 0 calc(var(--space-3) + 18px + var(--space-2));
+  font: inherit;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color 0.15s ease;
+}
+
+.search-field-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.search-field-input:hover {
+  border-color: var(--color-primary);
+}
+
+.search-field-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.search-field-select {
+  padding-right: calc(var(--space-3) + 18px + var(--space-2));
+  appearance: none;
+  cursor: pointer;
+}
+
+.clinic-search-submit {
+  height: var(--control-height);
+  padding: 0 var(--space-6);
+}
+
+@media (max-width: 900px) {
+  .clinic-search {
+    grid-template-columns: 1fr 1fr;
+    padding: var(--space-5);
+  }
+
+  .search-field:first-child,
+  .clinic-search-submit {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .clinic-search {
+    grid-template-columns: 1fr;
+  }
+}

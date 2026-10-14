@@ -1,0 +1,76 @@
+/* Login-specific pieces; shared card and field styles live in auth.css */
+.login-form-forgot {
+  align-self: flex-end;
+  margin: calc(-1 * var(--space-1)) 0 var(--space-4);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.login-form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.login-role {
+  width: 100%;
+  min-height: 52px;
+  font-size: var(--font-size-base);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface);
+}
+
+.login-role--patient {
+  color: var(--color-on-primary);
+  background-color: var(--color-primary);
+}
+
+.login-role--patient:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.login-role--clinic-admin {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.login-role--clinic-admin:hover {
+  background-color: var(--color-primary-soft);
+}
+
+.login-role--dentist {
+  color: var(--color-role-dentist);
+  border-color: var(--color-role-dentist);
+}
+
+.login-role--dentist:hover {
+  background-color: var(--color-neutral-soft);
+}
+
+.login-role--clinic-staff {
+  color: var(--color-role-staff);
+  border-color: var(--color-role-staff);
+}
+
+.login-role--clinic-staff:hover {
+  background-color: var(--color-success-soft);
+}
+
+.login-role--system-admin {
+  color: var(--color-role-system);
+  border-color: var(--color-role-system);
+}
+
+.login-role--system-admin:hover {
+  background-color: var(--color-role-system-soft);
+}
+
+@media (max-width: 480px) {
+  .login-form-actions {
+    gap: var(--space-3);
+  }
+
+  .login-role {
+    min-height: 48px;
+  }
+}
