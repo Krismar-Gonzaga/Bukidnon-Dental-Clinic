@@ -1,0 +1,63 @@
+/* Booking column width estimated from Figma; centered like the dashboard. */
+.book-appointment {
+  max-width: 768px;
+  margin: 0 auto;
+}
+
+.book-appointment-card {
+  margin-top: var(--space-6);
+  padding: var(--space-5) var(--space-5) var(--space-5);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+
+.book-appointment-title {
+  margin-bottom: var(--space-5);
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.book-appointment-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.book-appointment-title:focus {
+  outline: none;
+}
+
+.book-appointment-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.book-appointment-back {
+  border-color: var(--color-text-muted);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.book-appointment-back:hover {
+  background-color: var(--color-neutral-soft);
+}
+
+.book-appointment-footer .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.book-appointment-options--grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 600px) {
+  .book-appointment-options--grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+

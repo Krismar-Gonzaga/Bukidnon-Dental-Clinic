@@ -1,0 +1,25 @@
+.status-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.status-filter-chip {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background-color: var(--color-surface);
+  font-size: 0.9375rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.status-filter-chip:hover {
+  border-color: var(--color-placeholder);
+}
+
+.status-filter-chip.is-active {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+}

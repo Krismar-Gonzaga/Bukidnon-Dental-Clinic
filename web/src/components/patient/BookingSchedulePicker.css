@@ -1,0 +1,83 @@
+.booking-schedule-label {
+  margin-bottom: var(--space-3);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.booking-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-2);
+  text-align: center;
+}
+
+.booking-calendar + .booking-calendar {
+  margin-top: var(--space-2);
+}
+
+.booking-calendar-weekday {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.booking-calendar-day,
+.booking-time-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.booking-calendar-day {
+  height: 36px;
+  font-size: 0.9375rem;
+}
+
+.booking-calendar-day:hover {
+  background-color: var(--color-primary-soft);
+}
+
+.booking-calendar-day.is-selected,
+.booking-time-slot.is-selected {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.booking-calendar-day:focus-within,
+.booking-time-slot:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.booking-time-slots {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.booking-schedule-label:not(:first-child) {
+  margin-top: var(--space-6);
+}
+
+.booking-time-slot {
+  height: 44px;
+  border: 1.5px solid var(--color-border);
+  background-color: var(--color-surface);
+  font-size: 0.9375rem;
+}
+
+.booking-time-slot:hover {
+  border-color: var(--color-placeholder);
+}
+
+@media (max-width: 600px) {
+  .booking-time-slots {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1,0 +1,107 @@
+/* Same column as the appointment details pages. */
+.feedback-page {
+  max-width: 672px;
+  margin: 0 auto;
+}
+
+.feedback-intro {
+  margin-bottom: var(--space-5);
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
+.feedback-card {
+  padding: var(--space-6);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+
+.feedback-title {
+  margin-bottom: var(--space-4);
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.feedback-title:focus {
+  outline: none;
+}
+
+.feedback-appointments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Compact rows: the shared option shell is sized for the booking flow. */
+.feedback-appointments .booking-option-title {
+  font-size: 0.9375rem;
+}
+
+.feedback-appointments .booking-option-subtitle {
+  font-size: 0.8125rem;
+}
+
+.feedback-appointment-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background-color: var(--color-success-icon-bg);
+  color: var(--color-success-icon);
+}
+
+.feedback-empty {
+  color: var(--color-text-muted);
+}
+
+.feedback-divider {
+  margin: var(--space-5) 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.feedback-review-label {
+  display: block;
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.feedback-review {
+  display: block;
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 0.9375rem;
+  resize: vertical;
+}
+
+.feedback-review:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 0;
+  border-color: var(--color-primary);
+}
+
+.feedback-submit {
+  width: 100%;
+  margin-top: var(--space-5);
+}
+
+.feedback-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .feedback-card {
+    padding: var(--space-5) var(--space-4);
+  }
+}

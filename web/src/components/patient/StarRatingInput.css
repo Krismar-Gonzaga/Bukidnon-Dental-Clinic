@@ -1,0 +1,40 @@
+.star-rating-input-stars {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.star-rating-input-star {
+  display: inline-flex;
+  border-radius: var(--radius-sm);
+  color: var(--color-border);
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.star-rating-input-star svg {
+  stroke-width: 1.5;
+}
+
+.star-rating-input-star:hover {
+  transform: scale(1.08);
+}
+
+.star-rating-input-star.is-filled {
+  color: var(--color-rating-strong);
+}
+
+.star-rating-input-star.is-filled svg {
+  fill: currentColor;
+}
+
+.star-rating-input-star:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.star-rating-input-label {
+  min-height: 1.5em;
+  margin-top: var(--space-4);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+}

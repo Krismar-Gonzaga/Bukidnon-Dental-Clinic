@@ -1,0 +1,47 @@
+.booking-review {
+  margin: 0;
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-md);
+  background-color: var(--color-background);
+}
+
+.booking-review-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  font-size: 0.9375rem;
+}
+
+.booking-review-row + .booking-review-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.booking-review-row dt {
+  color: var(--color-text-muted);
+}
+
+.booking-review-row dd {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  text-align: right;
+}
+
+.booking-review-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--color-pending-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-pending-soft);
+  color: var(--color-pending-text);
+  font-size: var(--font-size-sm);
+}
+
+.booking-review-notice svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}

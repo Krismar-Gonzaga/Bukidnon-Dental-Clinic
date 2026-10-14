@@ -1,0 +1,66 @@
+.booking-stepper {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.booking-step {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+/* Connector line between steps */
+.booking-step:not(:last-child)::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  margin: 0 var(--space-3);
+  background-color: var(--color-border);
+}
+
+.booking-step.is-complete::after {
+  background-color: var(--color-primary);
+}
+
+.booking-step:last-child {
+  flex: 0 0 auto;
+}
+
+.booking-step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--color-neutral-soft);
+  font-weight: var(--font-weight-semibold);
+}
+
+.booking-step.is-reached {
+  color: var(--color-primary);
+}
+
+.booking-step.is-reached .booking-step-number {
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+@media (max-width: 600px) {
+  .booking-step-label {
+    display: none;
+  }
+
+  .booking-step[aria-current='step'] .booking-step-label {
+    display: inline;
+  }
+}
