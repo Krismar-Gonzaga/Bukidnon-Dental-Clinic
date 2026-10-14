@@ -12,6 +12,13 @@ import AppointmentHistoryPage from './pages/AppointmentHistoryPage';
 import AppointmentDetailsPage from './pages/AppointmentDetailsPage';
 import RescheduleAppointmentPage from './pages/RescheduleAppointmentPage';
 import FeedbackPage from './pages/FeedbackPage';
+import NotificationsPage from './pages/NotificationsPage';
+import PatientFindClinicsPage from './pages/PatientFindClinicsPage';
+import SavedClinicsPage from './pages/SavedClinicsPage';
+import ClinicLocatorPage from './pages/ClinicLocatorPage';
+import ClinicDetailsPage from './pages/ClinicDetailsPage';
+import ProfilePage from './pages/ProfilePage';
+import EditProfilePage from './pages/EditProfilePage';
 
 // TEMPORARY path switch until a router is approved and added.
 const PAGES_BY_PATH = {
@@ -26,11 +33,19 @@ const PAGES_BY_PATH = {
   '/patient/book': BookAppointmentPage,
   '/patient/appointments': AppointmentHistoryPage,
   '/patient/reviews': FeedbackPage,
+  '/patient/notifications': NotificationsPage,
+  '/patient/clinics': PatientFindClinicsPage,
+  '/patient/saved-clinics': SavedClinicsPage,
+  '/patient/clinic-locator': ClinicLocatorPage,
+  '/patient/profile': ProfilePage,
+  '/patient/profile/edit': EditProfilePage,
 };
 
 // Match /patient/appointments/<id> and /patient/appointments/<id>/reschedule
 const APPOINTMENT_DETAILS_PATH = /^\/patient\/appointments\/([^/]+)$/;
 const RESCHEDULE_PATH = /^\/patient\/appointments\/([^/]+)\/reschedule$/;
+// Match /patient/clinics/<id>
+const CLINIC_DETAILS_PATH = /^\/patient\/clinics\/([^/]+)$/;
 
 function App() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -40,6 +55,11 @@ function App() {
     return (
       <RescheduleAppointmentPage appointmentId={decodeURIComponent(rescheduleMatch[1])} />
     );
+  }
+
+  const clinicMatch = path.match(CLINIC_DETAILS_PATH);
+  if (clinicMatch) {
+    return <ClinicDetailsPage clinicId={decodeURIComponent(clinicMatch[1])} />;
   }
 
   const detailsMatch = path.match(APPOINTMENT_DETAILS_PATH);

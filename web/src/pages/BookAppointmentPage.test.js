@@ -319,3 +319,13 @@ test('review reflects different picks and confirm shows the request-sent screen'
     '/patient/appointments'
   );
 });
+
+test('?clinic preselects a bookable clinic and ignores unknown ones', () => {
+  const { unmount } = render(<BookAppointmentPage initialClinicId="mock-dir-2" />);
+  expect(screen.getByRole('radio', { name: /Braganza Dental Clinic/ })).toBeChecked();
+  expect(screen.getByRole('button', { name: 'Next: Select Dentist' })).toBeEnabled();
+  unmount();
+
+  render(<BookAppointmentPage initialClinicId="mock-dir-99" />);
+  expect(screen.getByRole('button', { name: 'Next: Select Dentist' })).toBeDisabled();
+});

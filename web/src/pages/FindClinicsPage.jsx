@@ -27,7 +27,15 @@ const INITIAL_FILTERS = {
 };
 
 // Clinic directory. Uses mock clinics until the clinics API is integrated.
-function FindClinicsPage({ clinics = DIRECTORY_CLINICS }) {
+// account: signed-in header (see SiteHeader). getBookHref(clinic) and
+// getDetailsHref(clinic): when given, the card buttons link into the patient
+// booking flow and clinic page.
+function FindClinicsPage({
+  clinics = DIRECTORY_CLINICS,
+  account,
+  getBookHref,
+  getDetailsHref,
+}) {
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -56,6 +64,7 @@ function FindClinicsPage({ clinics = DIRECTORY_CLINICS }) {
   return (
     <DirectoryPageLayout
       activeHref="/clinics"
+      account={account}
       title="Clinic Directory"
       description="Discover and compare verified dental clinics across Bukidnon."
       resultsLabel="Clinic results"
@@ -80,6 +89,8 @@ function FindClinicsPage({ clinics = DIRECTORY_CLINICS }) {
               <ClinicDirectoryCard
                 clinic={clinic}
                 accentIndex={(currentPage - 1) * CLINICS_PER_PAGE + index}
+                bookHref={getBookHref?.(clinic)}
+                detailsHref={getDetailsHref?.(clinic)}
               />
             </li>
           ))}

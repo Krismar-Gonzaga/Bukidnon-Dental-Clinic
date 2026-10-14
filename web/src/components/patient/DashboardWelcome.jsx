@@ -1,5 +1,5 @@
 import {
-  FIND_CLINICS_HREF,
+  PATIENT_FIND_CLINICS_HREF,
   PATIENT_BOOK_HREF,
 } from '../../config/patientNavigation';
 import { pluralize } from '../../utils/patientDashboard';
@@ -27,7 +27,7 @@ function DashboardWelcome({ greeting, name, confirmedCount, pendingCount }) {
         <a href={PATIENT_BOOK_HREF} className="btn dashboard-welcome-btn-light">
           Book Appointment
         </a>
-        <a href={FIND_CLINICS_HREF} className="btn dashboard-welcome-btn-ghost">
+        <a href={PATIENT_FIND_CLINICS_HREF} className="btn dashboard-welcome-btn-ghost">
           Find Clinics
         </a>
       </div>

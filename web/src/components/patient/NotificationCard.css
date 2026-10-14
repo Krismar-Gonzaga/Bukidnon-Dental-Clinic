@@ -1,0 +1,69 @@
+.notification-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.notification-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+}
+
+.notification-card-icon--reminder {
+  background-color: var(--color-primary-soft);
+  color: var(--color-avatar-1);
+}
+
+.notification-card-icon--confirmed {
+  background-color: var(--color-success-icon-bg);
+  color: var(--color-success-icon);
+}
+
+.notification-card-icon--message {
+  background-color: var(--color-neutral-soft);
+  color: var(--color-text-muted);
+}
+
+.notification-card-body {
+  flex: 1;
+  min-width: 0;
+  padding-right: var(--space-4);
+}
+
+.notification-card-title {
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.notification-card-message {
+  margin-top: var(--space-1);
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
+.notification-card-time {
+  margin-top: var(--space-1);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.notification-card-dot {
+  position: absolute;
+  top: var(--space-5);
+  right: var(--space-5);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-avatar-1);
+}

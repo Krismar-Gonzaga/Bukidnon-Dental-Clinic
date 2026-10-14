@@ -4,9 +4,11 @@ import './ClinicDirectoryCard.css';
 // Number of decorative header gradients defined in ClinicDirectoryCard.css.
 const ACCENT_COUNT = 6;
 
-// Directory listing card. Actions are visual only until routing/booking exist.
+// Directory listing card. Book Appointment and View Details link to their
+// pages when `bookHref` / `detailsHref` are given (patient view); otherwise
+// they are visual only.
 // The gradient header is a TEMPORARY stand-in for clinic photos.
-function ClinicDirectoryCard({ clinic, accentIndex = 0 }) {
+function ClinicDirectoryCard({ clinic, accentIndex = 0, bookHref, detailsHref }) {
   const {
     id,
     name,
@@ -60,12 +62,24 @@ function ClinicDirectoryCard({ clinic, accentIndex = 0 }) {
         </ul>
 
         <div className="clinic-dir-card-actions">
-          <button type="button" className="btn btn-primary">
-            Book Appointment
-          </button>
-          <button type="button" className="btn clinic-dir-card-details">
-            View Details
-          </button>
+          {bookHref ? (
+            <a href={bookHref} className="btn btn-primary">
+              Book Appointment
+            </a>
+          ) : (
+            <button type="button" className="btn btn-primary">
+              Book Appointment
+            </button>
+          )}
+          {detailsHref ? (
+            <a href={detailsHref} className="btn clinic-dir-card-details">
+              View Details
+            </a>
+          ) : (
+            <button type="button" className="btn clinic-dir-card-details">
+              View Details
+            </button>
+          )}
         </div>
       </div>
     </article>

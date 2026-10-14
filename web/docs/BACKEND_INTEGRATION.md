@@ -60,7 +60,11 @@ The staff, dentist, clinic-admin, and system-admin route groups point to control
 | Mock file | Used by | Replace with |
 |---|---|---|
 | `mocks/patientDashboard.js` (`MOCK_PATIENT`) | All patient pages: sidebar name and role | `GET /user` |
-| `mocks/patientDashboard.js` (stats, appointments, notifications) | Dashboard | Stats and appointments: work them out from `GET /patient/appointments`. Notifications: no endpoint yet |
+| `mocks/patientDashboard.js` (stats, appointments) | Dashboard | Work them out from `GET /patient/appointments` |
+| `mocks/notifications.js` | Notifications page, dashboard panel, bell dot | No endpoint yet (see gaps) |
+| `mocks/clinicProfiles.js` (`PATIENT_CLINICS`, `LOCATOR_CLINICS`) | Clinic Details, Clinic Locator, Saved Clinics | `GET /clinics/{id}` and `GET /clinics/search`; hours, phone, email, and map coordinates must be in the response (see gaps) |
+| `mocks/patientProfile.js` | My Profile, Edit Profile | `GET /patient/profile` (medical details, tags, and emergency contact may need new fields; see gaps) |
+| `mocks/clinicProfiles.js` (`MOCK_SAVED_CLINIC_IDS`) | Saved Clinics, the save heart on Clinic Details | No endpoint yet (see gaps) |
 | `mocks/appointmentHistory.js` | History, Details, Reschedule, Feedback | `GET /patient/appointments` |
 | `mocks/bookingClinics.js` (from `directoryClinics.js`) | Booking step 1 | `GET /clinics/search` |
 | `mocks/bookingDentists.js` (from `directoryDentists.js`) | Booking step 2 | No endpoint yet (see gaps) |
@@ -84,6 +88,10 @@ Each of these pretends to succeed and saves nothing. Search the code for `MOCK` 
 | `components/auth/RegisterForm.jsx` | Register | `POST /register` |
 | `layouts/PatientLayout.jsx` | Log Out | `POST /logout` |
 | `components/contact/ContactForm.jsx` | Send message | No endpoint yet |
+| `pages/NotificationsPage.jsx` (`handleMarkAllRead`) | Mark all as read | No endpoint yet |
+| `pages/EditProfilePage.jsx` (`// MOCK save`) | Save Changes | `PUT /patient/profile` |
+| `pages/ProfilePage.jsx`, `pages/EditProfilePage.jsx` | Password, Upload new photo | `POST /change-password`; no photo upload endpoint yet |
+| `pages/SavedClinicsPage.jsx` (`handleUnsave`), `pages/ClinicDetailsPage.jsx` (save heart) | Save / unsave a clinic | No endpoint yet |
 
 ## Field mapping
 
@@ -137,8 +145,11 @@ These block a full integration. They are backend decisions; do not change `backe
 6. **Who may cancel or reschedule what:** `PUT` and `DELETE /patient/appointments/{id}` do not check the status. The frontend only allows cancelling `pending` or `upcoming` appointments and rescheduling `upcoming` ones. The backend should enforce the same rules.
 7. **Rescheduling a confirmed appointment:** the backend keeps the status unchanged. Decide whether a reschedule should go back to `pending` for clinic approval.
 8. **Appointments linked by email:** patient appointments are matched by `patient_email`, not by user id, so changing the account email loses the history.
-9. **Notifications:** no endpoint yet (dashboard panel, bell dot, Notifications page).
-10. **Controller folder case:** the namespace says `API` but the folder is `Api`. This breaks on case-sensitive hosting (Linux).
+9. **Notifications:** no endpoint yet. The frontend needs a list with `type` (`reminder`, `confirmed`, or `message`), `title`, `message`, time, and `unread`, plus a mark-all-as-read action.
+10. **Saved clinics:** there is no endpoint to list, save, or unsave a patient's clinics.
+11. **Clinic profile fields:** Clinic Details and Clinic Locator show street address, operating hours, phone, email, and map coordinates. Confirm `GET /clinics/{id}` returns them; the frontend hides any that are missing.
+12. **Patient medical profile:** My Profile shows blood type, civil status, zip code, health tags, a medical alert, conditions, allergies, medications, and an emergency contact. Confirm which of these `GET /patient/profile` returns and which need new fields.
+13. **Controller folder case:** the namespace says `API` but the folder is `Api`. This breaks on case-sensitive hosting (Linux).
 
 ## Integration order (suggested)
 

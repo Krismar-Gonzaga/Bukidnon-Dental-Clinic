@@ -1,0 +1,111 @@
+/* Same column as the appointment details pages. */
+.edit-profile-page {
+  max-width: 672px;
+  margin: 0 auto;
+}
+
+.edit-profile-card {
+  padding: var(--space-6);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+
+.edit-profile-photo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding-bottom: var(--space-5);
+  margin-bottom: var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.edit-profile-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-lg);
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+}
+
+.edit-profile-photo-title {
+  font-weight: var(--font-weight-semibold);
+}
+
+.edit-profile-upload {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.edit-profile-upload:hover {
+  text-decoration: underline;
+}
+
+.edit-profile-panel {
+  padding-top: var(--space-5);
+}
+
+.edit-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.edit-profile-grid .is-wide {
+  grid-column: 1 / -1;
+}
+
+.edit-profile-pending {
+  color: var(--color-text-muted);
+}
+
+.edit-profile-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+.edit-profile-cancel {
+  border-color: var(--color-text-muted);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.edit-profile-cancel:hover {
+  background-color: var(--color-neutral-soft);
+}
+
+.edit-profile-notice {
+  margin-top: var(--space-3);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.edit-profile-notice:empty {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .edit-profile-card {
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .edit-profile-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

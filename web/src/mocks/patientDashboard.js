@@ -1,9 +1,15 @@
 // MOCK patient dashboard data from the Figma sample content.
 // Not real backend data; replace with the patient API responses later.
+import { PATIENT_DASHBOARD_HREF } from '../config/patientNavigation';
+import { MOCK_NOTIFICATIONS } from './notifications';
+
 export const MOCK_PATIENT = {
   name: 'Juan Dela Cruz',
   role: 'Patient',
 };
+
+// Signed-in account shown in the public site header ("My Account").
+export const MOCK_PATIENT_ACCOUNT = { name: MOCK_PATIENT.name, href: PATIENT_DASHBOARD_HREF };
 
 export const MOCK_DASHBOARD_STATS = [
   { id: 'upcoming', label: 'Upcoming', value: 1, icon: 'calendarBlank', tone: 'blue' },
@@ -32,8 +38,5 @@ export const MOCK_DASHBOARD_APPOINTMENTS = [
   },
 ];
 
-export const MOCK_DASHBOARD_NOTIFICATIONS = [
-  { id: 'n-1', title: 'Appointment Reminder', time: '2 hours ago', unread: true },
-  { id: 'n-2', title: 'Booking Confirmed', time: '1 day ago', unread: true },
-  { id: 'n-3', title: 'New Review Request', time: '3 days ago', unread: false },
-];
+// The dashboard panel shows the three newest notifications.
+export const MOCK_DASHBOARD_NOTIFICATIONS = MOCK_NOTIFICATIONS.slice(0, 3);

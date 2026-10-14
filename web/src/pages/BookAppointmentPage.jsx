@@ -41,10 +41,15 @@ function OptionGroup({ layout, children }) {
 }
 
 // Booking flow with MOCK clinics, dentists, services, and schedule;
-// nothing is saved yet.
-function BookAppointmentPage() {
+// nothing is saved yet. ?clinic=<id> (from Find Clinics) preselects a clinic
+// when it is one of the bookable clinics.
+const getClinicFromQuery = () => new URLSearchParams(window.location.search).get('clinic');
+
+function BookAppointmentPage({ initialClinicId = getClinicFromQuery() }) {
   const [stepIndex, setStepIndex] = useState(0);
-  const [clinicId, setClinicId] = useState(null);
+  const [clinicId, setClinicId] = useState(() =>
+    BOOKING_CLINICS.some(({ id }) => id === initialClinicId) ? initialClinicId : null
+  );
   const [dentistId, setDentistId] = useState(null);
   const [serviceId, setServiceId] = useState(null);
   const schedule = useScheduleSelection();

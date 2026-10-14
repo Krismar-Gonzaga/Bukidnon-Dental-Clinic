@@ -73,17 +73,20 @@ Always build links from `config/navigation.js` or `config/patientNavigation.js`.
 | `/clinics`, `/dentists`, `/services`, `/about`, `/contact` | Public pages |
 | `/login`, `/register` | `LoginPage`, `RegisterPage` |
 | `/patient/dashboard` | `PatientDashboardPage` |
-| `/patient/book` | `BookAppointmentPage` |
+| `/patient/book` (optional `?clinic=<id>`) | `BookAppointmentPage` |
 | `/patient/appointments` | `AppointmentHistoryPage` |
 | `/patient/appointments/<id>` | `AppointmentDetailsPage` |
 | `/patient/appointments/<id>/reschedule` | `RescheduleAppointmentPage` |
 | `/patient/reviews` (optional `?appointment=<id>`) | `FeedbackPage` |
+| `/patient/notifications` | `NotificationsPage` |
+| `/patient/clinics` | `PatientFindClinicsPage`: the clinic directory with the signed-in header |
+| `/patient/clinics/<id>` | `ClinicDetailsPage` |
+| `/patient/saved-clinics` | `SavedClinicsPage` |
+| `/patient/clinic-locator` | `ClinicLocatorPage` |
+| `/patient/profile` | `ProfilePage` |
+| `/patient/profile/edit` | `EditProfilePage` |
 
-Patient paths not built yet, which fall back to the homepage:
-- `/patient/notifications`
-- `/patient/saved-clinics`
-- `/patient/clinic-locator`
-- `/patient/profile`
+All patient sidebar pages are built. Unknown paths fall back to the homepage.
 
 ## Styling
 
