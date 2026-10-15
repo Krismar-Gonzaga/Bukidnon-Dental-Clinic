@@ -1,10 +1,11 @@
 import Icon from '../Icon';
+import { getAppointmentDetailsHref, getRescheduleHref } from '../../config/patientNavigation';
 import './patientPanel.css';
 import './DashboardAppointmentCard.css';
 
-// Actions are not connected until appointment pages and the API exist.
+// View and Reschedule open the appointment's details and reschedule pages.
 function DashboardAppointmentCard({ appointment }) {
-  const { service, dentist, clinic, status, dateTime } = appointment;
+  const { id, service, dentist, clinic, status, dateTime } = appointment;
   const isPending = status === 'pending';
 
   return (
@@ -39,21 +40,21 @@ function DashboardAppointmentCard({ appointment }) {
 
       <div className="dashboard-appointment-actions">
         {!isPending && (
-          <button
-            type="button"
+          <a
+            href={getRescheduleHref(id)}
             className="btn patient-btn-sm patient-btn-outline"
             aria-label={`Reschedule ${service}`}
           >
             Reschedule
-          </button>
+          </a>
         )}
-        <button
-          type="button"
+        <a
+          href={getAppointmentDetailsHref(id)}
           className="btn btn-primary patient-btn-sm"
           aria-label={`View ${service}`}
         >
           View
-        </button>
+        </a>
       </div>
     </article>
   );

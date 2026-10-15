@@ -76,6 +76,16 @@
   --color-overlay: rgba(19, 33, 59, 0.45);
   /* Booking flow star color, estimated from Figma */
   --color-rating-strong: #f58a2a;
+  /* Segmented meters (password strength, dental anxiety). Values estimated from Figma. */
+  --color-meter-track: #e4e7ec;
+  --color-strength-weak: var(--color-danger);
+  --color-strength-medium: #f2830d;
+  --color-strength-strong: var(--color-success-icon);
+  --color-anxiety-fill: #f5c518;
+  /* Profile medical tabs, estimated from Figma: medication caution text and
+     the severe-allergy chip on a pink card. */
+  --color-caution-text: #c2410c;
+  --color-danger-chip: #fbd5d5;
   --color-footer-bg: #0a2a5e;
   --color-on-dark: #ffffff;
   --color-on-dark-muted: rgba(255, 255, 255, 0.72);

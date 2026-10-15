@@ -9,6 +9,7 @@ export const PATIENT_REVIEWS_HREF = '/patient/reviews';
 export const PATIENT_FIND_CLINICS_HREF = '/patient/clinics';
 export const PATIENT_PROFILE_HREF = '/patient/profile';
 export const PATIENT_EDIT_PROFILE_HREF = '/patient/profile/edit';
+export const PATIENT_CHANGE_PASSWORD_HREF = '/patient/profile/password';
 
 export const getAppointmentDetailsHref = (appointmentId) =>
   `${PATIENT_HISTORY_HREF}/${encodeURIComponent(appointmentId)}`;
@@ -21,6 +22,10 @@ export const getBookClinicHref = (clinicId) =>
 
 export const getReviewHref = (appointmentId) =>
   `${PATIENT_REVIEWS_HREF}?appointment=${encodeURIComponent(appointmentId)}`;
+
+// Opens Edit Profile on one section tab (see PROFILE_TABS in config/profile.js).
+export const getEditProfileHref = (tabId) =>
+  `${PATIENT_EDIT_PROFILE_HREF}?tab=${encodeURIComponent(tabId)}`;
 
 export const getRescheduleHref = (appointmentId) =>
   `${getAppointmentDetailsHref(appointmentId)}/reschedule`;

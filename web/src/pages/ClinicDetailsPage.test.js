@@ -54,5 +54,7 @@ test('clinics without extra details hide those rows; unknown ids show a message'
   unmount();
 
   render(<ClinicDetailsPage clinicId="nope" />);
-  expect(screen.getByText('This clinic could not be found.')).toBeInTheDocument();
+  expect(
+    screen.getByRole('heading', { level: 1, name: 'This clinic could not be found.' })
+  ).toBeInTheDocument();
 });

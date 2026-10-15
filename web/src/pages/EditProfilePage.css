@@ -89,17 +89,6 @@
   background-color: var(--color-neutral-soft);
 }
 
-.edit-profile-notice {
-  margin-top: var(--space-3);
-  font-size: var(--font-size-sm);
-  text-align: center;
-  color: var(--color-text-muted);
-}
-
-.edit-profile-notice:empty {
-  display: none;
-}
-
 @media (max-width: 600px) {
   .edit-profile-card {
     padding: var(--space-5) var(--space-4);

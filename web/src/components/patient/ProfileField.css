@@ -56,3 +56,28 @@
 .profile-field-chevron {
   right: var(--space-3);
 }
+
+.profile-field-control.has-toggle {
+  padding-right: 44px;
+}
+
+.profile-field-toggle {
+  position: absolute;
+  top: 50%;
+  right: var(--space-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-muted);
+  transform: translateY(-50%);
+}
+
+.profile-field-toggle:hover {
+  color: var(--color-text);
+}

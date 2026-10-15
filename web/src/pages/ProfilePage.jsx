@@ -3,8 +3,17 @@ import PatientLayout from '../layouts/PatientLayout';
 import Icon from '../components/Icon';
 import Tabs from '../components/Tabs';
 import ProfileInfoCard from '../components/patient/ProfileInfoCard';
+import ProfileTag from '../components/patient/ProfileTag';
+import ProfileMedicalHistory from '../components/patient/ProfileMedicalHistory';
+import ProfileAllergiesMedications from '../components/patient/ProfileAllergiesMedications';
+import ProfileEmergencyContact from '../components/patient/ProfileEmergencyContact';
 import { PROFILE_TABS } from '../config/profile';
-import { PATIENT_EDIT_PROFILE_HREF, PATIENT_PROFILE_HREF } from '../config/patientNavigation';
+import {
+  getEditProfileHref,
+  PATIENT_CHANGE_PASSWORD_HREF,
+  PATIENT_EDIT_PROFILE_HREF,
+  PATIENT_PROFILE_HREF,
+} from '../config/patientNavigation';
 import { MOCK_APPOINTMENT_HISTORY } from '../mocks/appointmentHistory';
 import {
   MOCK_DASHBOARD_NOTIFICATIONS,
@@ -16,10 +25,8 @@ import { countAppointmentsByStatus } from '../utils/patientDashboard';
 import { formatBirthDate, getAge, getFullName } from '../utils/profile';
 import './ProfilePage.css';
 
-const listRows = (label, items) => items.map((item) => ({ label, value: item }));
-
-// My Profile with MOCK data. Only the Overview tab is designed; the other tabs
-// list what the medical alert already says. Password is not connected yet.
+// My Profile with MOCK data. Cards on the section tabs link to the matching
+// Edit Profile tab.
 function ProfilePage({ profile = MOCK_PATIENT_PROFILE, appointments = MOCK_APPOINTMENT_HISTORY }) {
   const [activeTab, setActiveTab] = useState('overview');
   const fullName = getFullName(profile);
@@ -32,51 +39,10 @@ function ProfilePage({ profile = MOCK_PATIENT_PROFILE, appointments = MOCK_APPOI
   ];
 
   const renderPanel = () => {
-    if (activeTab === 'medical') {
-      return (
-        <ProfileInfoCard
-          title="Medical History"
-          subtitle="Conditions your dentist should know about"
-          rows={listRows('Condition', profile.conditions)}
-        >
-          <p className="profile-empty">No medical conditions recorded.</p>
-        </ProfileInfoCard>
-      );
-    }
-    if (activeTab === 'allergies') {
-      return (
-        <ProfileInfoCard
-          title="Allergies & Medications"
-          subtitle="Share these before any procedure"
-          rows={[
-            ...listRows('Allergy', profile.allergies),
-            ...listRows('Medication', profile.medications),
-          ]}
-        >
-          <p className="profile-empty">No allergies or medications recorded.</p>
-        </ProfileInfoCard>
-      );
-    }
-    if (activeTab === 'emergency') {
-      const contact = profile.emergencyContact;
-      return (
-        <ProfileInfoCard
-          title="Emergency Contact"
-          subtitle="Who we call if something happens"
-          rows={
-            contact
-              ? [
-                  { label: 'Name', value: contact.name },
-                  { label: 'Relationship', value: contact.relationship },
-                  { label: 'Phone', value: contact.phone },
-                ]
-              : []
-          }
-        >
-          <p className="profile-empty">No emergency contact added yet.</p>
-        </ProfileInfoCard>
-      );
-    }
+    const sectionProps = { profile, editHref: getEditProfileHref(activeTab) };
+    if (activeTab === 'medical') return <ProfileMedicalHistory {...sectionProps} />;
+    if (activeTab === 'allergies') return <ProfileAllergiesMedications {...sectionProps} />;
+    if (activeTab === 'emergency') return <ProfileEmergencyContact {...sectionProps} />;
     return (
       <>
         <div className="profile-overview-grid">
@@ -149,8 +115,8 @@ function ProfilePage({ profile = MOCK_PATIENT_PROFILE, appointments = MOCK_APPOI
             </p>
             <ul className="profile-header-tags" aria-label="Health tags">
               {profile.tags.map(({ label, tone }) => (
-                <li key={label} className={`profile-tag profile-tag--${tone}`}>
-                  {label}
+                <li key={label}>
+                  <ProfileTag tone={tone}>{label}</ProfileTag>
                 </li>
               ))}
             </ul>
@@ -160,11 +126,10 @@ function ProfilePage({ profile = MOCK_PATIENT_PROFILE, appointments = MOCK_APPOI
               <Icon name="pencil" size={16} />
               Edit Profile
             </a>
-            {/* Change password is not connected until its design and the API exist. */}
-            <button type="button" className="btn profile-password">
+            <a href={PATIENT_CHANGE_PASSWORD_HREF} className="btn profile-password">
               <Icon name="lock" size={16} />
               Password
-            </button>
+            </a>
           </div>
         </section>
 

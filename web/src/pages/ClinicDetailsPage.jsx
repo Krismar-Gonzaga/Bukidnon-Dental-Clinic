@@ -39,7 +39,7 @@ function ClinicDetailsPage({ clinicId }) {
       <div className="clinic-details-page">
         <SiteHeader activeHref="/clinics" account={MOCK_PATIENT_ACCOUNT} />
         <main className="clinic-details-container clinic-details-missing">
-          <p>This clinic could not be found.</p>
+          <h1 className="clinic-details-missing-title">This clinic could not be found.</h1>
           <a href={PATIENT_FIND_CLINICS_HREF}>Back to Find Clinics</a>
         </main>
         <SiteFooter />

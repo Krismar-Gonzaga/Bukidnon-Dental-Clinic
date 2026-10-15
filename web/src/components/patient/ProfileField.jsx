@@ -1,10 +1,24 @@
+import { useState } from 'react';
 import Icon from '../Icon';
 import './ProfileField.css';
 
 // Labeled form field for the profile form: a text-type input, or a select
-// when `options` is given. `icon` is optional.
-function ProfileField({ id, label, icon, options, className = '', ...controlProps }) {
-  const controlClass = `profile-field-control${icon ? ' has-icon' : ''}`;
+// when `options` is given. `icon` is optional. `revealable` adds a show/hide
+// toggle for password fields.
+function ProfileField({
+  id,
+  label,
+  icon,
+  options,
+  revealable = false,
+  type,
+  className = '',
+  ...controlProps
+}) {
+  const [isRevealed, setIsRevealed] = useState(false);
+  const controlClass = `profile-field-control${icon ? ' has-icon' : ''}${
+    revealable ? ' has-toggle' : ''
+  }`;
 
   return (
     <div className={`profile-field ${className}`.trim()}>
@@ -26,7 +40,24 @@ function ProfileField({ id, label, icon, options, className = '', ...controlProp
             <Icon name="chevronDown" size={16} className="profile-field-chevron" />
           </>
         ) : (
-          <input id={id} className={controlClass} {...controlProps} />
+          <input
+            id={id}
+            type={revealable && isRevealed ? 'text' : type}
+            className={controlClass}
+            {...controlProps}
+          />
+        )}
+        {revealable && (
+          <button
+            type="button"
+            className="profile-field-toggle"
+            aria-label={`${isRevealed ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
+            aria-pressed={isRevealed}
+            aria-controls={id}
+            onClick={() => setIsRevealed((revealed) => !revealed)}
+          >
+            <Icon name={isRevealed ? 'eyeOff' : 'eye'} size={16} />
+          </button>
         )}
       </div>
     </div>

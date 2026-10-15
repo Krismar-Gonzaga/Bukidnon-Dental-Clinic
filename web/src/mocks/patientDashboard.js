@@ -19,9 +19,11 @@ export const MOCK_DASHBOARD_STATS = [
 ];
 
 // status: 'pending' (awaiting clinic approval) or 'confirmed'
+// id: the matching appointment in mocks/appointmentHistory.js, so View and
+// Reschedule open its pages.
 export const MOCK_DASHBOARD_APPOINTMENTS = [
   {
-    id: 'apt-1',
+    id: 'hist-1',
     service: 'Root Canal Treatment',
     dentist: 'Dr. Laura Reyes',
     clinic: 'Don Carlos Dental Clinic',
@@ -29,7 +31,7 @@ export const MOCK_DASHBOARD_APPOINTMENTS = [
     dateTime: 'July 25, 2026 at 9:00 AM',
   },
   {
-    id: 'apt-2',
+    id: 'hist-2',
     service: 'Braces Consultation',
     dentist: 'Dr. Maria Braganza',
     clinic: 'Braganza Dental Clinic',

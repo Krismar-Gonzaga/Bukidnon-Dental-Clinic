@@ -11,5 +11,33 @@ export const PROFILE_TABS = [
   { id: 'emergency', label: 'Emergency Contact', editLabel: 'Emergency Contact', icon: 'phone' },
 ];
 
-export const PROFILE_NOT_CONNECTED_NOTICE =
-  'Saving your profile is not connected yet. Your changes were not saved.';
+// Allergy severity labels and chip tones, from the Figma sample.
+export const ALLERGY_SEVERITIES = {
+  severe: { label: 'Severe', tone: 'danger' },
+  moderate: { label: 'Moderate', tone: 'warning' },
+  mild: { label: 'Mild', tone: 'success' },
+};
+
+// Dental anxiety is shown on a 5-step bar (Figma).
+export const ANXIETY_SCALE_MAX = 5;
+
+// PROVISIONAL consent settings from the Figma Emergency Contact tab, in order.
+export const CONSENT_OPTIONS = [
+  { id: 'smsReminders', label: 'SMS appointment reminders' },
+  { id: 'emailFollowUp', label: 'Email follow-up after procedures' },
+  { id: 'shareMedicalHistory', label: 'Share medical history with attending dentist' },
+  {
+    id: 'emergencyContactConsent',
+    label: 'Allow clinic to contact emergency contact for major procedures',
+  },
+  { id: 'promotions', label: 'Promotional offers and dental health tips' },
+];
+
+// PROVISIONAL copy from the Figma success screens.
+export const PROFILE_UPDATED_TITLE = 'Profile Updated!';
+export const PROFILE_UPDATED_MESSAGE = 'Your profile information has been successfully saved.';
+export const PASSWORD_CHANGED_TITLE = 'Password Changed!';
+export const PASSWORD_CHANGED_MESSAGE = 'Your password has been updated successfully.';
+
+// Matches the backend rule for POST /change-password (Password::min(8)).
+export const PASSWORD_MIN_LENGTH = 8;

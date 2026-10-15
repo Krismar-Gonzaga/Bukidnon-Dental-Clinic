@@ -6,6 +6,27 @@
   box-shadow: var(--shadow-md);
 }
 
+.profile-info-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.profile-info-card-edit {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.profile-info-card-edit:hover {
+  text-decoration: underline;
+}
+
 .profile-info-card-title {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);

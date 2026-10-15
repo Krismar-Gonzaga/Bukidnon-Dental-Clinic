@@ -50,17 +50,18 @@ test('renders a stat card per summary item', () => {
 
 test('renders appointments with status-specific actions', () => {
   render(<PatientDashboardPage />);
-  MOCK_DASHBOARD_APPOINTMENTS.forEach(({ service }) => {
-    expect(
-      screen.getByRole('button', { name: `View ${service}` })
-    ).toBeInTheDocument();
+  MOCK_DASHBOARD_APPOINTMENTS.forEach(({ id, service }) => {
+    expect(screen.getByRole('link', { name: `View ${service}` })).toHaveAttribute(
+      'href',
+      `/patient/appointments/${id}`
+    );
   });
   expect(screen.getByText('Pending')).toBeInTheDocument();
   expect(
-    screen.getByRole('button', { name: 'Reschedule Braces Consultation' })
-  ).toBeInTheDocument();
+    screen.getByRole('link', { name: 'Reschedule Braces Consultation' })
+  ).toHaveAttribute('href', '/patient/appointments/hist-2/reschedule');
   expect(
-    screen.queryByRole('button', { name: 'Reschedule Root Canal Treatment' })
+    screen.queryByRole('link', { name: 'Reschedule Root Canal Treatment' })
   ).not.toBeInTheDocument();
 });
 
