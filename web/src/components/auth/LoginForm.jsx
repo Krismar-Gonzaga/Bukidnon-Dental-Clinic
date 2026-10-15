@@ -3,29 +3,60 @@ import Icon from '../Icon';
 import AuthField from './AuthField';
 import { FORGOT_PASSWORD_HREF, SIGN_IN_ROLES } from '../../config/auth';
 import { REGISTER_HREF } from '../../config/navigation';
+import { login, logout } from '../../services/authService';
+import { getErrorMessage } from '../../services/apiErrors';
+import { navigateTo } from '../../utils/navigation';
 import './auth.css';
 import './LoginForm.css';
 
-// Login form UI only. Authentication is not integrated yet: submitting never
-// sends or stores credentials, it only shows a notice for the chosen role.
+// Signs in through the Laravel API. The clicked role button must match the
+// account's role; on a mismatch the new session is revoked straight away.
 function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState({ text: '', isError: false });
+  const [submitting, setSubmitting] = useState(false);
   // Set by the clicked role button just before the form submits.
   const pendingRoleRef = useRef(SIGN_IN_ROLES[0]);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    setNotice(
-      `${pendingRoleRef.current.label} sign-in is not connected yet. You have not been signed in.`
-    );
+    const role = pendingRoleRef.current;
+    setSubmitting(true);
+    setNotice({ text: '', isError: false });
+
+    try {
+      const user = await login({ email, password });
+
+      if (user.role !== role.backendRole) {
+        await logout();
+        setNotice({
+          text: `This account is not a ${role.label} account. Use the sign-in button for your account type.`,
+          isError: true,
+        });
+        return;
+      }
+
+      if (role.homeHref) {
+        navigateTo(role.homeHref);
+        return;
+      }
+      setNotice({
+        text: `Signed in as ${role.label}. The ${role.label} portal is not available on the web yet.`,
+        isError: false,
+      });
+    } catch (error) {
+      setNotice({ text: getErrorMessage(error), isError: true });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <form
       className="auth-card"
       aria-labelledby="login-title"
+      aria-busy={submitting}
       onSubmit={handleSubmit}
     >
       <span className="auth-badge" aria-hidden="true">
@@ -71,6 +102,7 @@ function LoginForm() {
             key={role.id}
             type="submit"
             className={`btn login-role login-role--${role.variant}`}
+            disabled={submitting}
             onClick={() => {
               pendingRoleRef.current = role;
             }}
@@ -81,8 +113,11 @@ function LoginForm() {
         ))}
       </div>
 
-      <p className="auth-notice" role="status">
-        {notice}
+      <p
+        className={`auth-notice${notice.isError ? ' auth-notice--error' : ''}`}
+        role="status"
+      >
+        {notice.text}
       </p>
 
       <p className="auth-footer">

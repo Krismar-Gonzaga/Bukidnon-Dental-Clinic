@@ -133,6 +133,10 @@
   color: var(--color-text-muted);
 }
 
+.auth-notice--error {
+  color: var(--color-error);
+}
+
 .auth-notice:empty {
   display: none;
 }

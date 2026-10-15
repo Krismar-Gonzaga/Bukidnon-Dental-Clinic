@@ -1,12 +1,20 @@
 import Icon from '../components/Icon';
 import { BRAND_NAME } from '../config/app';
+import { LOGIN_HREF } from '../config/navigation';
 import {
   PATIENT_NAV_ITEMS,
   PATIENT_NOTIFICATIONS_HREF,
 } from '../config/patientNavigation';
+import { logout } from '../services/authService';
+import { navigateTo } from '../utils/navigation';
 import './PatientLayout.css';
 
 const getInitial = (name) => name.trim().charAt(0).toUpperCase();
+
+const handleLogout = async () => {
+  await logout();
+  navigateTo(LOGIN_HREF);
+};
 
 // Patient portal frame: fixed sidebar with account summary and navigation,
 // plus a top bar with the page title, notifications, and avatar.
@@ -52,8 +60,7 @@ function PatientLayout({ title, activeHref, user, hasUnreadNotifications, childr
         </nav>
 
         <div className="patient-sidebar-bottom">
-          {/* Sign-out is not connected until authentication is integrated. */}
-          <button type="button" className="patient-logout">
+          <button type="button" className="patient-logout" onClick={handleLogout}>
             <Icon name="logOut" size={20} />
             Log Out
           </button>

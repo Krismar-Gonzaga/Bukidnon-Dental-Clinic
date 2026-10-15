@@ -1,6 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import LoginPage from './LoginPage';
 import { SIGN_IN_ROLES } from '../config/auth';
+import { login, logout } from '../services/authService';
+import { navigateTo } from '../utils/navigation';
+
+jest.mock('../services/authService', () => ({
+  login: jest.fn(),
+  logout: jest.fn(),
+}));
+jest.mock('../utils/navigation', () => ({ navigateTo: jest.fn() }));
 
 test('renders the sign-in form with required fields', () => {
   render(<LoginPage />);
@@ -35,23 +43,69 @@ test('toggles password visibility', () => {
   expect(password).toHaveAttribute('type', 'password');
 });
 
-test('submitting shows a not-connected notice for the chosen role', () => {
-  render(<LoginPage />);
+const signInAs = (roleLabel) => {
   fireEvent.change(screen.getByLabelText('Email Address'), {
     target: { value: 'juan@example.com' },
   });
   fireEvent.change(screen.getByLabelText('Password'), {
     target: { value: 'secret' },
   });
+  const button = screen.getByRole('button', { name: `Sign In as ${roleLabel}` });
+  fireEvent.click(button);
+  fireEvent.submit(button.closest('form'));
+};
 
-  const dentistButton = screen.getByRole('button', { name: 'Sign In as Dentist' });
-  fireEvent.click(dentistButton);
-  fireEvent.submit(dentistButton.closest('form'));
+test('signs a patient in and opens the patient dashboard', async () => {
+  login.mockResolvedValue({ role: 'patient' });
+  render(<LoginPage />);
+  signInAs('Patient');
 
-  expect(screen.getByRole('status')).toHaveTextContent(
-    'Dentist sign-in is not connected yet'
+  await waitFor(() =>
+    expect(navigateTo).toHaveBeenCalledWith('/patient/dashboard')
   );
+  expect(login).toHaveBeenCalledWith({
+    email: 'juan@example.com',
+    password: 'secret',
+  });
+  expect(logout).not.toHaveBeenCalled();
+});
+
+test('signs out again when the account role does not match the button', async () => {
+  login.mockResolvedValue({ role: 'patient' });
+  logout.mockResolvedValue();
+  render(<LoginPage />);
+  signInAs('Dentist');
+
+  expect(
+    await screen.findByText(/This account is not a Dentist account/)
+  ).toBeInTheDocument();
+  expect(logout).toHaveBeenCalled();
+  expect(navigateTo).not.toHaveBeenCalled();
+});
+
+test('shows a notice for roles without a web portal yet', async () => {
+  login.mockResolvedValue({ role: 'staff' });
+  render(<LoginPage />);
+  signInAs('Clinic Staff');
+
+  expect(
+    await screen.findByText(
+      'Signed in as Clinic Staff. The Clinic Staff portal is not available on the web yet.'
+    )
+  ).toBeInTheDocument();
+  expect(navigateTo).not.toHaveBeenCalled();
+});
+
+test('shows the server error and never echoes the password', async () => {
+  login.mockRejectedValue({
+    response: { status: 401, data: { message: 'Invalid login credentials' } },
+  });
+  render(<LoginPage />);
+  signInAs('Patient');
+
+  expect(await screen.findByText('Invalid login credentials')).toBeInTheDocument();
   expect(screen.getByRole('status')).not.toHaveTextContent('secret');
+  expect(navigateTo).not.toHaveBeenCalled();
 });
 
 test('shows a Back to Home link and the brand above the form', () => {
