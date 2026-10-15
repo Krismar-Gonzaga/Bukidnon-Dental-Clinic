@@ -1,200 +1,186 @@
 <?php
 
-namespace App\Http\Controllers\API;
+namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Http\Requests\Auth\ChangePasswordRequest;
+use App\Http\Requests\Auth\ForgotPasswordRequest;
+use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\ResetPasswordRequest;
+use App\Http\Requests\Auth\UpdateProfileRequest;
 use App\Models\Patient;
+use App\Models\User;
+use App\Services\AuditLogger;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Facades\Password;
 
 class AuthController extends Controller
 {
-    public function register(Request $request)
+    public function __construct(private readonly AuditLogger $audit)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => ['required', 'confirmed', Password::min(8)],
-            'phone' => 'required|string|max:20',
-            'address' => 'required|string|max:255',
-            'role' => 'sometimes|string|in:patient,clinic_admin',
-        ]);
+    }
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
+    public function register(RegisterRequest $request): JsonResponse
+    {
         $role = $request->input('role', 'patient');
 
-        // Create user
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'role' => $role,
-        ]);
+        $user = DB::transaction(function () use ($request, $role) {
+            $user = new User($request->only('name', 'email', 'password'));
+            $user->role = $role;
+            $user->save();
 
-        // Only patients get a patient profile; clinic admins set up their clinic separately
-        if ($role === 'patient') {
-            Patient::create([
-                'user_id' => $user->id,
-                'phone' => $request->phone,
-                'address' => $request->address,
-                'birth_date' => $request->birth_date ?? null,
-                'gender' => $request->gender ?? null,
-            ]);
-            $user->load('patient');
-        }
+            // Only patients get a patient profile; clinic admins set up their
+            // clinic through the clinic application workflow.
+            if ($role === 'patient') {
+                Patient::create([
+                    'user_id' => $user->id,
+                    'phone' => $request->phone,
+                    'address' => $request->address,
+                    'birth_date' => $request->birth_date,
+                    'gender' => $request->gender,
+                ]);
+                $user->load('patient');
+            }
 
-        // Generate token
-        $token = $user->createToken('auth_token')->plainTextToken;
+            return $user;
+        });
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Registration successful',
-            'data' => [
-                'user' => $user,
-                'token' => $token,
-                'role' => $user->role,
-            ]
-        ], 201);
+        $this->audit->record('auth.registered', $user, ['role' => $role], actor: $user);
+
+        return $this->ok($this->authPayload($user), 'Registration successful', 201);
     }
 
-    public function login(Request $request)
+    public function login(LoginRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
-            'password' => 'required'
-        ]);
+        $user = User::whereRaw('LOWER(email) = ?', [$request->email])->first();
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
+        if (! $user || ! Hash::check($request->password, $user->password)) {
+            $this->audit->record('auth.login_failed', $user, ['email' => $request->email]);
+
+            return $this->fail('Invalid login credentials', 401);
         }
 
-        if (!Auth::attempt($request->only('email', 'password'))) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid login credentials'
-            ], 401);
+        if (! $user->isActive()) {
+            $this->audit->record('auth.login_blocked', $user, actor: $user);
+
+            return $this->fail('This account is suspended.', 403);
         }
 
-        $user = User::where('email', $request->email)->firstOrFail();
-        $token = $user->createToken('auth_token')->plainTextToken;
+        $this->audit->record('auth.login', $user, actor: $user);
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'user' => $user,
-                'token' => $token,
-                'role' => $user->role
-            ]
-        ]);
+        return $this->ok($this->authPayload($user));
     }
 
-    public function logout(Request $request)
+    public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
+        $this->audit->record('auth.logout', $request->user());
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Logged out successfully'
-        ]);
+        return $this->ok(message: 'Logged out successfully');
     }
 
-    /**
-     * Get authenticated user
-     */
-    public function user(Request $request)
+    /** The signed-in user, their patient profile, and their clinic memberships. */
+    public function user(Request $request): JsonResponse
     {
         $user = $request->user()->load('patient');
 
-        return response()->json([
-            'success' => true,
-            'data' => $user
-        ]);
+        return $this->ok($this->userData($user));
     }
 
-    /**
-     * Update user profile
-     */
-    public function updateProfile(Request $request)
+    public function updateProfile(UpdateProfileRequest $request): JsonResponse
     {
         $user = $request->user();
 
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|string|max:255',
-            'email' => 'sometimes|email|unique:users,email,' . $user->id,
-            'phone' => 'sometimes|string|max:20',
-            'address' => 'sometimes|string|max:255',
-        ]);
+        DB::transaction(function () use ($request, $user) {
+            $user->update($request->only('name', 'email'));
+            $user->patient?->update($request->only('phone', 'address'));
+        });
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
+        return $this->ok($user->load('patient'), 'Profile updated successfully');
+    }
 
-        // Update user
-        $user->update($request->only('name', 'email'));
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
+    {
+        $user = $request->user();
+        $user->update(['password' => $request->new_password]);
 
-        // Update patient
-        if ($user->patient) {
-            $user->patient->update($request->only('phone', 'address'));
-        }
+        // Sign out every other device; keep the session that made the change.
+        $user->tokens()->whereKeyNot($user->currentAccessToken()->getKey())->delete();
+        $this->audit->record('auth.password_changed', $user);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Profile updated successfully',
-            'data' => $user->load('patient')
-        ]);
+        return $this->ok(message: 'Password changed successfully');
     }
 
     /**
-     * Change password
+     * Always answers the same way, so the endpoint cannot be used to find
+     * out which emails have accounts.
      */
-    public function changePassword(Request $request)
+    public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'current_password' => 'required|string',
-            'new_password' => ['required', 'confirmed', Password::min(8)],
-        ]);
+        $user = User::whereRaw('LOWER(email) = ?', [$request->email])->first();
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
+        if ($user && $user->isActive()) {
+            Password::sendResetLink(['email' => $user->email]);
+            $this->audit->record('auth.password_reset_requested', $user, actor: $user);
         }
 
-        $user = $request->user();
+        return $this->ok(message: 'If an account exists for that email, a password reset link has been sent.');
+    }
 
-        // Check current password
-        if (!Hash::check($request->current_password, $user->password)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Current password is incorrect'
-            ], 400);
+    public function resetPassword(ResetPasswordRequest $request): JsonResponse
+    {
+        $user = User::whereRaw('LOWER(email) = ?', [$request->email])->first();
+
+        $status = Password::reset(
+            [
+                'email' => $user?->email ?? $request->email,
+                'password' => $request->password,
+                'password_confirmation' => $request->password_confirmation,
+                'token' => $request->token,
+            ],
+            function (User $user, string $password) {
+                $user->update(['password' => $password]);
+                $user->tokens()->delete();
+            }
+        );
+
+        if ($status !== Password::PASSWORD_RESET) {
+            return $this->fail('This password reset link is invalid or has expired.', 422, [
+                'email' => ['This password reset link is invalid or has expired.'],
+            ]);
         }
 
-        // Update password
-        $user->update([
-            'password' => Hash::make($request->new_password)
-        ]);
+        $this->audit->record('auth.password_reset', $user, actor: $user);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Password changed successfully'
-        ]);
+        return $this->ok(message: 'Password has been reset. You can now sign in.');
+    }
+
+    private function authPayload(User $user): array
+    {
+        return [
+            'user' => $this->userData($user),
+            'token' => $user->createToken('auth_token')->plainTextToken,
+            'role' => $user->role,
+        ];
+    }
+
+    private function userData(User $user): array
+    {
+        $memberships = $user->clinicMemberships()
+            ->active()
+            ->with('clinic:id,name')
+            ->get()
+            ->map(fn ($membership) => [
+                'clinic_id' => $membership->clinic_id,
+                'clinic_name' => $membership->clinic?->name,
+                'role' => $membership->role,
+                'permissions' => $membership->permissions(),
+            ]);
+
+        return $user->toArray() + ['memberships' => $memberships];
     }
 }

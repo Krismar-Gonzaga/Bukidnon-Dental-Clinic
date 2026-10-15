@@ -1,4 +1,3 @@
-// database/migrations/2026_07_19_124230_create_billing_transactions_table.php
 <?php
 
 use Illuminate\Database\Migrations\Migration;
