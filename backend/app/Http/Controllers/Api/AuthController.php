@@ -36,13 +36,9 @@ class AuthController extends Controller
             // Only patients get a patient profile; clinic admins set up their
             // clinic through the clinic application workflow.
             if ($role === 'patient') {
-                Patient::create([
-                    'user_id' => $user->id,
-                    'phone' => $request->phone,
-                    'address' => $request->address,
-                    'birth_date' => $request->birth_date,
-                    'gender' => $request->gender,
-                ]);
+                $patient = new Patient($request->only('phone', 'address', 'birth_date', 'gender'));
+                $patient->user_id = $user->id;
+                $patient->save();
                 $user->load('patient');
             }
 

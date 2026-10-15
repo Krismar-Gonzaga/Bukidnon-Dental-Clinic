@@ -22,6 +22,7 @@ return [
         // Owner / administrator. Runs the clinic but does not read or write
         // clinical records by default (records.* is deliberately absent).
         'clinic_admin' => [
+            'clinic.view',
             'clinic.profile.manage',
             'clinic.branches.manage',
             'clinic.services.manage',
@@ -40,6 +41,7 @@ return [
 
         // Treats patients: sees their own schedule and writes clinical records.
         'dentist' => [
+            'clinic.view',
             'appointments.view_assigned',
             'appointments.progress',
             'patients.view',
@@ -50,6 +52,7 @@ return [
         // Receptionist: runs the schedule and patient registration, but
         // cannot read or change clinical treatment notes.
         'staff' => [
+            'clinic.view',
             'appointments.view_all',
             'appointments.manage',
             'patients.view',
@@ -57,6 +60,7 @@ return [
         ],
 
         'inventory_staff' => [
+            'clinic.view',
             'inventory.view',
             'inventory.manage',
         ],

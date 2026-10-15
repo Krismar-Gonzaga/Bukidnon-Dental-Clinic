@@ -13,6 +13,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * Guards clinic-scoped routes that carry a {clinic} parameter.
  *
  * Usage: ->middleware('clinic.permission:appointments.manage')
+ *        ->middleware('clinic.permission:appointments.view_all|appointments.view_assigned')
  *
  * - Not an active member of the clinic → 404, so outsiders cannot even
  *   confirm which clinic ids exist.
@@ -37,7 +38,10 @@ class EnsureClinicPermission
             throw new NotFoundHttpException();
         }
 
-        if (! $membership->grants($permission)) {
+        // "a|b" means any of the listed permissions is enough.
+        $granted = collect(explode('|', $permission))->contains(fn (string $p) => $membership->grants($p));
+
+        if (! $granted) {
             throw new AccessDeniedHttpException('You do not have permission to perform this action.');
         }
 

@@ -10,3 +10,8 @@ Artisan::command('inspire', function () {
 
 // Remove API tokens that expired more than a day ago.
 Schedule::command('sanctum:prune-expired --hours=24')->daily();
+
+// Run `php artisan schedule:work` (development) or a cron calling
+// `php artisan schedule:run` every minute (production) for these.
+Schedule::command('appointments:send-reminders')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('inventory:send-alerts')->dailyAt('07:00')->timezone(config('booking.timezone'));

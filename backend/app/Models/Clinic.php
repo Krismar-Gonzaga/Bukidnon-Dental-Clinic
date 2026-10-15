@@ -2,13 +2,22 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Clinic extends Model
 {
     use HasFactory;
 
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_APPROVED = 'approved';
+    public const STATUS_SUSPENDED = 'suspended';
+
+    // status, is_verified, is_published, owner_id and suspension fields are
+    // changed only by the verification and administration workflows.
     protected $fillable = [
         'name',
         'slug',
@@ -19,50 +28,106 @@ class Clinic extends Model
         'contact_number',
         'email',
         'image',
-        'rating',
-        'is_featured',
-        'is_verified',
         'opening_time',
         'closing_time',
-        'services_offered',
+        'latitude',
+        'longitude',
     ];
 
     protected $casts = [
-        'rating' => 'decimal:2',
+        'rating' => 'decimal:1',
         'is_featured' => 'boolean',
         'is_verified' => 'boolean',
+        'is_published' => 'boolean',
         'services_offered' => 'array',
+        'latitude' => 'float',
+        'longitude' => 'float',
+        'suspended_at' => 'datetime',
     ];
 
+    /** Clinics shown in the public directory. */
+    public function scopePubliclyListed(Builder $query): Builder
+    {
+        return $query->where('status', self::STATUS_APPROVED)
+            ->where('is_published', true)
+            ->where('is_verified', true);
+    }
+
+    public function isPubliclyListed(): bool
+    {
+        return $this->status === self::STATUS_APPROVED && $this->is_published && $this->is_verified;
+    }
+
     // Relationships
-    public function branches()
+    public function branches(): HasMany
     {
         return $this->hasMany(ClinicBranch::class);
     }
 
-    public function dentists()
+    public function holidays(): HasMany
     {
-        return $this->hasMany(Dentist::class);
+        return $this->hasMany(ClinicHoliday::class);
     }
 
-    public function services()
+    public function scheduleBlocks(): HasMany
     {
-        return $this->hasMany(Service::class);
+        return $this->hasMany(ScheduleBlock::class);
     }
 
-    public function specializations()
+    public function memberships(): HasMany
+    {
+        return $this->hasMany(ClinicMembership::class);
+    }
+
+    /** Dentist profiles with an active dentist membership in this clinic. */
+    public function dentistProfiles(): Builder
+    {
+        return Dentist::query()->workingAt($this->id);
+    }
+
+    public function serviceRates(): HasMany
+    {
+        return $this->hasMany(ServiceRate::class);
+    }
+
+    public function specializations(): BelongsToMany
     {
         return $this->belongsToMany(Specialization::class, 'clinic_specializations');
     }
 
-    public function reviews()
+    public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
     }
 
-    public function appointments()
+    public function appointments(): HasMany
     {
         return $this->hasMany(Appointment::class);
+    }
+
+    public function patients(): BelongsToMany
+    {
+        return $this->belongsToMany(Patient::class, 'clinic_patients')->withTimestamps();
+    }
+
+    public function patientRecords(): HasMany
+    {
+        return $this->hasMany(PatientRecord::class);
+    }
+
+    public function inventoryItems(): HasMany
+    {
+        return $this->hasMany(InventoryItem::class);
+    }
+
+    public function inventoryCategories(): HasMany
+    {
+        return $this->hasMany(InventoryCategory::class);
+    }
+
+    public function suppliers(): HasMany
+    {
+        return $this->hasMany(Supplier::class);
     }
 
     // Accessors
@@ -73,6 +138,13 @@ class Clinic extends Model
 
     public function getRatingStarsAttribute()
     {
-        return number_format($this->rating ?? 0, 1);
+        return number_format((float) ($this->rating ?? 0), 1);
+    }
+
+    /** Recalculate the public rating from published reviews. */
+    public function refreshRating(): void
+    {
+        $average = $this->reviews()->where('status', Review::STATUS_APPROVED)->avg('rating');
+        $this->forceFill(['rating' => round((float) ($average ?? 0), 1)])->save();
     }
 }

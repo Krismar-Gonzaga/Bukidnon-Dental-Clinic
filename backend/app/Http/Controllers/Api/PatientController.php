@@ -3,73 +3,85 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PatientRecordResource;
+use App\Models\Patient;
+use App\Models\PatientRecord;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
+/** The signed-in patient's own profile and patient-facing records. */
 class PatientController extends Controller
 {
-    /**
-     * Get the authenticated patient's profile
-     */
     public function profile(Request $request)
     {
-        $user = $request->user()->load('patient');
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->patient->phone ?? null,
-                'address' => $user->patient->address ?? null,
-                'birth_date' => $user->patient->birth_date ?? null,
-                'gender' => $user->patient->gender ?? null,
-            ],
-        ]);
+        return $this->ok($this->profileData($request->user()->load('patient')));
     }
 
-    /**
-     * Update the authenticated patient's profile
-     */
     public function updateProfile(Request $request)
     {
         $user = $request->user();
 
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|string|max:255',
-            'email' => 'sometimes|email|unique:users,email,' . $user->id,
-            'phone' => 'sometimes|string|max:20',
-            'address' => 'sometimes|string|max:255',
-            'birth_date' => 'sometimes|date',
-            'gender' => 'sometimes|in:male,female,other',
+        $data = $request->validate([
+            'name' => ['sometimes', 'string', 'max:255'],
+            'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'phone' => ['sometimes', 'string', 'max:20'],
+            'address' => ['sometimes', 'string', 'max:255'],
+            'birth_date' => ['sometimes', 'nullable', 'date', 'before:today'],
+            'gender' => ['sometimes', 'nullable', 'in:male,female,other'],
+            'emergency_contact_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'emergency_contact_phone' => ['sometimes', 'nullable', 'string', 'max:20'],
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
+        $user->update(array_intersect_key($data, array_flip(['name', 'email'])));
+        $user->patient?->update(array_diff_key($data, array_flip(['name', 'email'])));
 
-        $user->update($request->only('name', 'email'));
+        return $this->ok($this->profileData($user->load('patient')), 'Profile updated successfully');
+    }
 
-        if ($user->patient) {
-            $user->patient->update($request->only('phone', 'address', 'birth_date', 'gender'));
-        }
+    /**
+     * Records a clinic chose to share with the patient. Only the care
+     * instructions and visit summary are exposed — internal notes stay
+     * with the clinic.
+     */
+    public function records(Request $request)
+    {
+        $patient = $request->user()->patient ?? throw new AccessDeniedHttpException('Only patient accounts have records.');
 
-        $user->load('patient');
+        $records = PatientRecord::where('patient_id', $patient->id)
+            ->current()
+            ->where('is_patient_visible', true)
+            ->with(['clinic:id,name', 'dentist.user'])
+            ->latest()
+            ->get()
+            ->map(fn ($record) => [
+                'id' => $record->id,
+                'clinic' => $record->clinic?->name,
+                'dentist' => $record->dentist?->user?->name,
+                'record_type' => $record->record_type,
+                'procedures' => $record->procedures,
+                'care_instructions' => $record->care_instructions,
+                'date' => (new PatientRecordResource($record))->resolve()['created_at'],
+            ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Profile updated successfully',
-            'data' => [
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->patient->phone ?? null,
-                'address' => $user->patient->address ?? null,
-                'birth_date' => $user->patient->birth_date ?? null,
-                'gender' => $user->patient->gender ?? null,
-            ],
-        ]);
+        return $this->ok($records);
+    }
+
+    private function profileData($user): array
+    {
+        /** @var Patient|null $patient */
+        $patient = $user->patient;
+
+        return [
+            'name' => $user->name,
+            'email' => $user->email,
+            'phone' => $patient?->phone,
+            'address' => $patient?->address,
+            'birth_date' => $patient?->birth_date?->toDateString(),
+            'gender' => $patient?->gender,
+            'emergency_contact_name' => $patient?->emergency_contact_name,
+            'emergency_contact_phone' => $patient?->emergency_contact_phone,
+            'notification_preferences' => ['email' => ($user->notification_preferences['email'] ?? true)],
+        ];
     }
 }
