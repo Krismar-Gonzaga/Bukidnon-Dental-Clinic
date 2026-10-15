@@ -5,7 +5,7 @@ import AuthPageLayout from '../layouts/AuthPageLayout';
 import AuthField from '../components/auth/AuthField';
 import Icon from '../components/Icon';
 import { FORGOT_PASSWORD_HREF, LOGIN_HREF } from '../config/navigation';
-import { PASSWORD_MIN_LENGTH } from '../config/profile';
+import { getPasswordRuleError } from '../utils/passwordStrength';
 import { resetPassword } from '../services/authService';
 import { getErrorMessage } from '../services/apiErrors';
 import '../components/auth/auth.css';
@@ -23,8 +23,9 @@ function ResetPasswordPage() {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    if (password.length < PASSWORD_MIN_LENGTH) {
-      setLocalError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters.`);
+    const ruleError = getPasswordRuleError(password);
+    if (ruleError) {
+      setLocalError(ruleError);
       return;
     }
     if (password !== confirm) {

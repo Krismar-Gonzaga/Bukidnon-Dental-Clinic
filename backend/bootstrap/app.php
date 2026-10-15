@@ -28,6 +28,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // browser never holds an API token. Mobile keeps using tokens.
         $middleware->statefulApi();
 
+        $middleware->appendToGroup('api', \App\Http\Middleware\SecurityHeaders::class);
+
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'active' => \App\Http\Middleware\EnsureAccountActive::class,

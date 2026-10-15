@@ -35,3 +35,15 @@ export function getPasswordStrength(password) {
   const hint = unmet[0] ? `${unmet[0].hint} to strengthen` : '';
   return { score, label, level, hint };
 }
+
+// The rule the server enforces (at least PASSWORD_MIN_LENGTH characters with
+// at least one letter and one number). Returns a message, or '' when it passes.
+export function getPasswordRuleError(password, label = 'Password') {
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return `${label} must be at least ${PASSWORD_MIN_LENGTH} characters.`;
+  }
+  if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+    return `${label} must include at least one letter and one number.`;
+  }
+  return '';
+}

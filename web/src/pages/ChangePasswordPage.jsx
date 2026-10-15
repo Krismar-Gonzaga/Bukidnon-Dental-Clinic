@@ -8,8 +8,8 @@ import SuccessCard from '../components/patient/SuccessCard';
 import {
   PASSWORD_CHANGED_MESSAGE,
   PASSWORD_CHANGED_TITLE,
-  PASSWORD_MIN_LENGTH,
 } from '../config/profile';
+import { getPasswordRuleError } from '../utils/passwordStrength';
 import { PATIENT_PROFILE_HREF } from '../config/patientNavigation';
 import { changePassword } from '../services/authService';
 import { getErrorMessage, getFieldErrors } from '../services/apiErrors';
@@ -20,9 +20,8 @@ const INITIAL_FORM = { currentPassword: '', newPassword: '', confirmPassword: ''
 const STRENGTH_TEXT_ID = 'change-password-strength';
 
 const getFormError = ({ newPassword, confirmPassword }) => {
-  if (newPassword.length < PASSWORD_MIN_LENGTH) {
-    return `New password must be at least ${PASSWORD_MIN_LENGTH} characters.`;
-  }
+  const ruleError = getPasswordRuleError(newPassword, 'New password');
+  if (ruleError) return ruleError;
   if (newPassword !== confirmPassword) return 'New passwords do not match.';
   return '';
 };

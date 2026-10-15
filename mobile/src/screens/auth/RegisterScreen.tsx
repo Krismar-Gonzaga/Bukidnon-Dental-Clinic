@@ -119,6 +119,8 @@ const RegisterScreen = ({ navigation, route }: RegisterScreenProps) => {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 8) {
       newErrors.password = 'Password must be at least 8 characters';
+    } else if (!/[A-Za-z]/.test(formData.password) || !/\d/.test(formData.password)) {
+      newErrors.password = 'Password must include at least one letter and one number';
     }
 
     if (formData.password !== formData.password_confirmation) {

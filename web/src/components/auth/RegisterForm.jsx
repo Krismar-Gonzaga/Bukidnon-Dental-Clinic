@@ -8,6 +8,7 @@ import { register } from '../../services/authService';
 import { getErrorMessage, getFieldErrors } from '../../services/apiErrors';
 import { useAuth } from '../../auth/AuthContext';
 import { getHomeHref } from '../../auth/homeRoutes';
+import { getPasswordRuleError } from '../../utils/passwordStrength';
 import './auth.css';
 import './RegisterForm.css';
 
@@ -66,6 +67,11 @@ function RegisterForm() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setNotice({ text: '', isError: false });
+    const passwordError = getPasswordRuleError(values.password);
+    if (passwordError) {
+      setFieldErrors({ password: passwordError });
+      return;
+    }
     if (values.password !== values.confirmPassword) {
       setFieldErrors({ confirmPassword: PASSWORD_MISMATCH });
       return;
