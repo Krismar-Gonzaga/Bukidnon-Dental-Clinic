@@ -1,5 +1,5 @@
 // src/screens/FeedbackScreen.js
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -15,20 +15,35 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { patientService } from '../../services/api';
 
+type Reviewable = { id: number; clinic?: { name?: string }; service?: { name?: string }; appointment_date?: string };
+
+// Reviews are allowed once per completed appointment; the server enforces it.
+// Opened without an appointment (e.g. from the menu), the screen lists the
+// completed visits still waiting for a review.
 const FeedbackScreen = ({ route, navigation }: { route: any; navigation: any }) => {
-  const { appointmentId } = route.params || {};
+  const [appointmentId, setAppointmentId] = useState<number | string | undefined>(route.params?.appointmentId);
+  const [eligible, setEligible] = useState<Reviewable[] | null>(null);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
-    if (rating === 0) {
-      Alert.alert('Error', 'Please select a rating');
+  useEffect(() => {
+    if (appointmentId) {
       return;
     }
+    patientService
+      .getReviewableAppointments()
+      .then((response: any) => setEligible(response.data?.data ?? []))
+      .catch(() => setEligible([]));
+  }, [appointmentId]);
 
-    if (!comment.trim()) {
-      Alert.alert('Error', 'Please write a review');
+  const handleSubmit = async () => {
+    if (!appointmentId) {
+      Alert.alert('Choose a visit', 'Select the appointment you want to review.');
+      return;
+    }
+    if (rating === 0) {
+      Alert.alert('Error', 'Please select a rating');
       return;
     }
 
@@ -37,7 +52,7 @@ const FeedbackScreen = ({ route, navigation }: { route: any; navigation: any }) 
       const response = await patientService.submitFeedback({
         appointment_id: appointmentId,
         rating,
-        comment,
+        comment: comment.trim() || undefined,
       });
       Alert.alert(
         'Thank You!',
@@ -46,8 +61,9 @@ const FeedbackScreen = ({ route, navigation }: { route: any; navigation: any }) 
           : 'Your feedback has been submitted successfully.',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
-    } catch {
-      Alert.alert('Error', 'Failed to submit feedback. Please try again.');
+    } catch (error: any) {
+      // e.g. "You already reviewed this appointment."
+      Alert.alert('Not submitted', error?.response?.data?.message ?? error?.message ?? 'Please try again.');
     } finally {
       setLoading(false);
     }
@@ -98,6 +114,32 @@ const FeedbackScreen = ({ route, navigation }: { route: any; navigation: any }) 
         </View>
 
         <View style={styles.formContainer}>
+          {!route.params?.appointmentId && (
+            <View style={styles.visitPicker}>
+              <Text style={styles.commentLabel}>Which visit?</Text>
+              {eligible === null ? (
+                <ActivityIndicator color="#667eea" />
+              ) : eligible.length === 0 ? (
+                <Text style={styles.visitEmpty}>No completed appointments are waiting for a review.</Text>
+              ) : (
+                eligible.map((visit) => (
+                  <TouchableOpacity
+                    key={visit.id}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: appointmentId === visit.id }}
+                    style={[styles.visitOption, appointmentId === visit.id && styles.visitOptionSelected]}
+                    onPress={() => setAppointmentId(visit.id)}
+                  >
+                    <Text style={styles.visitTitle}>{visit.service?.name ?? 'Appointment'}</Text>
+                    <Text style={styles.visitMeta}>
+                      {visit.clinic?.name} · {visit.appointment_date}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+          )}
+
           <Text style={styles.ratingLabel}>How would you rate your experience?</Text>
           
           {renderStars()}
@@ -181,6 +223,12 @@ const FeedbackScreen = ({ route, navigation }: { route: any; navigation: any }) 
 };
 
 const styles = StyleSheet.create({
+  visitPicker: { marginBottom: 16 },
+  visitEmpty: { fontSize: 14, color: '#718096' },
+  visitOption: { padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 8, minHeight: 48 },
+  visitOptionSelected: { borderColor: '#667eea', backgroundColor: '#ebf8ff' },
+  visitTitle: { fontSize: 15, fontWeight: '600', color: '#2d3748' },
+  visitMeta: { fontSize: 13, color: '#718096', marginTop: 2 },
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',

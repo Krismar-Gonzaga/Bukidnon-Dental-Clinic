@@ -22,32 +22,22 @@ import AppHeader from '../../components/navigation/AppHeader';
 import SideDrawer from '../../components/navigation/SideDrawer';
 import BottomNav from '../../components/navigation/BottomNav';
 import { useSync } from '../../context/SyncContext';
+import { AppNotification, fetchNotifications } from '../../services/notifications';
+import { formatClockTime, formatDateKey } from '../../services/booking';
 
 // Types
 interface Appointment {
   id: number;
   clinic_name: string;
   service: string;
-  date: string;
+  /** YYYY-MM-DD in clinic time */
+  dateKey: string | null;
   time: string;
   location: string;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  status: string;
 }
 
-interface Notification {
-  id: number;
-  title: string;
-  message: string;
-  time: string;
-  icon: string;
-  action?: string;
-}
-
-interface LoyaltyData {
-  points: number;
-  nextReward: string;
-  progress: number;
-}
+const UPCOMING = ['pending', 'confirmed', 'reschedule_requested', 'checked_in', 'in_progress'];
 
 const PatientHomeScreen = ({ navigation }: { navigation: any }) => {
   const { user } = useAuth();
@@ -55,12 +45,8 @@ const PatientHomeScreen = ({ navigation }: { navigation: any }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loyaltyData] = useState<LoyaltyData>({
-    points: 1250,
-    nextReward: 'Free Cleaning',
-    progress: 75,
-  });
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const { dataVersion, syncNow } = useSync();
 
@@ -73,47 +59,24 @@ const PatientHomeScreen = ({ navigation }: { navigation: any }) => {
     try {
       setLoading(true);
       const appointmentsResponse = await patientService.getAppointments();
-      const transformedAppointments = appointmentsResponse.data.data.map((apt: any) => ({
+      const transformedAppointments: Appointment[] = appointmentsResponse.data.data.map((apt: any) => ({
         id: apt.id,
         clinic_name: apt.clinic?.name || 'Dental Clinic',
-        service: apt.reason || apt.notes || 'Dental Checkup',
-        date: new Date(apt.appointment_date).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-        }),
-        time: apt.appointment_time || '10:30 AM',
-        location: apt.clinic?.address || 'Main Practice, Malaybalay',
+        service: apt.service?.name || apt.reason || 'Dental appointment',
+        dateKey: apt.appointment_date ?? null,
+        time: formatClockTime(apt.appointment_time),
+        location: apt.branch?.address || apt.clinic?.address || '',
         status: apt.status || 'pending',
       }));
       setAppointments(transformedAppointments);
 
-      // Mock notifications (replace with API call)
-      setNotifications([
-        {
-          id: 1,
-          title: 'New Prescription',
-          message: 'Post-treatment medication guide ready.',
-          time: '2h ago',
-          icon: 'prescriptions',
-          action: 'Download PDF',
-        },
-        {
-          id: 2,
-          title: 'Billing Statement',
-          message: 'Statement for Oct 12 procedure is available.',
-          time: 'Yesterday',
-          icon: 'payments',
-          action: 'Pay Now',
-        },
-        {
-          id: 3,
-          title: 'Lab Results Ready',
-          message: 'X-ray analysis from your last screening.',
-          time: 'Oct 14',
-          icon: 'lab-panel',
-          action: 'View Results',
-        },
-      ]);
+      // Notifications are online-only; offline the section simply stays empty.
+      fetchNotifications()
+        .then((result) => {
+          setNotifications(result.notifications.slice(0, 3));
+          setUnreadCount(result.unreadCount);
+        })
+        .catch(() => undefined);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -133,8 +96,12 @@ const PatientHomeScreen = ({ navigation }: { navigation: any }) => {
   };
 
   const renderAppointmentCard = () => {
-    const upcomingAppointment = appointments.find(a => a.status === 'pending' || a.status === 'confirmed');
-    if (!upcomingAppointment) return null;
+    const upcomingAppointment = appointments
+      .filter((a) => UPCOMING.includes(a.status) && a.dateKey)
+      .sort((a, b) => `${a.dateKey} ${a.time}`.localeCompare(`${b.dateKey} ${b.time}`))[0];
+    if (!upcomingAppointment) {
+      return <Text style={styles.emptyText}>No upcoming visits. Book one when you're ready.</Text>;
+    }
 
     return (
       <View style={styles.appointmentCard}>
@@ -142,10 +109,10 @@ const PatientHomeScreen = ({ navigation }: { navigation: any }) => {
         <View style={styles.appointmentContent}>
           <View style={styles.appointmentDateBox}>
             <Text style={styles.appointmentMonth}>
-              {new Date(upcomingAppointment.date).toLocaleDateString('en-US', { month: 'short' })}
+              {formatDateKey(upcomingAppointment.dateKey!, { month: 'short' })}
             </Text>
             <Text style={styles.appointmentDay}>
-              {new Date(upcomingAppointment.date).getDate()}
+              {formatDateKey(upcomingAppointment.dateKey!, { day: 'numeric' })}
             </Text>
           </View>
           <View style={styles.appointmentInfo}>
@@ -154,52 +121,40 @@ const PatientHomeScreen = ({ navigation }: { navigation: any }) => {
               <Icon name="time-outline" size={16} color="#727784" />
               <Text style={styles.appointmentDetailText}>{upcomingAppointment.time}</Text>
             </View>
-            <View style={styles.appointmentDetailRow}>
-              <Icon name="location-outline" size={16} color="#727784" />
-              <Text style={styles.appointmentDetailText}>{upcomingAppointment.location}</Text>
-            </View>
+            {upcomingAppointment.location ? (
+              <View style={styles.appointmentDetailRow}>
+                <Icon name="location-outline" size={16} color="#727784" />
+                <Text style={styles.appointmentDetailText}>{upcomingAppointment.location}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
         <View style={styles.appointmentActions}>
-          <TouchableOpacity style={styles.rescheduleButton}>
-            <Text style={styles.rescheduleButtonText}>Reschedule</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.checkinButton}>
-            <Text style={styles.checkinButtonText}>Check-in</Text>
+          <TouchableOpacity style={styles.checkinButton} onPress={() => navigation.navigate('Appointments')}>
+            <Text style={styles.checkinButtonText}>View details</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   };
 
-  const notificationIconColors: Record<string, { backgroundColor: string }> = {
-    prescriptions: styles.notificationIcon_prescriptions,
-    payments: styles.notificationIcon_payments,
-    'lab-panel': styles.notificationIcon_lab_panel,
-  };
-
-  const renderNotificationItem = ({ item }: { item: Notification }) => (
-    <View style={styles.notificationItem}>
-      <View style={[
-        styles.notificationIcon,
-        notificationIconColors[item.icon] || styles.notificationIcon_default
-      ]}>
-        <Icon name={item.icon as any} size={24} color="#fff" />
+  const renderNotificationItem = ({ item }: { item: AppNotification }) => (
+    <TouchableOpacity style={styles.notificationItem} onPress={() => navigation.navigate('Notifications')}>
+      <View style={[styles.notificationIcon, styles.notificationIcon_default]}>
+        <Icon name={item.readAt ? 'notifications-outline' : 'notifications'} size={24} color="#fff" />
       </View>
       <View style={styles.notificationContent}>
         <View style={styles.notificationHeader}>
           <Text style={styles.notificationTitle}>{item.title}</Text>
-          <Text style={styles.notificationTime}>{item.time}</Text>
+          <Text style={styles.notificationTime}>
+            {item.createdAt
+              ? new Date(item.createdAt).toLocaleDateString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric' })
+              : ''}
+          </Text>
         </View>
         <Text style={styles.notificationMessage}>{item.message}</Text>
-        {item.action && (
-          <TouchableOpacity style={styles.notificationAction}>
-            <Icon name="download-outline" size={16} color="#003f87" />
-            <Text style={styles.notificationActionText}>{item.action}</Text>
-          </TouchableOpacity>
-        )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   if (loading) {
@@ -217,7 +172,6 @@ const PatientHomeScreen = ({ navigation }: { navigation: any }) => {
       {/* Header */}
       <AppHeader
         onMenuPress={toggleDrawer}
-        onNotificationPress={() => console.log('Notifications')}
         onAvatarPress={() => navigation.navigate('Profile')}
       />
 
@@ -231,7 +185,7 @@ const PatientHomeScreen = ({ navigation }: { navigation: any }) => {
       >
         {/* Greeting Section */}
         <View style={styles.greetingSection}>
-          <Text style={styles.greetingTitle}>Hello, {user?.name?.split(' ')[0] || 'Maria'}!</Text>
+          <Text style={styles.greetingTitle}>Hello, {user?.name?.split(' ')[0] || 'there'}!</Text>
           <Text style={styles.greetingSubtitle}>Welcome back to your dental health dashboard.</Text>
         </View>
 
@@ -268,32 +222,33 @@ const PatientHomeScreen = ({ navigation }: { navigation: any }) => {
             </Text>
           </View>
 
-          <View style={[styles.bentoCard, styles.loyaltyCard]}>
+          <TouchableOpacity
+            style={[styles.bentoCard, styles.loyaltyCard]}
+            onPress={() => navigation.navigate('Notifications')}
+            accessibilityRole="button"
+          >
             <View style={styles.loyaltyHeader}>
-              <Icon name="star" size={24} color="#003f87" />
-              <Text style={styles.loyaltyPercent}>75%</Text>
+              <Icon name="notifications-outline" size={24} color="#003f87" />
             </View>
-            <Text style={styles.loyaltyPoints}>{loyaltyData.points.toLocaleString()}</Text>
-            <Text style={styles.loyaltyLabel}>Loyalty Pts</Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${loyaltyData.progress}%` }]} />
-            </View>
-          </View>
+            <Text style={styles.loyaltyPoints}>{unreadCount}</Text>
+            <Text style={styles.loyaltyLabel}>Unread updates</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Recent Updates */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionLabel}>Recent Updates</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
               <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
           <FlatList
             data={notifications}
             renderItem={renderNotificationItem}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item) => item.id}
             scrollEnabled={false}
+            ListEmptyComponent={<Text style={styles.emptyText}>No updates yet.</Text>}
           />
         </View>
 
@@ -314,6 +269,11 @@ const PatientHomeScreen = ({ navigation }: { navigation: any }) => {
 };
 
 const styles = StyleSheet.create({
+  emptyText: {
+    fontSize: 14,
+    color: '#727784',
+    paddingVertical: 8,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f7f9ff',

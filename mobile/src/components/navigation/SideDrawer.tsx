@@ -39,6 +39,8 @@ const SideDrawer = ({ visible, onClose, activeItem = 'Home' }: SideDrawerProps) 
     { icon: 'home-outline', label: 'Home', route: 'Home' },
     { icon: 'location-outline', label: 'Clinics', route: 'Clinics' },
     { icon: 'calendar-outline', label: 'Appointments', route: 'Appointments' },
+    { icon: 'notifications-outline', label: 'Notifications', route: 'Notifications' },
+    { icon: 'star-outline', label: 'Leave a Review', route: 'Feedback' },
     { icon: 'person-outline', label: 'Profile', route: 'Profile' },
   ];
 
@@ -124,14 +126,14 @@ const SideDrawer = ({ visible, onClose, activeItem = 'Home' }: SideDrawerProps) 
             <View style={styles.drawerProfile}>
               <View style={styles.drawerAvatar}>
                 <Text style={styles.drawerAvatarText}>
-                  {user?.name?.charAt(0) || 'M'}
+                  {user?.name?.charAt(0)?.toUpperCase() || '?'}
                 </Text>
               </View>
               <View style={styles.drawerProfileInfo}>
                 <Text style={styles.drawerProfileName}>
-                  {user?.name || 'Maria Santos'}
+                  {user?.name || 'Patient'}
                 </Text>
-                <Text style={styles.drawerProfileBadge}>Premium Member</Text>
+                <Text style={styles.drawerProfileBadge}>Patient account</Text>
               </View>
               <TouchableOpacity onPress={handleLogout} style={styles.drawerLogout}>
                 <Icon name="log-out-outline" size={20} color="#727784" />

@@ -21,7 +21,7 @@ import {
   fetchClinicDetails as fetchClinicFromServer,
   getCachedClinicDetails,
 } from '../../services/offline/publicRepository';
-import { formatClock } from '../../utils/format';
+import { formatClock, formatPrice } from '../../utils/format';
 
 type Clinic = {
   id: number | string;
@@ -46,10 +46,37 @@ type Clinic = {
 };
 
 // Adapts the offline repository's clinic to the shape this screen renders.
+const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// "Mon–Sat 8:00 AM – 5:00 PM" style summary from the main branch's hours.
+const summarizeHours = (details: Partial<ClinicDetails>) => {
+  const branch = details.branches?.find((b) => b.isMain) ?? details.branches?.[0];
+  if (!branch || branch.hours.length === 0) {
+    return undefined;
+  }
+  return branch.hours
+    .slice()
+    .sort((a, b) => a.day - b.day)
+    .map((h) => `${DAY_SHORT[h.day]} ${formatClock(h.opensAt)} – ${formatClock(h.closesAt)}`)
+    .join('\n');
+};
+
 const toScreenClinic = (clinic: ClinicSummary | ClinicDetails, reviews: ClinicReview[] | null): Clinic => {
   const opening = formatClock(clinic.openingTime);
   const closing = formatClock(clinic.closingTime);
+  const details = clinic as Partial<ClinicDetails>;
   return {
+    latitude: clinic.latitude ?? undefined,
+    longitude: clinic.longitude ?? undefined,
+    services: (details.services ?? []).map((service) => ({
+      name: service.name,
+      description: `${service.description}${service.description ? ' · ' : ''}${service.durationMinutes} min`,
+      price_range: formatPrice(service.price),
+    })),
+    dentists: (details.dentists ?? []).map((dentist) => ({
+      name: dentist.name,
+      specialization: dentist.specialization ?? undefined,
+    })),
     id: clinic.id,
     name: clinic.name,
     contact_number: clinic.contactNumber ?? undefined,
@@ -60,7 +87,7 @@ const toScreenClinic = (clinic: ClinicSummary | ClinicDetails, reviews: ClinicRe
     review_count: reviews?.length ?? 0,
     full_address: clinic.fullAddress,
     description: clinic.description ?? undefined,
-    operating_hours: opening && closing ? `Daily: ${opening} - ${closing}` : undefined,
+    operating_hours: summarizeHours(details) ?? (opening && closing ? `${opening} - ${closing}` : undefined),
     specializations: clinic.specializations.map((spec) => ({ name: spec.name })),
     reviews: (reviews ?? []).map((review) => ({
       patient: { name: review.patientName },
@@ -119,11 +146,25 @@ const ClinicDetailsScreen = ({ route, navigation }: { route: any; navigation: an
     }
   };
 
+  // Directions by coordinates when the clinic has them, otherwise a Maps
+  // search for its address.
+  const mapsUrl = () => {
+    if (clinic?.latitude != null && clinic?.longitude != null) {
+      return `https://www.google.com/maps/dir/?api=1&destination=${clinic.latitude},${clinic.longitude}`;
+    }
+    if (clinic?.full_address) {
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${clinic.name}, ${clinic.full_address}`)}`;
+    }
+    return null;
+  };
+
   const handleShare = async () => {
+    const link = mapsUrl();
     try {
       await Share.share({
-        message: `Check out ${clinic?.name} on Bukidnon Dental Portal!`,
-        url: `https://bukidnondental.ph/clinics/${id}`,
+        message: [`Check out ${clinic?.name} on Bukidnon Dental Portal!`, clinic?.full_address, link]
+          .filter(Boolean)
+          .join('\n'),
       });
     } catch (error) {
       console.error('Share error:', error);
@@ -135,9 +176,11 @@ const ClinicDetailsScreen = ({ route, navigation }: { route: any; navigation: an
   };
 
   const handleViewMap = () => {
-    if (clinic?.latitude && clinic?.longitude) {
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${clinic.latitude},${clinic.longitude}`;
+    const url = mapsUrl();
+    if (url) {
       Linking.openURL(url);
+    } else {
+      Alert.alert('No location yet', "This clinic hasn't added its address or map location.");
     }
   };
 

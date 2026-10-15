@@ -45,6 +45,24 @@ export const subscribeQueue = (listener: () => void) => {
 
 const notify = () => queueListeners.forEach((listener) => listener());
 
+/**
+ * Payload keys starting with "__" are device-only: `__headers` holds request
+ * headers to send on replay (e.g. Idempotency-Key) and `__display` holds
+ * labels for showing the queued item. Neither is sent as request data.
+ */
+export const splitLocalFields = (payload: Record<string, unknown> | null | undefined) => {
+  const body: Record<string, unknown> = {};
+  let headers: Record<string, string> | undefined;
+  Object.entries(payload ?? {}).forEach(([key, value]) => {
+    if (key === '__headers') {
+      headers = (value as Record<string, string> | null) ?? undefined;
+    } else if (!key.startsWith('__')) {
+      body[key] = value;
+    }
+  });
+  return { body, headers };
+};
+
 const toMutation = (row: QueueRow): QueuedMutation => ({
   ...row,
   payload: row.payload ? JSON.parse(row.payload) : null,
@@ -164,10 +182,12 @@ const runFlush = async (ownerId: string): Promise<FlushResult> => {
 
   for (const item of pending) {
     try {
+      const { body, headers } = splitLocalFields(item.payload);
       await api.request({
         method: item.method,
         url: item.url,
-        data: item.payload ?? undefined,
+        data: item.payload ? body : undefined,
+        headers,
         timeout: 15000,
       });
       await db.runAsync('DELETE FROM sync_queue WHERE id = ?', item.id);

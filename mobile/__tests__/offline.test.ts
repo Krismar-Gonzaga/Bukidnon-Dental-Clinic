@@ -16,6 +16,7 @@ jest.mock('../src/services/offline/database', () => ({
   deleteCacheByPrefix: jest.fn(),
 }));
 jest.mock('../src/services/offline/syncQueue', () => ({
+  splitLocalFields: jest.requireActual('../src/services/offline/syncQueue').splitLocalFields,
   enqueue: jest.fn(async () => 42),
   getQueued: jest.fn(async () => []),
   removeQueued: jest.fn(),
@@ -93,22 +94,41 @@ describe('offline patient writes', () => {
     network.setOnline(true);
   });
 
-  it('queues a booking when the server is unreachable', async () => {
+  it('queues a booking when the server is unreachable, keeping its idempotency key', async () => {
     jest.spyOn(http.default, 'request').mockRejectedValueOnce(networkError);
-    const response = await offlinePatientService.createAppointment({ clinic_id: 1, reason: 'Cleaning' });
+    const response = await offlinePatientService.createAppointment(
+      { clinic_id: 1, reason: 'Cleaning' },
+      'key-123',
+      { service: 'Cleaning', dentist: 'Dr. Cruz' },
+    );
     expect(response.data.queued).toBe(true);
     expect(response.data.data.id).toBe('local-42');
     expect(queue.enqueue).toHaveBeenCalledWith(
-      expect.objectContaining({ ownerId: '7', kind: 'appointment.create', method: 'POST' }),
+      expect.objectContaining({
+        ownerId: '7',
+        kind: 'appointment.create',
+        method: 'POST',
+        payload: expect.objectContaining({ __headers: { 'Idempotency-Key': 'key-123' } }),
+      }),
     );
   });
 
-  it('queues straight away when already known to be offline', async () => {
+  it('sends the idempotency key as a header and never sends device-only fields', async () => {
+    const request = jest.spyOn(http.default, 'request').mockResolvedValueOnce({ data: { data: { id: 3 } } } as any);
+    await offlinePatientService.createAppointment({ clinic_id: 1 }, 'key-9', { service: 'Cleaning' });
+    const config = request.mock.calls[0][0] as any;
+    expect(config.headers).toEqual(expect.objectContaining({ 'Idempotency-Key': 'key-9' }));
+    expect(Object.keys(config.data ?? {}).some((key) => key.startsWith('__'))).toBe(false);
+  });
+
+  it('queues a review straight away when already known to be offline', async () => {
     network.setOnline(false);
     const request = jest.spyOn(http.default, 'request');
     await offlinePatientService.submitFeedback({ appointment_id: 5, rating: 5, comment: 'Great' });
     expect(request).not.toHaveBeenCalled();
-    expect(queue.enqueue).toHaveBeenCalledWith(expect.objectContaining({ kind: 'feedback.create' }));
+    expect(queue.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'feedback.create', url: '/patient/appointments/5/review' }),
+    );
   });
 
   it('surfaces server validation errors instead of queueing them', async () => {
@@ -126,5 +146,47 @@ describe('offline patient writes', () => {
     await offlinePatientService.cancelAppointment('local-9');
     expect(queue.removeQueued).toHaveBeenCalledWith(9);
     expect(request).not.toHaveBeenCalled();
+  });
+});
+
+describe('session storage', () => {
+  const SecureStore = require('expo-secure-store');
+  const AsyncStorage = require('@react-native-async-storage/async-storage');
+  const session = require('../src/services/session');
+
+  beforeEach(() => {
+    SecureStore.__reset();
+    jest.clearAllMocks();
+  });
+
+  it('keeps the token in the keystore, not AsyncStorage', async () => {
+    await session.saveToken('abc');
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith('auth_token', 'abc');
+    expect(AsyncStorage.setItem).not.toHaveBeenCalledWith('token', expect.anything());
+    expect(await session.readToken()).toBe('abc');
+  });
+
+  it('moves a token left in AsyncStorage by older builds into the keystore', async () => {
+    // The AsyncStorage mock above returns 'token' for the legacy key.
+    expect(await session.readToken()).toBe('token');
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith('auth_token', 'token');
+    expect(AsyncStorage.removeItem).toHaveBeenCalledWith('token');
+  });
+});
+
+describe('booking date helpers', () => {
+  const { toBusinessDateKey, upcomingBusinessDates, formatDateKey, formatClockTime } = require('../src/services/booking');
+
+  it('uses Philippine dates regardless of the device time zone', () => {
+    // 2026-11-02 17:30 UTC is already Nov 3 in Manila.
+    expect(toBusinessDateKey(new Date('2026-11-02T17:30:00Z'))).toBe('2026-11-03');
+    expect(upcomingBusinessDates(2, new Date('2026-11-02T17:30:00Z'))).toEqual(['2026-11-03', '2026-11-04']);
+  });
+
+  it('formats dates and clock times for display', () => {
+    expect(formatDateKey('2026-11-03')).toBe('Tue, Nov 3');
+    expect(formatClockTime('09:00')).toBe('9:00 AM');
+    expect(formatClockTime('13:30')).toBe('1:30 PM');
+    expect(formatClockTime(null)).toBe('');
   });
 });

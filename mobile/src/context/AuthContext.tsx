@@ -1,7 +1,8 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { isNetworkError } from '../services/api';
+import { setSessionExpiredHandler } from '../services/http';
 import { clearUserOfflineData } from '../services/offline/patientRepository';
+import { clearSession, readToken, readUser, saveToken, saveUser } from '../services/session';
 
 export type User = {
   id: number | string;
@@ -56,8 +57,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const response = await api.post('/login', { email, password });
       const { user: loggedInUser, token } = response.data.data;
 
-      await AsyncStorage.setItem('token', token);
-      await AsyncStorage.setItem('user', JSON.stringify(loggedInUser));
+      await saveToken(token);
+      await saveUser(loggedInUser);
 
       setUser(loggedInUser);
       setError(null);
@@ -74,8 +75,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const response = await api.post('/register', userData);
       const { user: registeredUser, token } = response.data.data;
 
-      await AsyncStorage.setItem('token', token);
-      await AsyncStorage.setItem('user', JSON.stringify(registeredUser));
+      await saveToken(token);
+      await saveUser(registeredUser);
 
       setUser(registeredUser);
       setError(null);
@@ -102,19 +103,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.error('Failed to clear offline data:', err),
         );
       }
-      await AsyncStorage.removeItem('token');
-      await AsyncStorage.removeItem('user');
+      await clearSession();
       setUser(null);
     }
   };
 
   const checkAuth = async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
-      const userData = await AsyncStorage.getItem('user');
+      const token = await readToken();
+      const savedUser = await readUser<User>();
 
-      if (token && userData) {
-        setUser(JSON.parse(userData));
+      if (token && savedUser) {
+        setUser(savedUser);
         return true;
       }
       return false;
@@ -128,6 +128,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     checkAuth();
+    // The server rejected the saved token (expired, revoked, suspended):
+    // show the signed-out screens. Offline data stays until a real logout.
+    setSessionExpiredHandler(() => setUser(null));
+    return () => setSessionExpiredHandler(null);
   }, []);
 
   return (

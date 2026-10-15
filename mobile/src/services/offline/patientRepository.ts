@@ -3,11 +3,19 @@
 // They keep the axios-like `{ data: { data } }` response shape the screens already
 // consume, and add `offline` / `queued` flags so a screen can tell the user that what
 // they see is saved data or that their change will be sent later.
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { isNetworkError } from '../http';
+import { readUser } from '../session';
 import { isOnline } from './network';
 import { deleteCacheByPrefix, readCache, writeCache } from './database';
-import { clearQueue, enqueue, getQueued, MutationKind, QueuedMutation, removeQueued } from './syncQueue';
+import {
+  clearQueue,
+  enqueue,
+  getQueued,
+  MutationKind,
+  QueuedMutation,
+  removeQueued,
+  splitLocalFields,
+} from './syncQueue';
 import { getClinicSummary } from './publicRepository';
 
 /** Ids of records that only exist locally until their queued create is synced. */
@@ -33,8 +41,7 @@ const respond = <T>(data: T, extra: Omit<OfflineResponse<T>['data'], 'success' |
 
 export const getCurrentUserId = async (): Promise<string | null> => {
   try {
-    const raw = await AsyncStorage.getItem('user');
-    const user = raw ? JSON.parse(raw) : null;
+    const user = await readUser<{ id?: number | string }>();
     return user?.id != null ? String(user.id) : null;
   } catch {
     return null;
@@ -61,16 +68,21 @@ const readThrough = async <T>(key: string, url: string, fallback: T) => {
   return { value: cached?.value ?? fallback, offline: true, cachedAt: cached?.updatedAt ?? null };
 };
 
-/** Sends a write now when possible, otherwise stores it in the sync queue. */
+/**
+ * Sends a write now when possible, otherwise stores it in the sync queue.
+ * `headers` (e.g. Idempotency-Key) are kept with a queued write and sent
+ * again when it is replayed, so a retry can never be applied twice.
+ */
 const sendOrQueue = async (
   kind: MutationKind,
   method: QueuedMutation['method'],
   url: string,
   payload: Record<string, unknown>,
+  headers?: Record<string, string>,
 ): Promise<OfflineResponse<any>> => {
   if (isOnline()) {
     try {
-      return await api.request({ method, url, data: payload });
+      return await api.request({ method, url, data: splitLocalFields(payload).body, headers });
     } catch (error) {
       // A real server answer (validation error etc.) goes back to the screen as usual.
       if (!isNetworkError(error)) {
@@ -83,8 +95,22 @@ const sendOrQueue = async (
   if (!ownerId) {
     throw new Error('Please sign in again to save this change.');
   }
-  const queueId = await enqueue({ ownerId, kind, method, url, payload });
+  // Keys starting with "__" stay on the device (see syncQueue.splitLocalFields).
+  const queueId = await enqueue({ ownerId, kind, method, url, payload: { ...payload, __headers: headers ?? null } });
   return respond({ ...payload, id: `${LOCAL_ID_PREFIX}${queueId}` }, { queued: true });
+};
+
+/** A fresh key per booking attempt; retries of the same attempt reuse it. */
+export const newIdempotencyKey = () =>
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}-${Math.random().toString(36).slice(2, 12)}`;
+
+const toLocalDateAndTime = (iso: unknown) => {
+  if (typeof iso !== 'string') {
+    return {};
+  }
+  // Business times arrive as "2026-11-03T09:00:00+08:00"; keep the local part.
+  const [date, time] = iso.split('T');
+  return { appointment_date: date, appointment_time: time?.slice(0, 5) };
 };
 
 // ---------------------------------------------------------------------------
@@ -97,14 +123,18 @@ const queuedAppointments = async (ownerId: string) => {
   return Promise.all(
     queued.map(async (item) => {
       const payload = item.payload ?? {};
+      const display = (payload.__display ?? {}) as { service?: string; dentist?: string };
       const clinic = payload.clinic_id ? await getClinicSummary(payload.clinic_id as number) : null;
       return {
         ...payload,
+        ...toLocalDateAndTime(payload.starts_at),
         id: `${LOCAL_ID_PREFIX}${item.id}`,
         status: 'pending',
         sync_status: item.status, // 'pending' | 'failed'
         sync_error: item.last_error,
         clinic: clinic ? { id: clinic.id, name: clinic.name, address: clinic.fullAddress } : null,
+        service: display.service ? { name: display.service } : null,
+        dentist: display.dentist ? { name: display.dentist } : null,
         created_at: new Date(item.created_at).toISOString(),
       };
     }),
@@ -135,8 +165,32 @@ const getAppointments = async (): Promise<OfflineResponse<any[]>> => {
   return respond(merged, { offline: result.offline, cachedAt: result.cachedAt });
 };
 
-const createAppointment = (data: Record<string, unknown>) =>
-  sendOrQueue('appointment.create', 'POST', '/patient/appointments', data);
+/**
+ * Requests an appointment for a slot chosen from live availability.
+ * data: { clinic_id, service_rate_id, dentist_id, branch_id, starts_at, reason?, notes? }
+ * The server re-checks the slot; if the request is queued offline it is
+ * revalidated on replay and parked as failed if the slot is gone.
+ * `display` (service/dentist names) is kept only on the device.
+ */
+const createAppointment = (
+  data: Record<string, unknown>,
+  idempotencyKey: string,
+  display: { service?: string; dentist?: string } = {},
+) =>
+  sendOrQueue(
+    'appointment.create',
+    'POST',
+    '/patient/appointments',
+    { ...data, __display: display },
+    { 'Idempotency-Key': idempotencyKey },
+  );
+
+/**
+ * Moves a pending request, or asks the clinic to move a confirmed one.
+ * Needs a connection: the new slot must be checked against live availability.
+ */
+const rescheduleAppointment = (id: number | string, startsAt: string) =>
+  api.put(`/patient/appointments/${id}`, { starts_at: startsAt });
 
 const cancelAppointment = async (id: number | string) => {
   // Not on the server yet: cancelling just drops the queued booking.
@@ -153,12 +207,19 @@ const cancelAppointment = async (id: number | string) => {
 // Feedback & profile
 // ---------------------------------------------------------------------------
 
-const submitFeedback = (data: Record<string, unknown>) => {
+/** Reviews are allowed once per completed appointment (checked by the server). */
+const submitFeedback = (data: { appointment_id: number | string; rating: number; comment?: string }) => {
   if (isLocalId(data.appointment_id)) {
     return Promise.reject(new Error('This appointment has not been synced yet.'));
   }
-  return sendOrQueue('feedback.create', 'POST', '/patient/feedback', data);
+  return sendOrQueue('feedback.create', 'POST', `/patient/appointments/${data.appointment_id}/review`, {
+    rating: data.rating,
+    comment: data.comment,
+  });
 };
+
+/** Completed appointments still waiting for a review (online only). */
+const getReviewableAppointments = () => api.get('/patient/reviews/eligible');
 
 const getProfile = async (): Promise<OfflineResponse<Record<string, any>>> => {
   const ownerId = await getCurrentUserId();
@@ -184,8 +245,10 @@ const updateProfile = async (data: Record<string, unknown>) => {
 export const offlinePatientService = {
   getAppointments,
   createAppointment,
+  rescheduleAppointment,
   cancelAppointment,
   submitFeedback,
+  getReviewableAppointments,
   getProfile,
   updateProfile,
 };

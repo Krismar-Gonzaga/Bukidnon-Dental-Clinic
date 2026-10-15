@@ -16,16 +16,51 @@ import AppHeader from '../../components/navigation/AppHeader';
 import SideDrawer from '../../components/navigation/SideDrawer';
 import BottomNav from '../../components/navigation/BottomNav';
 import { useSync } from '../../context/SyncContext';
+import { formatClockTime, formatDateKey } from '../../services/booking';
+
+const formatDateLabel = (item: { appointment_date?: string; starts_at?: string }) => {
+  const key = item.starts_at?.slice(0, 10) ?? item.appointment_date?.slice(0, 10);
+  return key ? formatDateKey(key, { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' }) : 'Date to be confirmed';
+};
 
 type Appointment = {
   id: number | string;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | string;
+  status: string;
+  starts_at?: string;
   appointment_date: string;
   appointment_time?: string;
-  clinic?: { name?: string; address?: string };
-  dentist?: { name?: string };
+  clinic?: { id?: number; name?: string; address?: string };
+  dentist?: { id?: number; name?: string };
+  service?: { id?: number; name?: string };
+  cancellation_reason?: string | null;
+  requested_starts_at?: string | null;
+  has_review?: boolean;
   [key: string]: unknown;
 };
+
+// Backend statuses grouped into the three tabs.
+const GROUPS: Record<string, string[]> = {
+  upcoming: ['pending', 'confirmed', 'reschedule_requested', 'checked_in', 'in_progress'],
+  completed: ['completed'],
+  cancelled: ['cancelled', 'rejected', 'no_show'],
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: 'Awaiting approval',
+  confirmed: 'Confirmed',
+  reschedule_requested: 'Reschedule requested',
+  checked_in: 'Checked in',
+  in_progress: 'In progress',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  rejected: 'Declined',
+  no_show: 'Missed',
+};
+
+const CANCELLABLE = ['pending', 'confirmed', 'reschedule_requested'];
+const RESCHEDULABLE = ['pending', 'confirmed'];
+
+const isLocal = (id: unknown) => String(id).startsWith('local-');
 
 const AppointmentsScreen = ({ navigation }: { navigation: any }) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -78,8 +113,9 @@ const AppointmentsScreen = ({ navigation }: { navigation: any }) => {
                   ? "You're offline. The cancellation is saved and will be sent once you're back online."
                   : 'Appointment cancelled successfully',
               );
-            } catch {
-              Alert.alert('Error', 'Failed to cancel appointment');
+            } catch (error: any) {
+              // e.g. "Appointments can only be changed online up to 24 hours before…"
+              Alert.alert('Not cancelled', error?.response?.data?.message ?? 'Failed to cancel appointment');
             }
           },
         },
@@ -88,33 +124,33 @@ const AppointmentsScreen = ({ navigation }: { navigation: any }) => {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmed':
-        return '#48bb78';
-      case 'pending':
-        return '#f6ad55';
-      case 'cancelled':
-        return '#fc8181';
-      case 'completed':
-        return '#667eea';
-      default:
-        return '#a0aec0';
+    if (status === 'pending' || status === 'reschedule_requested') {
+      return '#f6ad55';
     }
+    if (GROUPS.upcoming.includes(status)) {
+      return '#48bb78';
+    }
+    if (status === 'completed') {
+      return '#667eea';
+    }
+    return '#fc8181';
   };
 
-  const getStatusBadge = (status: string) => {
-    return status.charAt(0).toUpperCase() + status.slice(1);
+  const getStatusBadge = (status: string) => STATUS_LABELS[status] ?? status;
+
+  const handleReschedule = (item: Appointment) => {
+    navigation.navigate('BookAppointment', {
+      reschedule: {
+        appointmentId: item.id,
+        clinicId: item.clinic?.id,
+        serviceRateId: item.service?.id,
+        dentistId: item.dentist?.id,
+        currentLabel: `${formatDateLabel(item)} at ${formatClockTime(item.appointment_time)}`,
+      },
+    });
   };
 
-  const filteredAppointments = appointments.filter((apt) => {
-    if (activeFilter === 'upcoming') {
-      return apt.status === 'pending' || apt.status === 'confirmed';
-    } else if (activeFilter === 'completed') {
-      return apt.status === 'completed';
-    } else {
-      return apt.status === 'cancelled';
-    }
-  });
+  const filteredAppointments = appointments.filter((apt) => (GROUPS[activeFilter] ?? []).includes(apt.status));
 
   const renderAppointmentCard = ({ item }: { item: Appointment }) => (
     <View style={styles.appointmentCard}>
@@ -142,23 +178,37 @@ const AppointmentsScreen = ({ navigation }: { navigation: any }) => {
       <View style={styles.appointmentDetails}>
         <View style={styles.detailRow}>
           <Icon name="calendar-outline" size={16} color="#718096" />
-          <Text style={styles.detailText}>
-            {new Date(item.appointment_date).toLocaleDateString('en-US', {
-              weekday: 'short',
-              month: 'long',
-              day: 'numeric',
-              year: 'numeric',
-            })}
-          </Text>
+          <Text style={styles.detailText}>{formatDateLabel(item)}</Text>
         </View>
         <View style={styles.detailRow}>
           <Icon name="time-outline" size={16} color="#718096" />
-          <Text style={styles.detailText}>{item.appointment_time || '9:00 AM'}</Text>
+          <Text style={styles.detailText}>{formatClockTime(item.appointment_time) || 'Time to be confirmed'}</Text>
         </View>
-        {item.dentist && (
+        {item.service?.name && (
+          <View style={styles.detailRow}>
+            <Icon name="clipboard-outline" size={16} color="#718096" />
+            <Text style={styles.detailText}>{item.service.name}</Text>
+          </View>
+        )}
+        {item.dentist?.name && (
           <View style={styles.detailRow}>
             <Icon name="medkit-outline" size={16} color="#718096" />
-            <Text style={styles.detailText}>Dr. {item.dentist.name}</Text>
+            <Text style={styles.detailText}>{item.dentist.name}</Text>
+          </View>
+        )}
+        {item.status === 'reschedule_requested' && item.requested_starts_at && (
+          <View style={styles.detailRow}>
+            <Icon name="swap-horizontal-outline" size={16} color="#718096" />
+            <Text style={styles.detailText}>
+              Requested: {formatDateKey(item.requested_starts_at.slice(0, 10))} at{' '}
+              {formatClockTime(item.requested_starts_at.slice(11, 16))}
+            </Text>
+          </View>
+        )}
+        {Boolean(item.cancellation_reason) && GROUPS.cancelled.includes(item.status) && (
+          <View style={styles.detailRow}>
+            <Icon name="information-circle-outline" size={16} color="#718096" />
+            <Text style={styles.detailText}>{String(item.cancellation_reason)}</Text>
           </View>
         )}
         <View style={styles.detailRow}>
@@ -170,25 +220,27 @@ const AppointmentsScreen = ({ navigation }: { navigation: any }) => {
       </View>
 
       <View style={styles.appointmentActions}>
-        {item.status === 'pending' && (
+        {CANCELLABLE.includes(item.status) && (
           <TouchableOpacity
             style={styles.cancelButton}
             onPress={() => handleCancelAppointment(item.id)}
           >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+            <Text style={styles.cancelButtonText}>{item.status === 'pending' ? 'Cancel Request' : 'Cancel'}</Text>
           </TouchableOpacity>
         )}
-        {item.status === 'completed' && (
+        {item.status === 'completed' && !item.has_review && (
           <TouchableOpacity
             style={styles.feedbackButton}
             onPress={() => navigation.navigate('Feedback', { appointmentId: item.id })}
           >
-            <Text style={styles.feedbackButtonText}>Submit Feedback</Text>
+            <Text style={styles.feedbackButtonText}>Leave a Review</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={styles.rescheduleButton}>
-          <Text style={styles.rescheduleButtonText}>Reschedule</Text>
-        </TouchableOpacity>
+        {RESCHEDULABLE.includes(item.status) && !isLocal(item.id) && item.service?.id && item.dentist?.id && (
+          <TouchableOpacity style={styles.rescheduleButton} onPress={() => handleReschedule(item)}>
+            <Text style={styles.rescheduleButtonText}>Reschedule</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -232,12 +284,7 @@ const AppointmentsScreen = ({ navigation }: { navigation: any }) => {
             </Text>
             <View style={styles.filterCount}>
               <Text style={styles.filterCountText}>
-                {appointments.filter((apt) => {
-                  if (filter === 'upcoming') {
-                    return apt.status === 'pending' || apt.status === 'confirmed';
-                  }
-                  return apt.status === filter;
-                }).length}
+                {appointments.filter((apt) => GROUPS[filter].includes(apt.status)).length}
               </Text>
             </View>
           </TouchableOpacity>

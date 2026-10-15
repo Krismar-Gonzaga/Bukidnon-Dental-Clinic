@@ -12,9 +12,11 @@ import AppointmentsScreen from '../screens/patient/AppointmentsScreen';
 import BookAppointmentScreen from '../screens/patient/BookAppointmentScreen';
 import ProfileScreen from '../screens/patient/ProfileScreen';
 import FeedbackScreen from '../screens/patient/FeedbackScreen';
+import NotificationsScreen from '../screens/patient/NotificationsScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import ClinicRequirementsScreen from '../screens/auth/ClinicRequirementsScreen';
+import StaffNoticeScreen from '../screens/auth/StaffNoticeScreen';
 import GuestHomeScreen from '../screens/guest/GuestHomeScreen';
 import GuestClinicsScreen from '../screens/guest/GuestClinicsScreen';
 import GuestClinicDetailsScreen from '../screens/guest/GuestClinicDetailsScreen';
@@ -26,7 +28,9 @@ const Stack = createStackNavigator();
 
 // Main App Navigator
 export default function AppNavigator() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
+  // Clinic and admin accounts use the web portal; see StaffNoticeScreen.
+  const isPatient = !user?.role || user.role === 'patient';
 
   if (loading) {
     return (
@@ -46,7 +50,9 @@ export default function AppNavigator() {
           headerBackTitle: 'Back',
         }}
       >
-        {isAuthenticated ? (
+        {isAuthenticated && !isPatient ? (
+          <Stack.Screen name="StaffNotice" component={StaffNoticeScreen} options={{ headerShown: false }} />
+        ) : isAuthenticated ? (
           <>
             {/* Main patient pages — each renders its own AppHeader/BottomNav/SideDrawer */}
             <Stack.Screen name="Home" component={PatientHomeScreen} options={{ headerShown: false }} />
@@ -69,6 +75,11 @@ export default function AppNavigator() {
               name="Feedback"
               component={FeedbackScreen}
               options={{ title: 'Submit Feedback' }}
+            />
+            <Stack.Screen
+              name="Notifications"
+              component={NotificationsScreen}
+              options={{ title: 'Notifications' }}
             />
           </>
         ) : (

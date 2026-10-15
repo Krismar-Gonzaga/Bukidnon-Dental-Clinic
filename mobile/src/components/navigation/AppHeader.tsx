@@ -48,7 +48,7 @@ const AppHeader = ({
     if (onNotificationPress) {
       onNotificationPress();
     } else {
-      // Navigate to notifications
+      navigation.navigate('Notifications' as never);
     }
   };
 
@@ -105,7 +105,7 @@ const AppHeader = ({
               onPress={handleAvatarPress}
             >
               <Text style={styles.headerAvatarText}>
-                {user?.name?.charAt(0) || 'M'}
+                {user?.name?.charAt(0)?.toUpperCase() || '?'}
               </Text>
             </TouchableOpacity>
           )}
