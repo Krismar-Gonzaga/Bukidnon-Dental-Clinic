@@ -1,37 +1,19 @@
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import PatientFindClinicsPage from './PatientFindClinicsPage';
-import FindClinicsPage from './FindClinicsPage';
+import { getCities, getSpecializations, searchClinics } from '../services/publicApi';
+import { PATIENT_USER, renderWithProviders } from '../testUtils';
+import { clinicSummary } from '../testFixtures';
 
-test('patient view shows My Account instead of Login and Register', () => {
-  render(<PatientFindClinicsPage />);
-  const header = screen.getByRole('banner');
-  expect(within(header).getByRole('link', { name: /My Account/ })).toHaveAttribute(
-    'href',
-    '/patient/dashboard'
-  );
-  expect(within(header).queryByRole('link', { name: 'Login' })).not.toBeInTheDocument();
-  expect(within(header).queryByRole('link', { name: 'Register' })).not.toBeInTheDocument();
-  expect(
-    screen.getByRole('heading', { level: 1, name: 'Clinic Directory' })
-  ).toBeInTheDocument();
-});
+jest.mock('../services/publicApi');
 
-test('patient view links Book Appointment to booking with the clinic preselected', () => {
-  render(<PatientFindClinicsPage />);
-  const card = screen.getByRole('article', { name: 'Valencia Smile Center' });
-  expect(within(card).getByRole('link', { name: 'Book Appointment' })).toHaveAttribute(
-    'href',
-    '/patient/book?clinic=mock-dir-1'
-  );
-  expect(within(card).getByRole('link', { name: 'View Details' })).toHaveAttribute(
-    'href',
-    '/patient/clinics/mock-dir-1'
-  );
-});
+test('cards open the patient booking flow and clinic page; header shows My Account', async () => {
+  getCities.mockResolvedValue([]);
+  getSpecializations.mockResolvedValue([]);
+  searchClinics.mockResolvedValue({ clinics: [clinicSummary()], total: 1, pageCount: 1, currentPage: 1 });
+  renderWithProviders(<PatientFindClinicsPage />, { user: PATIENT_USER });
 
-test('public view keeps Login and Register', () => {
-  render(<FindClinicsPage />);
-  const header = screen.getByRole('banner');
-  expect(within(header).getByRole('link', { name: 'Login' })).toBeInTheDocument();
-  expect(within(header).queryByRole('link', { name: /My Account/ })).not.toBeInTheDocument();
+  const card = await screen.findByRole('article', { name: 'Valencia Smiles' });
+  expect(within(card).getByRole('link', { name: 'Book Appointment' })).toHaveAttribute('href', '/patient/book?clinic=7');
+  expect(within(card).getByRole('link', { name: 'View Details' })).toHaveAttribute('href', '/patient/clinics/7');
+  expect(screen.getByRole('link', { name: /My Account/ })).toHaveAttribute('href', '/patient/dashboard');
 });

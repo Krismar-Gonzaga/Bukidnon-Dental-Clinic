@@ -1,54 +1,38 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import DirectoryPageLayout from '../layouts/DirectoryPageLayout';
 import DentistDirectoryFilters from '../components/dentists/DentistDirectoryFilters';
 import DentistDirectoryCard from '../components/dentists/DentistDirectoryCard';
 import Pagination from '../components/Pagination';
+import { ErrorState, LoadingState } from '../components/StatusMessage';
 import { ALL_OPTION } from '../config/clinicDirectory';
 import { DENTISTS_PER_PAGE } from '../config/dentistDirectory';
-import { DIRECTORY_CLINICS } from '../mocks/directoryClinics';
-import { DIRECTORY_DENTISTS } from '../mocks/directoryDentists';
-import { getPageCount, paginate } from '../utils/clinicDirectory';
-import {
-  filterDentists,
-  getSpecialtyOptions,
-  withClinicNames,
-} from '../utils/dentistDirectory';
+import { getPublicClinicHref } from '../config/navigation';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { getDentists, getSpecializations } from '../services/publicApi';
 
-const INITIAL_FILTERS = {
-  query: '',
-  specialty: ALL_OPTION,
-};
-
-// Dentist directory. Uses mock dentists until the dentists API is integrated.
-function DentistsPage({
-  dentists = DIRECTORY_DENTISTS,
-  clinics = DIRECTORY_CLINICS,
-}) {
-  const [filters, setFilters] = useState(INITIAL_FILTERS);
+// Dentists working at listed clinics, searched and paginated on the server.
+function DentistsPage() {
+  const [filters, setFilters] = useState({ query: '', specialty: ALL_OPTION });
   const [currentPage, setCurrentPage] = useState(1);
+  const query = useDebouncedValue(filters.query);
 
-  const listings = useMemo(
-    () => withClinicNames(dentists, clinics),
-    [dentists, clinics]
-  );
-  const specialtyOptions = useMemo(() => getSpecialtyOptions(dentists), [dentists]);
+  const specializations = useQuery({ queryKey: ['specializations'], queryFn: getSpecializations, staleTime: 10 * 60 * 1000 });
+  const specializationId = specializations.data?.find(({ name }) => name === filters.specialty)?.id;
 
-  const results = useMemo(
-    () => filterDentists(listings, filters),
-    [listings, filters]
-  );
-  const pageCount = getPageCount(results.length, DENTISTS_PER_PAGE);
-  const pageResults = paginate(results, currentPage, DENTISTS_PER_PAGE);
+  const results = useQuery({
+    queryKey: ['dentists', query, specializationId, currentPage],
+    queryFn: () => getDentists({ query, specializationId, page: currentPage, perPage: DENTISTS_PER_PAGE }),
+    placeholderData: keepPreviousData,
+  });
 
   const handleFilterChange = (name, value) => {
     setFilters((current) => ({ ...current, [name]: value }));
     setCurrentPage(1);
   };
 
-  // Figma shows no visible count; announce it to screen readers only.
-  const resultLabel = `${results.length} ${
-    results.length === 1 ? 'dentist' : 'dentists'
-  } found`;
+  const dentists = results.data?.dentists ?? [];
+  const total = results.data?.total ?? 0;
 
   return (
     <DirectoryPageLayout
@@ -59,38 +43,45 @@ function DentistsPage({
       filters={
         <DentistDirectoryFilters
           filters={filters}
-          specialtyOptions={specialtyOptions}
+          specialtyOptions={[ALL_OPTION, ...(specializations.data ?? []).map(({ name }) => name)]}
           onFilterChange={handleFilterChange}
         />
       }
     >
-      <p className="visually-hidden" role="status">
-        {resultLabel}
-      </p>
-
-      {pageResults.length > 0 ? (
-        <ul className="directory-grid">
-          {pageResults.map((dentist, index) => (
-            <li key={dentist.id}>
-              <DentistDirectoryCard
-                dentist={dentist}
-                accentIndex={(currentPage - 1) * DENTISTS_PER_PAGE + index}
-              />
-            </li>
-          ))}
-        </ul>
+      {results.isPending ? (
+        <LoadingState label="Finding dentists…" />
+      ) : results.isError ? (
+        <ErrorState error={results.error} onRetry={() => results.refetch()} />
       ) : (
-        <p className="directory-empty">
-          No dentists match your search. Try a different name or specialization.
-        </p>
-      )}
+        <>
+          <p className="visually-hidden" role="status">
+            {`${total} ${total === 1 ? 'dentist' : 'dentists'} found`}
+          </p>
 
-      <Pagination
-        currentPage={currentPage}
-        pageCount={pageCount}
-        onPageChange={setCurrentPage}
-        label="Dentist results pages"
-      />
+          {dentists.length > 0 ? (
+            <ul className="directory-grid">
+              {dentists.map((dentist, index) => (
+                <li key={dentist.id}>
+                  <DentistDirectoryCard
+                    dentist={dentist}
+                    accentIndex={(currentPage - 1) * DENTISTS_PER_PAGE + index}
+                    profileHref={dentist.clinics[0] ? getPublicClinicHref(dentist.clinics[0].id) : undefined}
+                  />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="directory-empty">No dentists match your search. Try a different name or specialization.</p>
+          )}
+
+          <Pagination
+            currentPage={currentPage}
+            pageCount={results.data?.pageCount ?? 1}
+            onPageChange={setCurrentPage}
+            label="Dentist results pages"
+          />
+        </>
+      )}
     </DirectoryPageLayout>
   );
 }

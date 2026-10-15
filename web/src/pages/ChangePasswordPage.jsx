@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import PatientLayout from '../layouts/PatientLayout';
 import Icon from '../components/Icon';
 import ProfileField from '../components/patient/ProfileField';
@@ -10,7 +11,8 @@ import {
   PASSWORD_MIN_LENGTH,
 } from '../config/profile';
 import { PATIENT_PROFILE_HREF } from '../config/patientNavigation';
-import { MOCK_DASHBOARD_NOTIFICATIONS, MOCK_PATIENT } from '../mocks/patientDashboard';
+import { changePassword } from '../services/authService';
+import { getErrorMessage, getFieldErrors } from '../services/apiErrors';
 import '../components/patient/patientPanel.css';
 import './ChangePasswordPage.css';
 
@@ -25,17 +27,25 @@ const getFormError = ({ newPassword, confirmPassword }) => {
   return '';
 };
 
-// Change Password with a MOCK submit: the form checks the new password
-// locally, then shows the success screen. Nothing is sent yet.
-function ChangePasswordPage() {
+// Changing the password signs out the account's other devices; this
+// session stays signed in.
+function ChangePasswordPage({ layout: Layout = PatientLayout, backHref = PATIENT_PROFILE_HREF, activeHref = PATIENT_PROFILE_HREF }) {
   const [form, setForm] = useState(INITIAL_FORM);
   const [error, setError] = useState('');
-  const [isChanged, setIsChanged] = useState(false);
   const successRef = useRef(null);
 
+  const change = useMutation({
+    mutationFn: () => changePassword({ currentPassword: form.currentPassword, newPassword: form.newPassword }),
+    onSuccess: () => setForm(INITIAL_FORM),
+    onError: (apiError) => {
+      const fields = getFieldErrors(apiError);
+      setError(fields.current_password ?? fields.new_password ?? getErrorMessage(apiError));
+    },
+  });
+
   useEffect(() => {
-    if (isChanged) successRef.current?.focus();
-  }, [isChanged]);
+    if (change.isSuccess) successRef.current?.focus();
+  }, [change.isSuccess]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -50,8 +60,7 @@ function ChangePasswordPage() {
       setError(formError);
       return;
     }
-    // MOCK change password: replace with POST /change-password during integration.
-    setIsChanged(true);
+    change.mutate();
   };
 
   const field = (name) => ({
@@ -66,26 +75,21 @@ function ChangePasswordPage() {
   });
 
   return (
-    <PatientLayout
-      title="Change Password"
-      activeHref={PATIENT_PROFILE_HREF}
-      user={MOCK_PATIENT}
-      hasUnreadNotifications={MOCK_DASHBOARD_NOTIFICATIONS.some(({ unread }) => unread)}
-    >
+    <Layout title="Change Password" activeHref={activeHref}>
       <div className="change-password-page">
-        <a href={PATIENT_PROFILE_HREF} className="patient-back-link">
+        <a href={backHref} className="patient-back-link">
           <Icon name="chevronLeft" size={16} />
-          Back to Profile
+          Back
         </a>
 
-        {isChanged ? (
+        {change.isSuccess ? (
           <SuccessCard
             ref={successRef}
             title={PASSWORD_CHANGED_TITLE}
-            message={PASSWORD_CHANGED_MESSAGE}
+            message={`${PASSWORD_CHANGED_MESSAGE} Other devices were signed out.`}
             action={
-              <a href={PATIENT_PROFILE_HREF} className="btn btn-primary">
-                Back to Profile
+              <a href={backHref} className="btn btn-primary">
+                Done
               </a>
             }
           />
@@ -103,22 +107,14 @@ function ChangePasswordPage() {
               Change Password
             </h2>
 
-            <ProfileField
-              label="Current Password"
-              autoComplete="current-password"
-              {...field('currentPassword')}
-            />
+            <ProfileField label="Current Password" autoComplete="current-password" {...field('currentPassword')} />
             <ProfileField
               label="New Password"
               autoComplete="new-password"
               aria-describedby={STRENGTH_TEXT_ID}
               {...field('newPassword')}
             />
-            <ProfileField
-              label="Confirm New Password"
-              autoComplete="new-password"
-              {...field('confirmPassword')}
-            />
+            <ProfileField label="Confirm New Password" autoComplete="new-password" {...field('confirmPassword')} />
 
             <PasswordStrengthMeter id={STRENGTH_TEXT_ID} password={form.newPassword} />
 
@@ -128,13 +124,13 @@ function ChangePasswordPage() {
               </p>
             )}
 
-            <button type="submit" className="btn btn-primary btn-lg change-password-submit">
-              Update Password
+            <button type="submit" className="btn btn-primary btn-lg change-password-submit" disabled={change.isPending}>
+              {change.isPending ? 'Updating…' : 'Update Password'}
             </button>
           </form>
         )}
       </div>
-    </PatientLayout>
+    </Layout>
   );
 }
 

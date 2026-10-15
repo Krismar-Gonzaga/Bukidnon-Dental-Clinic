@@ -98,3 +98,30 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.edit-profile-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+.edit-profile-toggle input {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+}
+
+.edit-profile-error {
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background-color: var(--color-danger-soft);
+  color: var(--color-danger-text);
+  font-size: var(--font-size-sm);
+}
+
+.edit-profile-error ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+}

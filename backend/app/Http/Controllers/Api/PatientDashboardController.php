@@ -27,6 +27,8 @@ class PatientDashboardController extends Controller
                 'pending' => $mine()->whereIn('status', [Appointment::PENDING, Appointment::RESCHEDULE_REQUESTED])->count(),
                 'completed' => $mine()->where('status', Appointment::COMPLETED)->count(),
                 'awaiting_review' => $mine()->where('status', Appointment::COMPLETED)->whereDoesntHave('review')->count(),
+                'saved_clinics' => $patient->savedClinics()->count(),
+                'reviews_given' => $patient->reviews()->count(),
             ],
             'unread_notifications' => $user->unreadNotifications()->count(),
         ]);

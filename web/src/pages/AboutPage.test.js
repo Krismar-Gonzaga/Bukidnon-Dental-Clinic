@@ -1,4 +1,5 @@
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import { renderWithProviders as render } from '../testUtils';
 import AboutPage from './AboutPage';
 import { ABOUT_STATS, ABOUT_VALUES } from '../mocks/aboutContent';
 

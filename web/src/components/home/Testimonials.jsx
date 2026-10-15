@@ -1,5 +1,5 @@
 import Icon from '../Icon';
-import { TESTIMONIALS } from '../../mocks/testimonials';
+import { useHomeData } from '../../hooks/useHomeData';
 import './Testimonials.css';
 
 const MAX_RATING = 5;
@@ -15,27 +15,27 @@ function getInitials(name) {
 
 function StarRating({ rating }) {
   return (
-    <p
-      className="testimonial-stars"
-      role="img"
-      aria-label={`Rated ${rating} out of ${MAX_RATING}`}
-    >
+    <p className="testimonial-stars" role="img" aria-label={`Rated ${rating} out of ${MAX_RATING}`}>
       {Array.from({ length: MAX_RATING }, (_, index) => (
         <Icon
           key={index}
           name="star"
           size={18}
-          className={
-            index < rating ? 'testimonial-star is-filled' : 'testimonial-star'
-          }
+          className={index < rating ? 'testimonial-star is-filled' : 'testimonial-star'}
         />
       ))}
     </p>
   );
 }
 
-// Uses mock testimonials until verified reviews come from the backend.
+// Recent published reviews from verified visits (GET /home). The section is
+// hidden until there are reviews with comments to show.
 function Testimonials() {
+  const home = useHomeData();
+  const reviews = (home.data?.reviews ?? []).filter(({ quote }) => quote).slice(0, 3);
+
+  if (reviews.length === 0) return null;
+
   return (
     <section className="testimonials" aria-labelledby="testimonials-title">
       <div className="testimonials-inner">
@@ -43,14 +43,11 @@ function Testimonials() {
           <h2 id="testimonials-title" className="testimonials-title">
             What Patients Say
           </h2>
-          <p className="testimonials-text">
-            Hear from patients who found their dentist through the
-            portal.
-          </p>
+          <p className="testimonials-text">Hear from patients who found their dentist through the portal.</p>
         </div>
 
         <ul className="testimonials-grid">
-          {TESTIMONIALS.map((item) => (
+          {reviews.map((item) => (
             <li key={item.id} className="testimonial-card">
               <figure className="testimonial-figure">
                 <div className="testimonial-top">

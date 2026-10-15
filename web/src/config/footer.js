@@ -1,6 +1,7 @@
-import { LOGIN_HREF, MAIN_NAV_ITEMS, REGISTER_HREF } from './navigation';
+import { getLoginHref, LOGIN_HREF, MAIN_NAV_ITEMS, PRIVACY_HREF, REGISTER_HREF, TERMS_HREF } from './navigation';
+import { PATIENT_BOOK_HREF } from './patientNavigation';
 
-// Footer content. Hash hrefs are placeholders until those pages exist.
+// Footer content. Social hrefs are placeholders until the profiles exist.
 export const FOOTER_TAGLINE =
   'Helping patients find trusted dental clinics and book appointments across Bukidnon.';
 
@@ -13,9 +14,16 @@ export const FOOTER_LINK_GROUPS = [
     title: 'For Patients',
     links: [
       { label: 'Find Clinics', href: '/clinics' },
-      { label: 'Book Appointment', href: '#find-clinics' },
+      { label: 'Book Appointment', href: getLoginHref(PATIENT_BOOK_HREF) },
       { label: 'Login', href: LOGIN_HREF },
       { label: 'Register', href: REGISTER_HREF },
+    ],
+  },
+  {
+    title: 'Legal',
+    links: [
+      { label: 'Privacy Notice', href: PRIVACY_HREF },
+      { label: 'Terms of Use', href: TERMS_HREF },
     ],
   },
 ];

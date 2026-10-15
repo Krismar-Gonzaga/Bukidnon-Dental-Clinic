@@ -1,115 +1,75 @@
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import App from './App';
-import { CLINIC_MAP_MARKERS } from './mocks/clinicMapMarkers';
-import { TESTIMONIALS } from './mocks/testimonials';
+import { getCities, getClinicMap, getHome, getSpecializations } from './services/publicApi';
+import { getPatientDashboard } from './services/patientApi';
+import { getNotifications } from './services/notificationApi';
+import { PATIENT_USER, renderWithProviders } from './testUtils';
 
-test('renders the guest home page hero and search panel', () => {
-  render(<App />);
-  expect(
-    screen.getByRole('heading', {
-      level: 1,
-      name: /find trusted dental clinics across bukidnon/i,
-    })
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole('search', { name: /search dental clinics/i })
-  ).toBeInTheDocument();
-  expect(
-    within(screen.getByRole('banner')).getByRole('link', { name: 'Home' })
-  ).toHaveAttribute('aria-current', 'page');
+jest.mock('./services/publicApi');
+jest.mock('./services/patientApi');
+jest.mock('./services/notificationApi');
+
+const HOME = {
+  featuredClinics: [
+    { id: '1', name: 'Malaybalay Dental Care', location: 'Sayre Highway, Malaybalay City', rating: 4.9, reviewCount: null, tags: ['General Dentistry'], imageSrc: null },
+  ],
+  reviews: [{ id: '9', name: 'Maria L.', detail: 'Patient, Malaybalay Dental Care', rating: 5, quote: 'Booking took two minutes.' }],
+  serviceRates: [{ name: 'Dental Cleaning', startingPrice: 800, clinicCount: 2 }],
+  specializations: [],
+  stats: {},
+};
+
+beforeEach(() => {
+  getHome.mockResolvedValue(HOME);
+  getClinicMap.mockResolvedValue([
+    { id: '1', name: 'Malaybalay Dental Care', location: 'Malaybalay City', latitude: 8.1575, longitude: 125.1278 },
+    { id: '2', name: 'No Coordinates Clinic', location: 'Valencia City', latitude: null, longitude: null },
+  ]);
+  getCities.mockResolvedValue(['Malaybalay City', 'Valencia City']);
+  getSpecializations.mockResolvedValue([{ id: 1, name: 'Orthodontics' }]);
+  getNotifications.mockResolvedValue({ notifications: [], unreadCount: 0, pageCount: 1 });
+  getPatientDashboard.mockResolvedValue({ name: 'Juan', upcoming: [], counts: { upcoming: 0, pending: 0, completed: 0, saved_clinics: 0, reviews_given: 0 }, unreadNotifications: 0 });
 });
 
-test('renders the featured clinics section with clinic cards', () => {
-  render(<App />);
-  expect(
-    screen.getByRole('heading', { level: 2, name: /featured clinics/i })
-  ).toBeInTheDocument();
-  expect(screen.getAllByRole('article').length).toBeGreaterThan(0);
-  expect(
-    screen.getAllByRole('button', { name: /book appointment/i }).length
-  ).toBe(screen.getAllByRole('article').length);
+const renderApp = (route = '/', user = null) => renderWithProviders(<App />, { route, user });
+
+test('renders the guest home page with live featured clinics, prices and reviews', async () => {
+  renderApp();
+  expect(screen.getByRole('heading', { level: 1, name: /find trusted dental clinics across bukidnon/i })).toBeInTheDocument();
+  expect(within(screen.getByRole('banner')).getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+
+  expect(await screen.findByRole('heading', { level: 3, name: 'Malaybalay Dental Care' })).toBeInTheDocument();
+  const featured = screen.getByRole('heading', { level: 2, name: /featured clinics/i }).closest('section');
+  expect(within(featured).getByRole('link', { name: /book appointment/i })).toHaveAttribute('href', '/login?next=%2Fpatient%2Fbook%3Fclinic%3D1');
+  expect(screen.getByText('Starts at ₱800')).toBeInTheDocument();
+  expect(screen.getByText('Booking took two minutes.')).toBeInTheDocument();
 });
 
-test('renders the four dental specializations', () => {
-  render(<App />);
-  const section = screen
-    .getByRole('heading', { level: 2, name: /dental specializations/i })
-    .closest('section');
-  ['Orthodontist', 'Pediatric Dentist', 'Oral Surgeon', 'General Dentist'].forEach(
-    (name) => {
-      expect(
-        within(section).getByRole('heading', { level: 3, name })
-      ).toBeInTheDocument();
-    }
-  );
+test('search panel lists real cities and specializations', async () => {
+  renderApp();
+  expect(await screen.findByRole('option', { name: 'Valencia City' })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: 'Orthodontics' })).toBeInTheDocument();
 });
 
-test('renders the affordable care section with four priced services', () => {
-  render(<App />);
-  const section = screen
-    .getByRole('heading', { level: 2, name: /affordable care for everyone/i })
-    .closest('section');
-  expect(within(section).getAllByRole('heading', { level: 3 })).toHaveLength(4);
-  expect(within(section).getByText('Starts at ₱5,000')).toBeInTheDocument();
+test('map pins only clinics that have coordinates', async () => {
+  renderApp();
+  const section = (await screen.findByRole('heading', { level: 2, name: /find clinics near you/i })).closest('section');
+  expect(await within(section).findByRole('link', { name: 'Malaybalay Dental Care' })).toBeInTheDocument();
+  expect(within(section).queryByRole('link', { name: 'No Coordinates Clinic' })).not.toBeInTheDocument();
 });
 
-test('renders the why book section with three benefits', () => {
-  render(<App />);
-  const section = screen
-    .getByRole('heading', {
-      level: 2,
-      name: /why book through bukidnondental\?/i,
-    })
-    .closest('section');
-  ['Verified Clinics', 'Instant Online Booking', 'Smart Reminders'].forEach(
-    (name) => {
-      expect(
-        within(section).getByRole('heading', { level: 3, name })
-      ).toBeInTheDocument();
-    }
-  );
+test('signed-out visitors are sent to login from the patient portal', () => {
+  renderApp('/patient/dashboard');
+  expect(screen.getByRole('heading', { level: 1, name: 'Welcome Back' })).toBeInTheDocument();
 });
 
-test('renders the find clinics near you section with map markers', () => {
-  render(<App />);
-  const section = screen
-    .getByRole('heading', { level: 2, name: /find clinics near you/i })
-    .closest('section');
-  expect(
-    within(section).getByRole('button', { name: /open full map/i })
-  ).toBeInTheDocument();
-  const markers = within(
-    within(section).getByRole('list', { name: /clinic locations/i })
-  ).getAllByRole('listitem');
-  expect(markers).toHaveLength(CLINIC_MAP_MARKERS.length);
+test('a patient cannot open the admin portal', async () => {
+  renderApp('/admin/users', PATIENT_USER);
+  // Redirected to their own dashboard instead.
+  expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
 });
 
-test('renders the testimonials section from mock data', () => {
-  render(<App />);
-  const section = screen
-    .getByRole('heading', { level: 2, name: /what patients say/i })
-    .closest('section');
-  expect(within(section).getAllByRole('listitem')).toHaveLength(
-    TESTIMONIALS.length
-  );
-  expect(
-    within(section).getAllByRole('img', { name: /rated \d out of 5/i })
-  ).toHaveLength(TESTIMONIALS.length);
-});
-
-test('renders the site footer with link groups and copyright', () => {
-  render(<App />);
-  const footer = screen.getByRole('contentinfo');
-  expect(
-    within(footer).getByRole('navigation', { name: 'Quick Links' })
-  ).toBeInTheDocument();
-  expect(
-    within(footer).getByRole('navigation', { name: 'For Patients' })
-  ).toBeInTheDocument();
-  expect(
-    within(footer).getByRole('heading', { level: 2, name: 'Contact' })
-  ).toBeInTheDocument();
-  expect(
-    within(footer).getByText(/bukidnondental\. all rights reserved\./i)
-  ).toBeInTheDocument();
+test('unknown paths show a not-found page', () => {
+  renderApp('/no-such-page');
+  expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();
 });

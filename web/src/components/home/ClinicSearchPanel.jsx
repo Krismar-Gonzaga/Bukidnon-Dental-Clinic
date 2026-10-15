@@ -1,11 +1,10 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import Icon from '../Icon';
-import {
-  DEFAULT_LOCATION,
-  DEFAULT_SPECIALIZATION,
-  LOCATION_OPTIONS,
-  SPECIALIZATION_OPTIONS,
-} from '../../config/searchOptions';
+import { ALL_OPTION } from '../../config/clinicDirectory';
+import { FIND_CLINICS_HREF } from '../../config/navigation';
+import { getCities, getSpecializations } from '../../services/publicApi';
 import './ClinicSearchPanel.css';
 
 function SearchSelect({ id, label, icon, value, options, onChange }) {
@@ -24,7 +23,7 @@ function SearchSelect({ id, label, icon, value, options, onChange }) {
         >
           {options.map((option) => (
             <option key={option} value={option}>
-              {option}
+              {option === ALL_OPTION ? `Any ${label.toLowerCase()}` : option}
             </option>
           ))}
         </select>
@@ -34,23 +33,28 @@ function SearchSelect({ id, label, icon, value, options, onChange }) {
   );
 }
 
-// Visual search form only. Submitting does not call the backend yet.
+// Opens the clinic directory with these filters applied. Locations and
+// specializations come from the listed clinics.
 function ClinicSearchPanel() {
+  const navigate = useNavigate();
   const [clinicName, setClinicName] = useState('');
-  const [location, setLocation] = useState(DEFAULT_LOCATION);
-  const [specialization, setSpecialization] = useState(DEFAULT_SPECIALIZATION);
+  const [location, setLocation] = useState(ALL_OPTION);
+  const [specialization, setSpecialization] = useState(ALL_OPTION);
+
+  const cities = useQuery({ queryKey: ['cities'], queryFn: getCities, staleTime: 10 * 60 * 1000 });
+  const specializations = useQuery({ queryKey: ['specializations'], queryFn: getSpecializations, staleTime: 10 * 60 * 1000 });
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    const params = new URLSearchParams();
+    if (clinicName.trim()) params.set('search', clinicName.trim());
+    if (location !== ALL_OPTION) params.set('city', location);
+    if (specialization !== ALL_OPTION) params.set('specialization', specialization);
+    navigate(`${FIND_CLINICS_HREF}${params.toString() ? `?${params}` : ''}`);
   };
 
   return (
-    <form
-      className="clinic-search"
-      role="search"
-      aria-label="Search dental clinics"
-      onSubmit={handleSubmit}
-    >
+    <form className="clinic-search" role="search" aria-label="Search dental clinics" onSubmit={handleSubmit}>
       <div className="search-field">
         <label htmlFor="search-clinic-name" className="search-field-label">
           Clinic Name
@@ -73,7 +77,7 @@ function ClinicSearchPanel() {
         label="Location"
         icon="mapPin"
         value={location}
-        options={LOCATION_OPTIONS}
+        options={[ALL_OPTION, ...(cities.data ?? [])]}
         onChange={setLocation}
       />
 
@@ -82,7 +86,7 @@ function ClinicSearchPanel() {
         label="Specialization"
         icon="tooth"
         value={specialization}
-        options={SPECIALIZATION_OPTIONS}
+        options={[ALL_OPTION, ...(specializations.data ?? []).map(({ name }) => name)]}
         onChange={setSpecialization}
       />
 

@@ -1,8 +1,8 @@
 import Icon from './Icon';
 import './ClinicCard.css';
 
-// Actions are visual only until routing/booking are implemented.
-function ClinicCard({ clinic }) {
+// Featured clinic card. bookHref / detailsHref link the actions.
+function ClinicCard({ clinic, bookHref, detailsHref }) {
   const { name, location, rating, reviewCount, tags, imageSrc } = clinic;
   const titleId = `${clinic.id}-name`;
 
@@ -25,7 +25,7 @@ function ClinicCard({ clinic }) {
         <p className="clinic-card-rating">
           <Icon name="star" size={16} className="clinic-card-star" />
           <span className="clinic-card-rating-value">{rating.toFixed(1)}</span>
-          <span className="clinic-card-reviews">({reviewCount} reviews)</span>
+          {reviewCount != null && <span className="clinic-card-reviews">({reviewCount} reviews)</span>}
         </p>
 
         <h3 id={titleId} className="clinic-card-name">
@@ -37,7 +37,7 @@ function ClinicCard({ clinic }) {
           {location}
         </p>
 
-        <ul className="clinic-card-tags" aria-label="Services">
+        <ul className="clinic-card-tags" aria-label="Specializations">
           {tags.map((tag) => (
             <li key={tag} className="clinic-card-tag">
               {tag}
@@ -46,12 +46,12 @@ function ClinicCard({ clinic }) {
         </ul>
 
         <div className="clinic-card-actions">
-          <button type="button" className="btn btn-primary btn-sm">
+          <a href={bookHref} className="btn btn-primary btn-sm">
             Book Appointment
-          </button>
-          <button type="button" className="btn btn-outline btn-sm">
+          </a>
+          <a href={detailsHref} className="btn btn-outline btn-sm">
             View Details
-          </button>
+          </a>
         </div>
       </div>
     </article>

@@ -1,129 +1,59 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import ProfilePage from './ProfilePage';
-import { MOCK_PATIENT_PROFILE } from '../mocks/patientProfile';
-import { getAge } from '../utils/profile';
+import { getMedicalHistory, getPatientDashboard, getProfile, getSharedRecords } from '../services/patientApi';
+import { getNotifications } from '../services/notificationApi';
+import { PATIENT_USER, renderWithProviders } from '../testUtils';
+import { emptyNotifications } from '../testFixtures';
 
-test('shows the profile header, tags, medical alert, and actions', () => {
-  render(<ProfilePage />);
-  expect(screen.getByRole('heading', { level: 1, name: 'My Profile' })).toBeInTheDocument();
-  const nav = screen.getByRole('navigation', { name: 'Patient' });
-  expect(within(nav).getByRole('link', { name: 'My Profile' })).toHaveAttribute(
-    'aria-current',
-    'page'
-  );
+jest.mock('../services/patientApi');
+jest.mock('../services/notificationApi');
 
-  const header = screen.getByRole('region', { name: 'Profile summary' });
-  expect(within(header).getByRole('heading', { name: 'Juan Dela Cruz' })).toBeInTheDocument();
-  const tags = within(header).getByRole('list', { name: 'Health tags' });
-  expect(within(tags).getAllByRole('listitem')).toHaveLength(3);
-  expect(within(header).getByRole('link', { name: 'Edit Profile' })).toHaveAttribute(
-    'href',
-    '/patient/profile/edit'
-  );
-  expect(within(header).getByRole('link', { name: 'Password' })).toHaveAttribute(
-    'href',
-    '/patient/profile/password'
-  );
-  expect(screen.getByText('Important Medical Alerts')).toBeInTheDocument();
-});
-
-test('overview shows personal, contact, and activity details', () => {
-  render(<ProfilePage />);
-  const personal = screen.getByRole('region', { name: 'Personal Information' });
-  expect(personal).toHaveTextContent('March 15, 1995');
-  expect(personal).toHaveTextContent(`${getAge('1995-03-15')} years old`);
-  expect(personal).toHaveTextContent('O+');
-
-  const contact = screen.getByRole('region', { name: 'Contact Details' });
-  expect(contact).toHaveTextContent('juan@email.com');
-  expect(contact).toHaveTextContent('8709');
-
-  const activity = screen.getByRole('region', { name: 'Activity Summary' });
-  expect(activity).toHaveTextContent('Total Appointments');
-  expect(activity).toHaveTextContent('6');
-});
-
-const openTab = (name) => {
-  fireEvent.click(screen.getByRole('tab', { name }));
-  return screen.getByRole('tabpanel');
+const PROFILE = {
+  name: 'Juan Dela Cruz',
+  email: 'juan@example.com',
+  phone: '09171234567',
+  address: 'Sayre Highway, Valencia City',
+  birthDate: '1995-03-15',
+  gender: 'Male',
+  emergencyContactName: 'Maria Dela Cruz',
+  emergencyContactPhone: '09170000000',
+  emailNotifications: true,
 };
 
-const expectEditLink = (card, tabId) => {
-  expect(within(card).getByRole('link', { name: /^Edit / })).toHaveAttribute(
-    'href',
-    `/patient/profile/edit?tab=${tabId}`
-  );
-};
-
-test('Medical History tab shows conditions, procedures, and vital notes', () => {
-  render(<ProfilePage />);
-  const panel = openTab('Medical History');
-
-  const conditions = within(panel).getByRole('region', { name: 'Medical Conditions' });
-  const conditionList = within(conditions).getByRole('list', { name: 'Medical conditions' });
-  expect(within(conditionList).getAllByRole('listitem')).toHaveLength(3);
-  expect(within(conditions).getByRole('note')).toHaveTextContent('special precautions');
-  expectEditLink(conditions, 'medical');
-
-  const procedures = within(panel).getByRole('region', { name: 'Previous Dental Procedures' });
-  expect(within(procedures).getAllByRole('listitem')).toHaveLength(3);
-  expect(procedures).toHaveTextContent('Lower right molar (#47)');
-  expect(procedures).toHaveTextContent('March 2024');
-
-  const vitals = within(panel).getByRole('region', { name: 'Vital & Systemic Notes' });
-  expect(vitals).toHaveTextContent('130/85 mmHg');
-  expect(vitals).toHaveTextContent('Elevated — monitor before procedures');
-  expect(vitals).toHaveTextContent('None in past 6 months');
+beforeEach(() => {
+  getNotifications.mockResolvedValue(emptyNotifications);
+  getProfile.mockResolvedValue(PROFILE);
+  getPatientDashboard.mockResolvedValue({ name: 'Juan', upcoming: [], counts: { upcoming: 1, pending: 0, completed: 3, saved_clinics: 2, reviews_given: 1 } });
+  getMedicalHistory.mockResolvedValue([
+    { clinic: 'Valencia Smiles', allergies: 'Penicillin', medications: 'Amlodipine 5mg', conditions: 'Hypertension', recordedAt: 'October 1, 2026' },
+  ]);
+  getSharedRecords.mockResolvedValue([
+    { id: '1', clinic: 'Valencia Smiles', dentist: 'Dr. Maria Santos', type: 'treatment', procedures: 'Scaling', careInstructions: 'Floss nightly.', date: 'October 1, 2026' },
+  ]);
 });
 
-test('Allergies & Medications tab shows allergies, medications, and anxiety', () => {
-  render(<ProfilePage />);
-  const panel = openTab('Allergies & Medications');
+test('shows personal details, contact details and activity from the API', async () => {
+  renderWithProviders(<ProfilePage />, { user: PATIENT_USER });
 
-  const allergies = within(panel).getByRole('region', { name: 'Known Allergies' });
-  expect(within(allergies).getAllByRole('listitem')).toHaveLength(3);
-  expect(allergies).toHaveTextContent('Severe');
-  expect(allergies).toHaveTextContent('Reaction: Hives, difficulty breathing');
-  expectEditLink(allergies, 'allergies');
-
-  const medications = within(panel).getByRole('region', { name: 'Current Medications' });
-  expect(medications).toHaveTextContent('5mg once daily');
-  expect(medications).toHaveTextContent('For: Type 2 Diabetes');
-  expect(medications).toHaveTextContent('May cause gingival enlargement');
-
-  const anxiety = within(panel).getByRole('region', { name: 'Dental Anxiety' });
-  expect(within(anxiety).getByRole('img', { name: 'Level 3 of 5' })).toBeInTheDocument();
-  expect(anxiety).toHaveTextContent('Local anesthesia only');
-  expect(anxiety).toHaveTextContent('Sensitive to needles');
+  expect(await screen.findByRole('heading', { level: 2, name: 'Juan Dela Cruz' })).toBeInTheDocument();
+  expect(screen.getByText('March 15, 1995')).toBeInTheDocument();
+  expect(screen.getByText('Sayre Highway, Valencia City')).toBeInTheDocument();
+  expect(await screen.findByText('Reviews Submitted')).toBeInTheDocument();
 });
 
-test('Emergency Contact tab shows the contact and consent settings', () => {
-  render(<ProfilePage />);
-  const panel = openTab('Emergency Contact');
+test('medical tabs show what clinics recorded, read-only', async () => {
+  renderWithProviders(<ProfilePage />, { user: PATIENT_USER });
+  await screen.findByRole('heading', { level: 2, name: 'Juan Dela Cruz' });
 
-  const contact = within(panel).getByRole('region', { name: 'Primary Emergency Contact' });
-  expect(contact).toHaveTextContent('Maria Dela Cruz');
-  expect(within(contact).getByRole('link', { name: '+63 918 765 4321' })).toHaveAttribute(
-    'href',
-    'tel:+639187654321'
-  );
-  expect(contact).toHaveTextContent('Purok 5, Catumbalon, Valencia City, Bukidnon');
-  expectEditLink(contact, 'emergency');
+  fireEvent.click(screen.getByRole('tab', { name: 'Allergies & Medications' }));
+  expect(await screen.findByText('Penicillin')).toBeInTheDocument();
+  expect(screen.getByText('Amlodipine 5mg')).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /Edit Valencia Smiles/ })).not.toBeInTheDocument();
 
-  const consents = within(panel).getByRole('region', { name: 'Consent & Preferences' });
-  const items = within(consents).getAllByRole('listitem');
-  expect(items).toHaveLength(5);
-  expect(items[0]).toHaveTextContent('SMS appointment remindersOn');
-  expect(items[4]).toHaveTextContent('Promotional offers and dental health tipsOff');
-});
+  fireEvent.click(screen.getByRole('tab', { name: 'Medical History' }));
+  expect(await screen.findByText('Hypertension')).toBeInTheDocument();
+  expect(await screen.findByText('Floss nightly.')).toBeInTheDocument();
 
-test('section tabs show empty messages when nothing is recorded', () => {
-  render(<ProfilePage profile={{ ...MOCK_PATIENT_PROFILE, conditions: [], emergencyContact: null }} />);
-  expect(openTab('Medical History')).toHaveTextContent('No medical conditions recorded.');
-  expect(openTab('Emergency Contact')).toHaveTextContent('No emergency contact added yet.');
-});
-
-test('age counts only birthdays already reached', () => {
-  expect(getAge('1995-03-15', new Date(2026, 2, 14))).toBe(30);
-  expect(getAge('1995-03-15', new Date(2026, 2, 15))).toBe(31);
+  fireEvent.click(screen.getByRole('tab', { name: 'Emergency Contact' }));
+  expect(screen.getByText('Maria Dela Cruz')).toBeInTheDocument();
 });

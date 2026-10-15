@@ -1,71 +1,44 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import AppointmentHistoryPage from './AppointmentHistoryPage';
-import { APPOINTMENT_FILTERS } from '../config/appointments';
-import { MOCK_APPOINTMENT_HISTORY } from '../mocks/appointmentHistory';
+import { getAppointments } from '../services/patientApi';
+import { getNotifications } from '../services/notificationApi';
+import { PATIENT_USER, renderWithProviders } from '../testUtils';
+import { appointment, emptyNotifications } from '../testFixtures';
 
-const getCards = () => screen.queryAllByRole('article');
+jest.mock('../services/patientApi');
+jest.mock('../services/notificationApi');
 
-test('renders the title, active nav item, and all appointments by default', () => {
-  render(<AppointmentHistoryPage />);
-  expect(
-    screen.getByRole('heading', { level: 1, name: 'Appointment History' })
-  ).toBeInTheDocument();
-  const nav = screen.getByRole('navigation', { name: 'Patient' });
-  expect(
-    within(nav).getByRole('link', { name: 'Appointment History' })
-  ).toHaveAttribute('aria-current', 'page');
-
-  const filters = screen.getByRole('group', { name: 'Filter appointments by status' });
-  APPOINTMENT_FILTERS.forEach(({ label }) => {
-    expect(within(filters).getByRole('button', { name: label })).toBeInTheDocument();
-  });
-  expect(within(filters).getByRole('button', { name: 'All' })).toHaveAttribute(
-    'aria-pressed',
-    'true'
-  );
-  expect(getCards()).toHaveLength(MOCK_APPOINTMENT_HISTORY.length);
+beforeEach(() => {
+  getNotifications.mockResolvedValue(emptyNotifications);
+  getAppointments.mockResolvedValue([
+    appointment(),
+    appointment({ id: 13, status: 'confirmed', service: { id: 9, name: 'Braces Consultation' } }),
+    appointment({ id: 14, status: 'completed', service: { id: 9, name: 'Tooth Extraction' } }),
+    appointment({ id: 15, status: 'rejected', service: { id: 9, name: 'Whitening' } }),
+  ]);
 });
 
-test('filter chips show only matching appointments', () => {
-  render(<AppointmentHistoryPage />);
-  const filters = screen.getByRole('group', { name: 'Filter appointments by status' });
+test('lists appointments with patient-facing statuses and filters them', async () => {
+  renderWithProviders(<AppointmentHistoryPage />, { user: PATIENT_USER });
 
-  fireEvent.click(within(filters).getByRole('button', { name: 'Completed' }));
-  const expected = MOCK_APPOINTMENT_HISTORY.filter(({ status }) => status === 'completed');
-  expect(getCards()).toHaveLength(expected.length);
-  getCards().forEach((card) => expect(card).toHaveTextContent('Completed'));
+  expect(await screen.findByRole('heading', { name: 'Dental Cleaning' })).toBeInTheDocument();
+  expect(screen.getAllByRole('article')).toHaveLength(4);
 
-  fireEvent.click(within(filters).getByRole('button', { name: 'Cancelled' }));
-  expect(getCards()).toHaveLength(1);
-  expect(getCards()[0]).toHaveTextContent('Tooth Extraction');
+  fireEvent.click(screen.getByRole('button', { name: 'Upcoming' }));
+  expect(screen.getAllByRole('article')).toHaveLength(1);
+  expect(screen.getByRole('link', { name: 'Reschedule Braces Consultation' })).toHaveAttribute('href', '/patient/appointments/13/reschedule');
+
+  // A rejected request shows under Cancelled.
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelled' }));
+  expect(screen.getByRole('heading', { name: 'Whitening' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Completed' }));
+  expect(screen.getByRole('link', { name: /Review Tooth Extraction/ })).toHaveAttribute('href', '/patient/reviews?appointment=14');
 });
 
-test('actions depend on the appointment status', () => {
-  render(<AppointmentHistoryPage />);
-  const [pending, upcoming, completed, , cancelled] = getCards();
+test('shows the empty message for a filter with no appointments', async () => {
+  getAppointments.mockResolvedValue([]);
+  renderWithProviders(<AppointmentHistoryPage />, { user: PATIENT_USER });
 
-  expect(pending).toHaveTextContent('Awaiting Approval');
-  expect(within(pending).queryAllByRole('button')).toHaveLength(0);
-  expect(within(pending).getByRole('link', { name: /^View/ })).toBeInTheDocument();
-
-  expect(within(upcoming).getByRole('link', { name: /^Reschedule/ })).toHaveAttribute(
-    'href',
-    '/patient/appointments/hist-2/reschedule'
-  );
-  expect(within(completed).getByRole('link', { name: /^Review/ })).toHaveAttribute(
-    'href',
-    '/patient/reviews?appointment=hist-3'
-  );
-
-  expect(within(cancelled).queryAllByRole('button')).toHaveLength(0);
-  expect(within(cancelled).getByRole('link', { name: /^View/ })).toBeInTheDocument();
-});
-
-test('View links to the appointment details page', () => {
-  render(<AppointmentHistoryPage />);
-  const [pending] = getCards();
-  expect(within(pending).getByRole('link', { name: /^View Root Canal Treatment/ })).toHaveAttribute(
-    'href',
-    '/patient/appointments/hist-1'
-  );
+  expect(await screen.findByText('No appointments in this category.')).toBeInTheDocument();
 });

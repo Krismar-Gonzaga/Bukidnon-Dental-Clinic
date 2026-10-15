@@ -1,57 +1,77 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import RescheduleAppointmentPage from './RescheduleAppointmentPage';
+import { getAppointment, rescheduleAppointment } from '../services/patientApi';
+import { getAvailability, getAvailableDates } from '../services/publicApi';
+import { getNotifications } from '../services/notificationApi';
+import { apiError, PATIENT_USER, renderWithProviders } from '../testUtils';
+import { appointment, emptyNotifications } from '../testFixtures';
+import { toDateKey } from '../utils/bookingCalendar';
+import { businessTodayKey, dateFromKey } from '../utils/dateTime';
 
-const UPCOMING_ID = 'hist-2';
-// Pin today so the calendar shows July 20-31, 2026.
-const TODAY = new Date(2026, 6, 20, 9);
+jest.mock('../services/patientApi');
+jest.mock('../services/publicApi');
+jest.mock('../services/notificationApi');
 
-beforeEach(() => jest.useFakeTimers().setSystemTime(TODAY));
-afterEach(() => jest.useRealTimers());
+// An open date a few days from today (calendar shows the next 4 weeks).
+const openDate = dateFromKey(businessTodayKey());
+openDate.setDate(openDate.getDate() + 3);
+const OPEN_KEY = toDateKey(openDate);
+const SLOT = { startsAt: `${OPEN_KEY}T10:00:00+08:00`, label: '10:00 AM', dentistId: 5, branchId: 3 };
 
-test('shows the current appointment and the new date and time pickers', () => {
-  render(<RescheduleAppointmentPage appointmentId={UPCOMING_ID} />);
-
-  expect(
-    screen.getByRole('heading', { level: 1, name: 'Reschedule Appointment' })
-  ).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Back to Appointment' })).toHaveAttribute(
-    'href',
-    '/patient/appointments/hist-2'
-  );
-  expect(screen.getByText(/Current appointment:/)).toHaveTextContent(
-    'Current appointment: July 22, 2026 at 10:00 AM with Dr. Maria Braganza'
-  );
-  expect(
-    screen.getByRole('radiogroup', { name: 'Select New Date — July 2026' })
-  ).toBeInTheDocument();
-  expect(screen.getByRole('radiogroup', { name: 'Select New Time' })).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute(
-    'href',
-    '/patient/appointments/hist-2'
-  );
+beforeEach(() => {
+  getNotifications.mockResolvedValue(emptyNotifications);
+  getAvailableDates.mockResolvedValue([OPEN_KEY]);
+  getAvailability.mockResolvedValue([SLOT]);
 });
 
-test('Confirm Reschedule needs a date and time, then shows the success screen', () => {
-  render(<RescheduleAppointmentPage appointmentId={UPCOMING_ID} />);
-  const confirm = screen.getByRole('button', { name: 'Confirm Reschedule' });
-  expect(confirm).toBeDisabled();
+const renderPage = () => renderWithProviders(<RescheduleAppointmentPage appointmentId="12" />, { user: PATIENT_USER });
 
-  fireEvent.click(screen.getByRole('radio', { name: 'Tuesday, July 28, 2026' }));
-  fireEvent.click(screen.getByRole('radio', { name: '10:00 AM' }));
-  expect(confirm).toBeEnabled();
-  fireEvent.click(confirm);
+const pickSlot = async () => {
+  const day = await screen.findByRole('radio', { name: new RegExp(openDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })) });
+  fireEvent.click(day);
+  fireEvent.click(await screen.findByRole('radio', { name: '10:00 AM' }));
+};
 
-  expect(
-    screen.getByRole('heading', { level: 2, name: 'Appointment Rescheduled!' })
-  ).toHaveFocus();
-  expect(screen.getByRole('link', { name: 'View All Appointments' })).toHaveAttribute(
-    'href',
-    '/patient/appointments'
-  );
+test('only dates the dentist works can be chosen, and times come from availability', async () => {
+  getAppointment.mockResolvedValue(appointment({ status: 'confirmed' }));
+  renderPage();
+
+  expect(await screen.findByText(/Current appointment:/)).toHaveTextContent('November 3, 2026 at 9:00 AM');
+  const unavailable = screen.getAllByRole('radio', { name: /\(unavailable\)/ });
+  expect(unavailable.length).toBeGreaterThan(20);
+  unavailable.forEach((radio) => expect(radio).toBeDisabled());
+
+  await pickSlot();
+  expect(getAvailability).toHaveBeenCalledWith({ clinicId: 7, serviceRateId: 9, dentistId: 5, date: OPEN_KEY });
 });
 
-test('appointments that are not upcoming cannot be rescheduled', () => {
-  render(<RescheduleAppointmentPage appointmentId="hist-1" />);
-  expect(screen.getByText('This appointment cannot be rescheduled.')).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Confirm Reschedule' })).not.toBeInTheDocument();
+test('a confirmed appointment sends a reschedule request', async () => {
+  getAppointment.mockResolvedValue(appointment({ status: 'confirmed' }));
+  rescheduleAppointment.mockResolvedValue({
+    appointment: appointment({ status: 'reschedule_requested', requested_starts_at: SLOT.startsAt }),
+    message: 'Reschedule request sent to the clinic',
+  });
+  renderPage();
+  await pickSlot();
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm Reschedule' }));
+
+  expect(await screen.findByRole('heading', { name: 'Reschedule Requested' })).toBeInTheDocument();
+  expect(rescheduleAppointment).toHaveBeenCalledWith('12', SLOT.startsAt);
+});
+
+test('shows a conflict when the slot was just taken', async () => {
+  getAppointment.mockResolvedValue(appointment({ status: 'pending' }));
+  rescheduleAppointment.mockRejectedValue(apiError(409, { message: 'That time is not available. Please choose another slot.' }));
+  renderPage();
+  await pickSlot();
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm Reschedule' }));
+
+  expect(await screen.findByText('That time is not available. Please choose another slot.')).toBeInTheDocument();
+});
+
+test('completed appointments cannot be rescheduled', async () => {
+  getAppointment.mockResolvedValue(appointment({ status: 'completed' }));
+  renderPage();
+
+  expect(await screen.findByText('This appointment cannot be rescheduled online.')).toBeInTheDocument();
 });

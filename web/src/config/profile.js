@@ -1,7 +1,5 @@
-// Profile form choices. PROVISIONAL until the backend defines the allowed values.
-export const GENDER_OPTIONS = ['Male', 'Female', 'Prefer not to say'];
-export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated'];
-export const BLOOD_TYPE_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+// Matches the backend's allowed values (male | female | other).
+export const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 
 // Profile sections, in Figma order. editLabel is the shorter tab label on Edit Profile.
 export const PROFILE_TABS = [

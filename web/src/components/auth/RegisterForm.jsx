@@ -1,11 +1,13 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Icon from '../Icon';
 import AuthField from './AuthField';
 import { PRIVACY_HREF, REGISTER_ROLES, TERMS_HREF } from '../../config/auth';
 import { LOGIN_HREF } from '../../config/navigation';
 import { register } from '../../services/authService';
 import { getErrorMessage, getFieldErrors } from '../../services/apiErrors';
-import { navigateTo } from '../../utils/navigation';
+import { useAuth } from '../../auth/AuthContext';
+import { getHomeHref } from '../../auth/homeRoutes';
 import './auth.css';
 import './RegisterForm.css';
 
@@ -40,6 +42,8 @@ const toFormErrors = (backendErrors) =>
 // Both roles use the same fields; the design shows no role-specific fields.
 // Address is not in the Figma design but is required by POST /register.
 function RegisterForm() {
+  const navigate = useNavigate();
+  const { setUser } = useAuth();
   const [role, setRole] = useState(REGISTER_ROLES[0].id);
   const [values, setValues] = useState(INITIAL_VALUES);
   const [agreed, setAgreed] = useState(false);
@@ -72,7 +76,7 @@ function RegisterForm() {
     setFieldErrors({});
 
     try {
-      await register({
+      const user = await register({
         name: values.fullName,
         email: values.email,
         phone: values.mobile,
@@ -81,14 +85,9 @@ function RegisterForm() {
         role: selectedRole.backendRole,
       });
 
-      if (selectedRole.homeHref) {
-        navigateTo(selectedRole.homeHref);
-        return;
-      }
-      setNotice({
-        text: `Account created. The ${selectedRole.label} portal is not available on the web yet.`,
-        isError: false,
-      });
+      // Patients go to their dashboard; clinic admins to the clinic application.
+      setUser(user);
+      navigate(getHomeHref(user), { replace: true });
     } catch (error) {
       const formErrors = toFormErrors(getFieldErrors(error));
       setFieldErrors(formErrors);

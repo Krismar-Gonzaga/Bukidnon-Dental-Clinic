@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
+import { renderWithProviders as render } from '../testUtils';
 import ContactPage from './ContactPage';
 import { CONTACT_METHODS } from '../mocks/contactContent';
 

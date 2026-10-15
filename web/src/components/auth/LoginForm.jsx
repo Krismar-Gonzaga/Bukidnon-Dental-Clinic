@@ -1,17 +1,23 @@
 import { useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Icon from '../Icon';
 import AuthField from './AuthField';
 import { FORGOT_PASSWORD_HREF, SIGN_IN_ROLES } from '../../config/auth';
 import { REGISTER_HREF } from '../../config/navigation';
 import { login, logout } from '../../services/authService';
 import { getErrorMessage } from '../../services/apiErrors';
-import { navigateTo } from '../../utils/navigation';
+import { useAuth } from '../../auth/AuthContext';
+import { getHomeHref, safeNextPath } from '../../auth/homeRoutes';
 import './auth.css';
 import './LoginForm.css';
 
-// Signs in through the Laravel API. The clicked role button must match the
-// account's role; on a mismatch the new session is revoked straight away.
+// Signs in through the Laravel API (session cookie). The clicked role button
+// must match the account's role; on a mismatch the session is ended at once.
+// ?next=/path returns the user there afterwards (same-site paths only).
 function LoginForm() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { setUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState({ text: '', isError: false });
@@ -37,14 +43,8 @@ function LoginForm() {
         return;
       }
 
-      if (role.homeHref) {
-        navigateTo(role.homeHref);
-        return;
-      }
-      setNotice({
-        text: `Signed in as ${role.label}. The ${role.label} portal is not available on the web yet.`,
-        isError: false,
-      });
+      setUser(user);
+      navigate(safeNextPath(searchParams.get('next')) ?? getHomeHref(user), { replace: true });
     } catch (error) {
       setNotice({ text: getErrorMessage(error), isError: true });
     } finally {
@@ -53,12 +53,7 @@ function LoginForm() {
   };
 
   return (
-    <form
-      className="auth-card"
-      aria-labelledby="login-title"
-      aria-busy={submitting}
-      onSubmit={handleSubmit}
-    >
+    <form className="auth-card" aria-labelledby="login-title" aria-busy={submitting} onSubmit={handleSubmit}>
       <span className="auth-badge" aria-hidden="true">
         <Icon name="lock" size={28} />
       </span>
@@ -113,10 +108,7 @@ function LoginForm() {
         ))}
       </div>
 
-      <p
-        className={`auth-notice${notice.isError ? ' auth-notice--error' : ''}`}
-        role="status"
-      >
+      <p className={`auth-notice${notice.isError ? ' auth-notice--error' : ''}`} role="status">
         {notice.text}
       </p>
 

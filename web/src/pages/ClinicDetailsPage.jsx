@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import SiteHeader from '../components/SiteHeader';
 import SiteFooter from '../components/SiteFooter';
 import Icon from '../components/Icon';
@@ -7,16 +8,13 @@ import Tabs from '../components/Tabs';
 import ClinicOverview from '../components/clinics/ClinicOverview';
 import DentistDirectoryCard from '../components/dentists/DentistDirectoryCard';
 import ServiceCard from '../components/services/ServiceCard';
-import {
-  getBookClinicHref,
-  PATIENT_FIND_CLINICS_HREF,
-} from '../config/patientNavigation';
-import { findPatientClinic, MOCK_SAVED_CLINIC_IDS } from '../mocks/clinicProfiles';
-import { DIRECTORY_CLINICS } from '../mocks/directoryClinics';
-import { DIRECTORY_DENTISTS } from '../mocks/directoryDentists';
-import { MOCK_PATIENT_ACCOUNT } from '../mocks/patientDashboard';
-import { SERVICES } from '../mocks/services';
-import { withClinicNames } from '../utils/dentistDirectory';
+import { ErrorState, LoadingState } from '../components/StatusMessage';
+import { getBookClinicHref, PATIENT_FIND_CLINICS_HREF } from '../config/patientNavigation';
+import { FIND_CLINICS_HREF, getLoginHref } from '../config/navigation';
+import { useAuth } from '../auth/AuthContext';
+import { getClinic } from '../services/publicApi';
+import { getSavedClinics, saveClinic, unsaveClinic } from '../services/patientApi';
+import { SAVED_CLINICS_KEY } from './SavedClinicsPage';
 import './ClinicDetailsPage.css';
 
 const TABS = [
@@ -26,48 +24,75 @@ const TABS = [
   { id: 'reviews', label: 'Reviews' },
 ];
 
-// A clinic's page as seen by a signed-in patient, with MOCK data. Only the
-// Overview tab is designed; Dentists and Services reuse the directory cards,
-// and Reviews waits for review data. Saving only changes this page.
+function ReviewList({ reviews }) {
+  if (reviews.length === 0) return <p className="clinic-details-empty">No reviews yet.</p>;
+  return (
+    <ul className="clinic-details-reviews">
+      {reviews.map((review) => (
+        <li key={review.id} className="clinic-details-review">
+          <StarRating rating={review.rating} size={15} />
+          {review.comment && <p className="clinic-details-review-text">{review.comment}</p>}
+          <p className="clinic-details-review-meta">
+            {review.patientName}
+            {review.isVerifiedVisit && ' · Verified visit'}
+            {review.date && ` · ${review.date}`}
+          </p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * A listed clinic's public profile. Patients can save the clinic and book;
+ * guests are sent to sign in first.
+ */
 function ClinicDetailsPage({ clinicId }) {
-  const clinic = findPatientClinic(clinicId);
-  const [isSaved, setIsSaved] = useState(MOCK_SAVED_CLINIC_IDS.includes(clinicId));
+  const { user } = useAuth();
+  const isPatient = user?.role === 'patient';
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('overview');
 
-  if (!clinic) {
+  const query = useQuery({ queryKey: ['clinic', clinicId], queryFn: () => getClinic(clinicId) });
+  const saved = useQuery({ queryKey: SAVED_CLINICS_KEY, queryFn: getSavedClinics, enabled: isPatient });
+  const isSaved = Boolean(saved.data?.some(({ id }) => id === String(clinicId)));
+
+  const toggleSave = useMutation({
+    mutationFn: () => (isSaved ? unsaveClinic(clinicId) : saveClinic(clinicId)),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['patient'] }),
+  });
+
+  const bookHref = isPatient ? getBookClinicHref(clinicId) : getLoginHref(getBookClinicHref(clinicId));
+  const backHref = isPatient ? PATIENT_FIND_CLINICS_HREF : FIND_CLINICS_HREF;
+
+  if (query.isPending || query.isError) {
     return (
       <div className="clinic-details-page">
-        <SiteHeader activeHref="/clinics" account={MOCK_PATIENT_ACCOUNT} />
+        <SiteHeader activeHref="/clinics" />
         <main className="clinic-details-container clinic-details-missing">
-          <h1 className="clinic-details-missing-title">This clinic could not be found.</h1>
-          <a href={PATIENT_FIND_CLINICS_HREF}>Back to Find Clinics</a>
+          {query.isPending ? (
+            <LoadingState label="Loading clinic…" />
+          ) : (
+            <>
+              <ErrorState error={query.error} onRetry={() => query.refetch()} />
+              <a href={backHref}>Back to Find Clinics</a>
+            </>
+          )}
         </main>
         <SiteFooter />
       </div>
     );
   }
 
-  const {
-    name,
-    address,
-    rating,
-    reviewCount,
-    specializations,
-    verified,
-    accent,
-  } = clinic;
-  const bookHref = getBookClinicHref(clinic.id);
-  const clinicDentists = withClinicNames(
-    DIRECTORY_DENTISTS.filter((dentist) => dentist.clinicId === clinic.id),
-    DIRECTORY_CLINICS
-  );
+  const clinic = query.data;
+  const { name, address, rating, reviewCount, specializations, verified, accent } = clinic;
 
   const renderPanel = () => {
     if (activeTab === 'overview') return <ClinicOverview clinic={clinic} bookHref={bookHref} />;
     if (activeTab === 'dentists') {
-      return clinicDentists.length > 0 ? (
+      return clinic.dentists.length > 0 ? (
         <ul className="clinic-details-grid">
-          {clinicDentists.map((dentist, index) => (
+          {clinic.dentists.map((dentist, index) => (
             <li key={dentist.id}>
               <DentistDirectoryCard dentist={dentist} accentIndex={index} />
             </li>
@@ -78,22 +103,24 @@ function ClinicDetailsPage({ clinicId }) {
       );
     }
     if (activeTab === 'services') {
-      return (
+      return clinic.services.length > 0 ? (
         <ul className="clinic-details-grid">
-          {SERVICES.map((service) => (
+          {clinic.services.map((service) => (
             <li key={service.id}>
-              <ServiceCard service={service} />
+              <ServiceCard service={service} actionHref={bookHref} />
             </li>
           ))}
         </ul>
+      ) : (
+        <p className="clinic-details-empty">This clinic has not published services yet.</p>
       );
     }
-    return <p className="clinic-details-empty">No reviews to show yet.</p>;
+    return <ReviewList reviews={clinic.reviews} />;
   };
 
   return (
     <div className="clinic-details-page">
-      <SiteHeader activeHref="/clinics" account={MOCK_PATIENT_ACCOUNT} />
+      <SiteHeader activeHref="/clinics" />
 
       <main>
         <section className={`clinic-details-hero clinic-details-hero--accent-${accent}`}>
@@ -129,28 +156,25 @@ function ClinicDetailsPage({ clinicId }) {
               </span>
             </p>
             <div className="clinic-details-actions">
-              <button
-                type="button"
-                className={`clinic-details-save${isSaved ? ' is-saved' : ''}`}
-                aria-pressed={isSaved}
-                aria-label={isSaved ? `Remove ${name} from saved clinics` : `Save ${name}`}
-                onClick={() => setIsSaved((saved) => !saved)}
-              >
-                <Icon name="heart" size={20} />
-              </button>
+              {isPatient && (
+                <button
+                  type="button"
+                  className={`clinic-details-save${isSaved ? ' is-saved' : ''}`}
+                  aria-pressed={isSaved}
+                  aria-label={isSaved ? `Remove ${name} from saved clinics` : `Save ${name}`}
+                  disabled={toggleSave.isPending || saved.isPending}
+                  onClick={() => toggleSave.mutate()}
+                >
+                  <Icon name="heart" size={20} />
+                </button>
+              )}
               <a href={bookHref} className="btn btn-primary">
                 Book Appointment
               </a>
             </div>
           </div>
 
-          <Tabs
-            tabs={TABS}
-            activeId={activeTab}
-            onChange={setActiveTab}
-            idPrefix="clinic"
-            label="Clinic sections"
-          />
+          <Tabs tabs={TABS} activeId={activeTab} onChange={setActiveTab} idPrefix="clinic" label="Clinic sections" />
           <div
             role="tabpanel"
             id={`clinic-panel-${activeTab}`}

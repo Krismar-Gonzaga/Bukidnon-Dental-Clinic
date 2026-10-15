@@ -1,77 +1,53 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import FeedbackPage from './FeedbackPage';
-import { MOCK_APPOINTMENT_HISTORY } from '../mocks/appointmentHistory';
+import { getReviewableAppointments, submitReview } from '../services/patientApi';
+import { getNotifications } from '../services/notificationApi';
+import { apiError, PATIENT_USER, renderWithProviders } from '../testUtils';
+import { appointment, emptyNotifications } from '../testFixtures';
 
-const COMPLETED = MOCK_APPOINTMENT_HISTORY.filter(({ status }) => status === 'completed');
+jest.mock('../services/patientApi');
+jest.mock('../services/notificationApi');
 
-test('lists only completed appointments to review', () => {
-  render(<FeedbackPage initialAppointmentId={null} />);
-  expect(
-    screen.getByRole('heading', { level: 1, name: 'Feedback & Ratings' })
-  ).toBeInTheDocument();
-  expect(screen.getByText('You can only review completed appointments.')).toBeInTheDocument();
-
-  const group = screen.getByRole('radiogroup', { name: 'Select Appointment to Review' });
-  expect(within(group).getAllByRole('radio')).toHaveLength(COMPLETED.length);
-  expect(within(group).queryByText('Root Canal Treatment')).not.toBeInTheDocument();
+beforeEach(() => {
+  getNotifications.mockResolvedValue(emptyNotifications);
+  getReviewableAppointments.mockResolvedValue([appointment({ status: 'completed' })]);
 });
 
-test('preselects the appointment passed from history or details', () => {
-  render(<FeedbackPage initialAppointmentId="hist-4" />);
-  expect(screen.getByRole('radio', { name: /Teeth Whitening/ })).toBeChecked();
-});
+const renderPage = (route = '/patient/reviews') => renderWithProviders(<FeedbackPage />, { user: PATIENT_USER, route });
 
-test('ignores a preselected appointment that is not completed', () => {
-  render(<FeedbackPage initialAppointmentId="hist-1" />);
-  screen.getAllByRole('radio', { name: /Dental Cleaning|Teeth Whitening/ }).forEach((radio) => {
-    expect(radio).not.toBeChecked();
-  });
-});
+test('submits a rating and comment for a completed visit', async () => {
+  submitReview.mockResolvedValue({ id: '1' });
+  renderPage();
 
-test('star rating shows its word and Submit needs an appointment and rating', () => {
-  render(<FeedbackPage initialAppointmentId={null} />);
+  fireEvent.click(await screen.findByRole('radio', { name: /Dental Cleaning/ }));
   const submit = screen.getByRole('button', { name: 'Submit Review' });
   expect(submit).toBeDisabled();
+  fireEvent.click(screen.getByRole('radio', { name: /^4 stars/ }));
+  fireEvent.change(screen.getByLabelText('Your Review'), { target: { value: '  Gentle and on time.  ' } });
+  fireEvent.click(submit);
 
-  fireEvent.click(screen.getByRole('radio', { name: /Teeth Whitening/ }));
-  expect(submit).toBeDisabled();
-
-  const stars = screen.getByRole('radiogroup', { name: 'Your Rating' });
-  fireEvent.click(within(stars).getByRole('radio', { name: '4 stars, Very Good' }));
-  expect(screen.getByText('Very Good')).toBeInTheDocument();
-  expect(submit).toBeEnabled();
-
-  expect(screen.getByLabelText('Your Review')).toHaveAttribute(
-    'placeholder',
-    'Share your experience with this clinic...'
-  );
+  expect(await screen.findByRole('button', { name: 'Leave Another Review' })).toBeInTheDocument();
+  expect(submitReview).toHaveBeenCalledWith('12', { rating: 4, comment: 'Gentle and on time.' });
 });
 
-test('submitting shows the success screen; Leave Another Review resets the form', () => {
-  render(<FeedbackPage initialAppointmentId="hist-3" />);
-  fireEvent.click(screen.getByRole('radio', { name: '5 stars, Excellent' }));
-  fireEvent.change(screen.getByLabelText('Your Review'), {
-    target: { value: 'Gentle and quick.' },
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Submit Review' }));
-
-  expect(screen.getByRole('heading', { level: 2, name: 'Review Submitted!' })).toHaveFocus();
-
-  fireEvent.click(screen.getByRole('button', { name: 'Leave Another Review' }));
-  expect(
-    screen.getByRole('heading', { level: 2, name: 'Select Appointment to Review' })
-  ).toHaveFocus();
-  expect(screen.getByLabelText('Your Review')).toHaveValue('');
-  expect(screen.getByRole('button', { name: 'Submit Review' })).toBeDisabled();
+test('preselects the appointment from ?appointment=', async () => {
+  renderPage('/patient/reviews?appointment=12');
+  expect(await screen.findByRole('radio', { name: /Dental Cleaning/ })).toBeChecked();
 });
 
-test('Back to History link shows on the form and after submitting', () => {
-  render(<FeedbackPage initialAppointmentId="hist-3" />);
-  expect(screen.getByRole('link', { name: 'Back to History' })).toHaveAttribute(
-    'href',
-    '/patient/appointments'
-  );
-  fireEvent.click(screen.getByRole('radio', { name: '4 stars, Very Good' }));
+test('shows the server message for an already reviewed visit', async () => {
+  submitReview.mockRejectedValue(apiError(409, { message: 'You already reviewed this appointment.' }));
+  renderPage('/patient/reviews?appointment=12');
+
+  await screen.findByRole('radio', { name: /Dental Cleaning/ });
+  fireEvent.click(screen.getByRole('radio', { name: /^5 stars/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Submit Review' }));
-  expect(screen.getByRole('link', { name: 'Back to History' })).toBeInTheDocument();
+
+  expect(await screen.findByText('You already reviewed this appointment.')).toBeInTheDocument();
+});
+
+test('explains when there is nothing to review', async () => {
+  getReviewableAppointments.mockResolvedValue([]);
+  renderPage();
+  expect(await screen.findByText('No completed appointments to review yet.')).toBeInTheDocument();
 });

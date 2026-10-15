@@ -1,60 +1,56 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import ClinicDetailsPage from './ClinicDetailsPage';
+import { getClinic } from '../services/publicApi';
+import { getSavedClinics, saveClinic } from '../services/patientApi';
+import { apiError, PATIENT_USER, renderWithProviders } from '../testUtils';
+import { clinicProfile } from '../testFixtures';
 
-test('shows the clinic banner, rating, signed-in header, and overview', () => {
-  render(<ClinicDetailsPage clinicId="mock-dir-2" />);
-  expect(
-    screen.getByRole('heading', { level: 1, name: 'Braganza Dental Clinic' })
-  ).toBeInTheDocument();
-  expect(
-    within(screen.getByRole('banner')).getByRole('link', { name: /My Account/ })
-  ).toBeInTheDocument();
-  expect(screen.getByText('4.8 (120 reviews)')).toBeInTheDocument();
-  expect(screen.getAllByText('Sayre Highway, Valencia City, Bukidnon').length).toBeGreaterThan(0);
-  expect(screen.getByText('Mon–Sat 8AM–5PM')).toBeInTheDocument();
-  expect(screen.getByText('braganza@clinic.ph')).toBeInTheDocument();
-  expect(within(screen.getByRole('main')).getByRole('link', { name: 'Book Appointment' })).toHaveAttribute(
-    'href',
-    '/patient/book?clinic=mock-dir-2'
-  );
-  expect(screen.getByRole('link', { name: 'Book Now' })).toHaveAttribute(
-    'href',
-    '/patient/book?clinic=mock-dir-2'
-  );
-  expect(screen.getByRole('link', { name: /Open in Maps/ })).toHaveAttribute('target', '_blank');
+jest.mock('../services/publicApi');
+jest.mock('../services/patientApi');
+
+beforeEach(() => getClinic.mockResolvedValue(clinicProfile()));
+
+test('shows the public profile with hours, directions and a sign-in booking link for guests', async () => {
+  renderWithProviders(<ClinicDetailsPage clinicId="7" />);
+
+  expect(await screen.findByRole('heading', { level: 1, name: 'Valencia Smiles' })).toBeInTheDocument();
+  expect(screen.getByText('Mon–Sat 8:00 AM–5:00 PM')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /Get Directions/ })).toHaveAttribute('href', expect.stringContaining('destination=7.906%2C125.094'));
+  expect(screen.getAllByRole('link', { name: 'Book Appointment' })[0]).toHaveAttribute('href', '/login?next=%2Fpatient%2Fbook%3Fclinic%3D7');
+  expect(screen.queryByRole('button', { name: /Save Valencia Smiles/ })).not.toBeInTheDocument();
 });
 
-test('save toggles; tabs switch panels and support arrow keys', () => {
-  render(<ClinicDetailsPage clinicId="mock-dir-2" />);
-  const save = screen.getByRole('button', {
-    name: 'Remove Braganza Dental Clinic from saved clinics',
-  });
-  expect(save).toHaveAttribute('aria-pressed', 'true');
-  fireEvent.click(save);
-  expect(screen.getByRole('button', { name: 'Save Braganza Dental Clinic' })).toHaveAttribute(
-    'aria-pressed',
-    'false'
-  );
+test('tabs show the clinic’s real services, dentists and reviews', async () => {
+  renderWithProviders(<ClinicDetailsPage clinicId="7" />);
+  await screen.findByRole('heading', { level: 1, name: 'Valencia Smiles' });
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Services' }));
+  const panel = () => screen.getByRole('tabpanel');
+  expect(within(panel()).getByRole('heading', { name: 'Dental Cleaning' })).toBeInTheDocument();
+  expect(within(panel()).getByText('₱800')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('tab', { name: 'Dentists' }));
-  expect(screen.getByRole('tabpanel')).toHaveTextContent('Dr. Maria Braganza');
-
-  fireEvent.keyDown(screen.getByRole('tab', { name: 'Dentists' }), { key: 'ArrowRight' });
-  expect(screen.getByRole('tab', { name: 'Services' })).toHaveAttribute('aria-selected', 'true');
-  expect(screen.getByRole('tab', { name: 'Services' })).toHaveFocus();
+  expect(within(panel()).getByRole('heading', { name: 'Dr. Maria Santos' })).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('tab', { name: 'Reviews' }));
-  expect(screen.getByRole('tabpanel')).toHaveTextContent('No reviews to show yet.');
+  expect(within(panel()).getByText('Very gentle.')).toBeInTheDocument();
+  expect(within(panel()).getByText(/Juan D\. · Verified visit/)).toBeInTheDocument();
 });
 
-test('clinics without extra details hide those rows; unknown ids show a message', () => {
-  const { unmount } = render(<ClinicDetailsPage clinicId="mock-dir-1" />);
-  expect(screen.queryByText('Operating Hours')).not.toBeInTheDocument();
-  expect(screen.getAllByText('Valencia City, Bukidnon').length).toBeGreaterThan(0);
-  unmount();
+test('a patient can save the clinic', async () => {
+  getSavedClinics.mockResolvedValue([]);
+  saveClinic.mockResolvedValue();
+  renderWithProviders(<ClinicDetailsPage clinicId="7" />, { user: PATIENT_USER });
 
-  render(<ClinicDetailsPage clinicId="nope" />);
-  expect(
-    screen.getByRole('heading', { level: 1, name: 'This clinic could not be found.' })
-  ).toBeInTheDocument();
+  const save = await screen.findByRole('button', { name: 'Save Valencia Smiles' });
+  await waitFor(() => expect(save).toBeEnabled());
+  fireEvent.click(save);
+  await waitFor(() => expect(saveClinic).toHaveBeenCalledWith('7'));
+  expect(screen.getAllByRole('link', { name: 'Book Appointment' })[0]).toHaveAttribute('href', '/patient/book?clinic=7');
+});
+
+test('an unlisted clinic shows not found', async () => {
+  getClinic.mockRejectedValue(apiError(404));
+  renderWithProviders(<ClinicDetailsPage clinicId="99" />);
+  expect(await screen.findByText('Not found')).toBeInTheDocument();
 });

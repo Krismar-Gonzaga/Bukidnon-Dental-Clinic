@@ -260,3 +260,18 @@
     flex: 1;
   }
 }
+
+.clinic-locator-embed {
+  width: 100%;
+  border: 0;
+}
+
+.clinic-locator-location-error {
+  margin-top: var(--space-2);
+  color: var(--color-danger-text);
+  font-size: var(--font-size-sm);
+}
+
+.clinic-locator-selected-actions {
+  flex-wrap: wrap;
+}

@@ -42,6 +42,26 @@
   background-color: var(--color-primary-soft);
 }
 
+/* Days the dentist does not work, holidays, and past days. */
+.booking-calendar-day.is-disabled {
+  color: var(--color-placeholder);
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.booking-calendar-day.is-disabled:hover {
+  background-color: transparent;
+}
+
+.booking-schedule-hint {
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
 .booking-calendar-day.is-selected,
 .booking-time-slot.is-selected {
   border-color: var(--color-primary);

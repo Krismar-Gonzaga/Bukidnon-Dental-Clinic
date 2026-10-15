@@ -37,6 +37,7 @@ class AppointmentController extends Controller
             'dentist_id' => ['nullable', 'integer'],
             'branch_id' => ['nullable', 'integer'],
             'service_rate_id' => ['nullable', 'integer'],
+            'patient_id' => ['nullable', 'integer'],
             'search' => ['nullable', 'string', 'max:100'],
         ]);
 
@@ -51,7 +52,7 @@ class AppointmentController extends Controller
         if (isset($data['status'])) {
             $query->whereIn('status', explode(',', $data['status']));
         }
-        foreach (['dentist_id', 'branch_id', 'service_rate_id'] as $filter) {
+        foreach (['dentist_id', 'branch_id', 'service_rate_id', 'patient_id'] as $filter) {
             if (isset($data[$filter])) {
                 $query->where($filter, $data[$filter]);
             }

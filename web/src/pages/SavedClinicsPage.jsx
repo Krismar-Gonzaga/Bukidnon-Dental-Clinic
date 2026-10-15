@@ -1,57 +1,62 @@
-import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import PatientLayout from '../layouts/PatientLayout';
 import Icon from '../components/Icon';
 import SavedClinicCard from '../components/patient/SavedClinicCard';
+import { QueryState } from '../components/StatusMessage';
 import {
   PATIENT_FIND_CLINICS_HREF,
   PATIENT_SAVED_CLINICS_HREF,
 } from '../config/patientNavigation';
-import { findPatientClinic, MOCK_SAVED_CLINIC_IDS } from '../mocks/clinicProfiles';
-import { MOCK_DASHBOARD_NOTIFICATIONS, MOCK_PATIENT } from '../mocks/patientDashboard';
+import { getSavedClinics, unsaveClinic } from '../services/patientApi';
 import { pluralize } from '../utils/patientDashboard';
 import './SavedClinicsPage.css';
 
-// Saved clinics with MOCK data. Removing a clinic only changes this page;
-// nothing is saved until a saved-clinics endpoint exists.
-function SavedClinicsPage({ initialSavedIds = MOCK_SAVED_CLINIC_IDS }) {
-  const [savedIds, setSavedIds] = useState(initialSavedIds);
-  const clinics = savedIds.map(findPatientClinic).filter(Boolean);
+export const SAVED_CLINICS_KEY = ['patient', 'savedClinics'];
 
-  const handleUnsave = (clinicId) => {
-    setSavedIds((current) => current.filter((id) => id !== clinicId));
-  };
+function SavedClinicsPage() {
+  const queryClient = useQueryClient();
+  const query = useQuery({ queryKey: SAVED_CLINICS_KEY, queryFn: getSavedClinics });
+
+  const unsave = useMutation({
+    mutationFn: (clinicId) => unsaveClinic(clinicId),
+    // Remove it right away; the server confirms in the background.
+    onMutate: (clinicId) =>
+      queryClient.setQueryData(SAVED_CLINICS_KEY, (current = []) => current.filter(({ id }) => id !== clinicId)),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['patient'] }),
+  });
 
   return (
-    <PatientLayout
-      title="Saved Clinics"
-      activeHref={PATIENT_SAVED_CLINICS_HREF}
-      user={MOCK_PATIENT}
-      hasUnreadNotifications={MOCK_DASHBOARD_NOTIFICATIONS.some(({ unread }) => unread)}
-    >
+    <PatientLayout title="Saved Clinics" activeHref={PATIENT_SAVED_CLINICS_HREF}>
       <div className="saved-clinics">
-        <div className="saved-clinics-toolbar">
-          <p className="saved-clinics-count" role="status">
-            {pluralize(clinics.length, 'saved clinic', 'saved clinics')}
-          </p>
-          <a href={PATIENT_FIND_CLINICS_HREF} className="saved-clinics-find">
-            <Icon name="plus" size={16} />
-            Find More Clinics
-          </a>
-        </div>
+        <QueryState query={query} loadingLabel="Loading saved clinics…">
+          {(clinics) => (
+            <>
+              <div className="saved-clinics-toolbar">
+                <p className="saved-clinics-count" role="status">
+                  {pluralize(clinics.length, 'saved clinic', 'saved clinics')}
+                </p>
+                <a href={PATIENT_FIND_CLINICS_HREF} className="saved-clinics-find">
+                  <Icon name="plus" size={16} />
+                  Find More Clinics
+                </a>
+              </div>
 
-        {clinics.length > 0 ? (
-          <ul className="saved-clinics-grid">
-            {clinics.map((clinic) => (
-              <li key={clinic.id}>
-                <SavedClinicCard clinic={clinic} onUnsave={handleUnsave} />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="saved-clinics-empty">
-            You have no saved clinics yet. Use the heart on a clinic's page to save it.
-          </p>
-        )}
+              {clinics.length > 0 ? (
+                <ul className="saved-clinics-grid">
+                  {clinics.map((clinic) => (
+                    <li key={clinic.id}>
+                      <SavedClinicCard clinic={clinic} onUnsave={(id) => unsave.mutate(id)} />
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="saved-clinics-empty">
+                  You have no saved clinics yet. Use the heart on a clinic's page to save it.
+                </p>
+              )}
+            </>
+          )}
+        </QueryState>
       </div>
     </PatientLayout>
   );

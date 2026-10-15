@@ -65,3 +65,12 @@
     padding: var(--space-5) var(--space-4);
   }
 }
+
+.reschedule-error {
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background-color: var(--color-danger-soft);
+  color: var(--color-danger-text);
+  font-size: var(--font-size-sm);
+}

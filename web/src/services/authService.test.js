@@ -1,69 +1,50 @@
-import apiClient from './apiClient';
-import { login, logout, register } from './authService';
-import { getSession, getToken, saveSession } from './authSession';
+import apiClient, { ensureCsrfCookie } from './apiClient';
+import { fetchCurrentUser, login, logout, register } from './authService';
 
-jest.mock('./apiClient', () => ({ post: jest.fn() }));
+jest.mock('./apiClient', () => ({
+  __esModule: true,
+  default: { post: jest.fn(), get: jest.fn() },
+  ensureCsrfCookie: jest.fn(),
+}));
 
-const authResponse = (role) => ({
-  data: {
-    success: true,
-    data: { user: { id: 7, name: 'Juan', role }, token: 'test-token', role },
-  },
-});
+const authResponse = (role) => ({ data: { success: true, data: { user: { id: 7, name: 'Juan', role }, role } } });
 
-beforeEach(() => {
-  window.localStorage.clear();
-});
-
-test('login posts credentials and stores the session', async () => {
+test('login fetches the CSRF cookie first and returns the user (no token is stored)', async () => {
+  ensureCsrfCookie.mockResolvedValue();
   apiClient.post.mockResolvedValue(authResponse('patient'));
 
   const user = await login({ email: 'juan@example.com', password: 'secret' });
 
-  expect(apiClient.post).toHaveBeenCalledWith('/login', {
-    email: 'juan@example.com',
-    password: 'secret',
-  });
+  expect(ensureCsrfCookie).toHaveBeenCalled();
+  expect(apiClient.post).toHaveBeenCalledWith('/login', { email: 'juan@example.com', password: 'secret' });
   expect(user).toEqual({ id: 7, name: 'Juan', role: 'patient' });
-  expect(getToken()).toBe('test-token');
+  expect(window.localStorage.length).toBe(0);
 });
 
-test('register sends the confirmation field the backend requires', async () => {
+test('register sends the password confirmation the backend requires', async () => {
+  ensureCsrfCookie.mockResolvedValue();
   apiClient.post.mockResolvedValue(authResponse('patient'));
 
-  await register({
-    name: 'Juan',
-    email: 'juan@example.com',
-    phone: '09000000000',
-    address: 'Malaybalay City',
-    password: 'secret-123',
-    role: 'patient',
-  });
+  await register({ name: 'Juan', email: 'juan@example.com', phone: '0917', address: 'Malaybalay', password: 'secret-123', role: 'patient' });
 
   expect(apiClient.post).toHaveBeenCalledWith(
     '/register',
-    expect.objectContaining({
-      password: 'secret-123',
-      password_confirmation: 'secret-123',
-      role: 'patient',
-    })
+    expect.objectContaining({ password: 'secret-123', password_confirmation: 'secret-123', role: 'patient' })
   );
-  expect(getSession().user.role).toBe('patient');
 });
 
-test('failed login leaves no session behind', async () => {
-  apiClient.post.mockRejectedValue({ response: { status: 401, data: {} } });
-
-  await expect(login({ email: 'a@b.c', password: 'x' })).rejects.toBeTruthy();
-  expect(getSession()).toBeNull();
+test('fetchCurrentUser returns null when signed out', async () => {
+  apiClient.get.mockRejectedValue(Object.assign(new Error('401'), { response: { status: 401 } }));
+  await expect(fetchCurrentUser()).resolves.toBeNull();
 });
 
-test('logout clears the session even when the server call fails', async () => {
-  saveSession({ token: 'test-token', user: { role: 'patient' } });
+test('fetchCurrentUser rethrows other failures', async () => {
+  apiClient.get.mockRejectedValue(Object.assign(new Error('500'), { response: { status: 500 } }));
+  await expect(fetchCurrentUser()).rejects.toThrow('500');
+});
+
+test('logout resolves even when the server call fails', async () => {
+  ensureCsrfCookie.mockResolvedValue();
   apiClient.post.mockRejectedValue(new Error('offline'));
-
-  await logout();
-
-  expect(apiClient.post).toHaveBeenCalledWith('/logout');
-  expect(getSession()).toBeNull();
+  await expect(logout()).resolves.toBeUndefined();
 });

@@ -148,3 +148,8 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+iframe.clinic-overview-map {
+  width: 100%;
+  border: 0;
+}

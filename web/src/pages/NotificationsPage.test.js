@@ -1,41 +1,34 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import NotificationsPage from './NotificationsPage';
-import { MOCK_NOTIFICATIONS } from '../mocks/notifications';
+import { getNotifications, markAllNotificationsRead, markNotificationRead } from '../services/notificationApi';
+import { PATIENT_USER, renderWithProviders } from '../testUtils';
+import { notification } from '../testFixtures';
 
-test('lists notifications with the unread count and active nav item', () => {
-  render(<NotificationsPage />);
-  expect(screen.getByRole('heading', { level: 1, name: 'Notifications' })).toBeInTheDocument();
-  const nav = screen.getByRole('navigation', { name: 'Patient' });
-  expect(within(nav).getByRole('link', { name: 'Notifications' })).toHaveAttribute(
-    'aria-current',
-    'page'
-  );
+jest.mock('../services/notificationApi');
 
-  expect(screen.getAllByRole('article')).toHaveLength(MOCK_NOTIFICATIONS.length);
-  expect(screen.getByRole('status')).toHaveTextContent('2 unread notifications');
-  expect(
-    screen.getByRole('heading', { level: 2, name: 'Appointment Reminder (unread)' })
-  ).toBeInTheDocument();
-  expect(
-    screen.getByText('Your profile information has been successfully updated.')
-  ).toBeInTheDocument();
-});
+test('lists notifications and marks them read', async () => {
+  getNotifications.mockResolvedValue({
+    notifications: [notification(), notification({ id: 'n-2', title: 'Upcoming appointment', kind: 'reminder', read_at: '2026-10-01T00:00:00Z' })],
+    unreadCount: 1,
+    pageCount: 1,
+  });
+  markAllNotificationsRead.mockResolvedValue();
+  markNotificationRead.mockResolvedValue();
+  renderWithProviders(<NotificationsPage />, { user: PATIENT_USER });
 
-test('Mark all as read clears unread markers, the count, and the bell dot', () => {
-  render(<NotificationsPage />);
-  expect(screen.getByRole('link', { name: 'Notifications, unread items' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: /Appointment confirmed/ })).toBeInTheDocument();
+  expect(screen.getAllByText('2 hours ago')).toHaveLength(2);
+  expect(screen.getByRole('status')).toHaveTextContent('1 unread notification');
+
+  fireEvent.click(screen.getByRole('heading', { name: /Appointment confirmed/ }));
+  await waitFor(() => expect(markNotificationRead).toHaveBeenCalledWith('n-1'));
 
   fireEvent.click(screen.getByRole('button', { name: 'Mark all as read' }));
-
-  expect(screen.getByRole('status')).toHaveTextContent('No unread notifications');
-  expect(screen.queryByText(/\(unread\)/)).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Mark all as read' })).not.toBeInTheDocument();
-  expect(
-    screen.queryByRole('link', { name: 'Notifications, unread items' })
-  ).not.toBeInTheDocument();
+  await waitFor(() => expect(markAllNotificationsRead).toHaveBeenCalled());
 });
 
-test('shows an empty message when there are no notifications', () => {
-  render(<NotificationsPage initialNotifications={[]} />);
-  expect(screen.getByText('You have no notifications yet.')).toBeInTheDocument();
+test('shows the empty state', async () => {
+  getNotifications.mockResolvedValue({ notifications: [], unreadCount: 0, pageCount: 1 });
+  renderWithProviders(<NotificationsPage />, { user: PATIENT_USER });
+  expect(await screen.findByText('You have no notifications yet.')).toBeInTheDocument();
 });

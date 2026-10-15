@@ -6,13 +6,17 @@ import {
   MAIN_NAV_ITEMS,
   REGISTER_HREF,
 } from '../config/navigation';
+import { useAuth } from '../auth/AuthContext';
+import { getHomeHref } from '../auth/homeRoutes';
 import './SiteHeader.css';
 
-// Login and Register link to the account pages. When `account` ({ name, href })
-// is given, a "My Account" link replaces them for a signed-in user.
+// Login and Register link to the account pages. For a signed-in user a
+// "My Account" link to their portal replaces them (`account` overrides it).
 // Below the desktop breakpoint, nav and actions collapse into a menu panel.
-function SiteHeader({ activeHref = '/', account }) {
+function SiteHeader({ activeHref = '/', account: accountOverride }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user } = useAuth();
+  const account = accountOverride ?? (user ? { name: user.name, href: getHomeHref(user) } : null);
 
   useEffect(() => {
     if (!isMenuOpen) return undefined;

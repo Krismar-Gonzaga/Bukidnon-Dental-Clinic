@@ -1,0 +1,68 @@
+.status-message {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.status-message--loading {
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+}
+
+.status-message--loading.is-full-page {
+  min-height: 60vh;
+  border: none;
+  background: none;
+}
+
+.status-message--error {
+  border-color: var(--color-danger-border);
+  background-color: var(--color-danger-soft);
+  color: var(--color-danger-text);
+}
+
+.status-message-title {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.status-message--error .status-message-title {
+  color: var(--color-danger-text);
+}
+
+.status-message-text {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-sm);
+}
+
+.status-message-retry,
+.status-message-action {
+  margin-top: var(--space-3);
+}
+
+.status-message-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: status-message-spin 0.8s linear infinite;
+}
+
+@keyframes status-message-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-message-spinner {
+    animation: none;
+  }
+}

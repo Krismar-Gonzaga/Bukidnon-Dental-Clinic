@@ -1,56 +1,26 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import ServicesPage from './ServicesPage';
-import { SERVICES } from '../mocks/services';
+import { getServiceCatalog } from '../services/publicApi';
+import { renderWithProviders } from '../testUtils';
 
-const getCards = () => screen.queryAllByRole('article');
+jest.mock('../services/publicApi');
 
-test('renders the heading, category filter, and active nav link', () => {
-  render(<ServicesPage />);
-  expect(
-    screen.getByRole('heading', { level: 1, name: 'Affordable Care for Everyone' })
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole('group', { name: /filter services by category/i })
-  ).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute(
-    'aria-pressed',
-    'true'
-  );
-  expect(
-    within(screen.getByRole('banner')).getByRole('link', { name: 'Services' })
-  ).toHaveAttribute('aria-current', 'page');
+beforeEach(() => {
+  getServiceCatalog.mockResolvedValue([
+    { id: '1', name: 'Dental Cleaning', category: 'Preventive', priceLabel: '₱500 – ₱1,500', durationLabel: '30–45 min', description: 'Prophylaxis', clinicCount: 3 },
+    { id: '2', name: 'Implants', category: 'Restorative', priceLabel: 'Price on request', durationLabel: '', description: 'Implant placement', clinicCount: 0 },
+  ]);
 });
 
-test('renders every service with price, duration, and booking action', () => {
-  render(<ServicesPage />);
-  expect(getCards()).toHaveLength(SERVICES.length);
+test('shows published price ranges and filters by category from the data', async () => {
+  renderWithProviders(<ServicesPage />);
 
-  const firstCard = getCards()[0];
-  expect(
-    within(firstCard).getByRole('heading', { name: 'Dental Cleaning' })
-  ).toBeInTheDocument();
-  expect(within(firstCard).getByText('Preventive')).toBeInTheDocument();
-  expect(within(firstCard).getByText('₱500 – ₱1,500')).toBeInTheDocument();
-  expect(within(firstCard).getByText('45–60 min')).toBeInTheDocument();
-  expect(
-    within(firstCard).getByRole('button', { name: 'Book This Service' })
-  ).toBeInTheDocument();
-});
+  expect(await screen.findByText('₱500 – ₱1,500')).toBeInTheDocument();
+  expect(within(screen.getByRole('main')).getByRole('link', { name: 'Find Clinics' })).toHaveAttribute('href', '/clinics?service=Dental%20Cleaning');
+  // A service no clinic offers yet has no action.
+  expect(within(screen.getByRole('main')).getAllByRole('link', { name: 'Find Clinics' })).toHaveLength(1);
 
-test('filters services by category', () => {
-  render(<ServicesPage />);
   fireEvent.click(screen.getByRole('button', { name: 'Restorative' }));
-
-  const expected = SERVICES.filter((service) => service.category === 'Restorative');
-  expect(getCards()).toHaveLength(expected.length);
-  expect(screen.getByRole('button', { name: 'Restorative' })).toHaveAttribute(
-    'aria-pressed',
-    'true'
-  );
-  expect(screen.getByRole('status')).toHaveTextContent(
-    `${expected.length} services shown`
-  );
-
-  fireEvent.click(screen.getByRole('button', { name: 'All' }));
-  expect(getCards()).toHaveLength(SERVICES.length);
+  expect(screen.queryByText('₱500 – ₱1,500')).not.toBeInTheDocument();
+  expect(screen.getByText('Price on request')).toBeInTheDocument();
 });

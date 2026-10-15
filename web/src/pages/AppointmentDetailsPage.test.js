@@ -1,94 +1,72 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import AppointmentDetailsPage from './AppointmentDetailsPage';
+import { cancelAppointment, getAppointment } from '../services/patientApi';
+import { getNotifications } from '../services/notificationApi';
+import { apiError, PATIENT_USER, renderWithProviders } from '../testUtils';
+import { appointment, emptyNotifications } from '../testFixtures';
 
-const PENDING_ID = 'hist-1';
-const UPCOMING_ID = 'hist-2';
+jest.mock('../services/patientApi');
+jest.mock('../services/notificationApi');
 
-test('shows the pending appointment details, notice, and back link', () => {
-  render(<AppointmentDetailsPage appointmentId={PENDING_ID} />);
+beforeEach(() => getNotifications.mockResolvedValue(emptyNotifications));
 
-  expect(
-    screen.getByRole('heading', { level: 1, name: 'Appointment Details' })
-  ).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Back to History' })).toHaveAttribute(
-    'href',
-    '/patient/appointments'
-  );
+const renderPage = () => renderWithProviders(<AppointmentDetailsPage appointmentId="12" />, { user: PATIENT_USER });
 
-  const card = screen.getByRole('region', { name: 'Root Canal Treatment' });
-  expect(card).toHaveTextContent('Appointment #000006');
-  expect(card).toHaveTextContent('Pending');
-  expect(card).toHaveTextContent('Don Carlos Dental Clinic');
-  expect(card).toHaveTextContent('Dr. Laura Reyes');
-  expect(card).toHaveTextContent('July 25, 2026');
-  expect(card).toHaveTextContent('9:00 AM');
-  expect(card).toHaveTextContent('Awaiting Clinic Approval');
-  expect(within(card).getByRole('button', { name: 'Cancel Request' })).toBeInTheDocument();
+test('shows a pending request with its details and the approval notice', async () => {
+  getAppointment.mockResolvedValue(appointment());
+  renderPage();
+
+  expect(await screen.findByRole('heading', { level: 2, name: 'Dental Cleaning' })).toBeInTheDocument();
+  expect(screen.getByText('Appointment #000012')).toBeInTheDocument();
+  expect(screen.getByText('Dr. Maria Santos')).toBeInTheDocument();
+  expect(screen.getByText('November 3, 2026')).toBeInTheDocument();
+  expect(screen.getByText('9:00 AM')).toBeInTheDocument();
+  expect(screen.getByText('Awaiting Clinic Approval')).toBeInTheDocument();
 });
 
-test('Keep Appointment closes the dialog and returns focus', () => {
-  render(<AppointmentDetailsPage appointmentId={PENDING_ID} />);
-  const cancelRequest = screen.getByRole('button', { name: 'Cancel Request' });
-  cancelRequest.focus();
-  fireEvent.click(cancelRequest);
+test('cancelling asks for confirmation, calls the API and refreshes', async () => {
+  getAppointment.mockResolvedValueOnce(appointment()).mockResolvedValue(appointment({ status: 'cancelled', cancellation_reason: 'Cancelled by patient' }));
+  cancelAppointment.mockResolvedValue();
+  renderPage();
 
-  const dialog = screen.getByRole('alertdialog', { name: 'Cancel Appointment?' });
-  expect(dialog).toHaveTextContent(
-    'Are you sure you want to cancel your appointment with Dr. Laura Reyes?'
-  );
-  expect(within(dialog).getByRole('button', { name: 'Keep Appointment' })).toHaveFocus();
-
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Keep Appointment' }));
-  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-  expect(cancelRequest).toHaveFocus();
-  expect(screen.getByText('Pending')).toBeInTheDocument();
-});
-
-test('Escape closes the dialog without cancelling', () => {
-  render(<AppointmentDetailsPage appointmentId={PENDING_ID} />);
-  fireEvent.click(screen.getByRole('button', { name: 'Cancel Request' }));
-  fireEvent.keyDown(screen.getByRole('alertdialog'), { key: 'Escape' });
-  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-  expect(screen.getByText('Pending')).toBeInTheDocument();
-});
-
-test('Yes, Cancel marks the appointment cancelled and removes pending actions', () => {
-  render(<AppointmentDetailsPage appointmentId={PENDING_ID} />);
-  fireEvent.click(screen.getByRole('button', { name: 'Cancel Request' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Cancel Request' }));
   fireEvent.click(screen.getByRole('button', { name: 'Yes, Cancel' }));
 
-  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-  expect(screen.getByText('Cancelled')).toBeInTheDocument();
-  expect(screen.queryByText('Awaiting Clinic Approval')).not.toBeInTheDocument();
+  expect(await screen.findByText('Appointment cancelled')).toBeInTheDocument();
+  expect(cancelAppointment).toHaveBeenCalledWith('12');
   expect(screen.queryByRole('button', { name: 'Cancel Request' })).not.toBeInTheDocument();
-  expect(screen.getByRole('heading', { level: 2, name: 'Root Canal Treatment' })).toHaveFocus();
 });
 
-test('upcoming appointments offer Reschedule and Cancel Appointment', () => {
-  render(<AppointmentDetailsPage appointmentId={UPCOMING_ID} />);
-  expect(screen.getByText('Upcoming')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Reschedule' })).toHaveAttribute(
-    'href',
-    '/patient/appointments/hist-2/reschedule'
-  );
-  fireEvent.click(screen.getByRole('button', { name: 'Cancel Appointment' }));
+test('shows the server reason when cancelling is too late', async () => {
+  getAppointment.mockResolvedValue(appointment({ status: 'confirmed' }));
+  cancelAppointment.mockRejectedValue(apiError(409, { message: 'Appointments can only be changed online up to 24 hours before the start. Please contact the clinic.' }));
+  renderPage();
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Cancel Appointment' }));
   fireEvent.click(screen.getByRole('button', { name: 'Yes, Cancel' }));
-  expect(screen.getByText('Cancelled')).toBeInTheDocument();
+
+  expect(await screen.findByText(/up to 24 hours before the start/)).toBeInTheDocument();
+});
+
+test('explains a pending reschedule request', async () => {
+  getAppointment.mockResolvedValue(appointment({ status: 'reschedule_requested', requested_starts_at: '2026-11-05T10:00:00+08:00' }));
+  renderPage();
+
+  expect(await screen.findByText('Reschedule requested')).toBeInTheDocument();
+  expect(screen.getByText(/November 5, 2026 at 10:00 AM/)).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'Reschedule' })).not.toBeInTheDocument();
 });
 
-test('completed appointments offer Leave a Review only', () => {
-  render(<AppointmentDetailsPage appointmentId="hist-3" />);
-  expect(screen.getByText('Completed')).toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: 'Reschedule' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /^Cancel/ })).not.toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Leave a Review' })).toHaveAttribute(
-    'href',
-    '/patient/reviews?appointment=hist-3'
-  );
+test('offers a review link only for a completed visit without a review', async () => {
+  getAppointment.mockResolvedValue(appointment({ status: 'completed' }));
+  renderPage();
+
+  expect(await screen.findByRole('link', { name: 'Leave a Review' })).toHaveAttribute('href', '/patient/reviews?appointment=12');
 });
 
-test('unknown appointment shows a not-found message', () => {
-  render(<AppointmentDetailsPage appointmentId="missing" />);
-  expect(screen.getByText('This appointment could not be found.')).toBeInTheDocument();
+test('shows not found for an appointment the patient cannot see', async () => {
+  getAppointment.mockRejectedValue(apiError(404, { message: 'Resource not found.' }));
+  renderPage();
+
+  expect(await screen.findByText('Not found')).toBeInTheDocument();
 });
