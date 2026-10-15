@@ -25,6 +25,8 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => false,
+    // Needed for the web app's session cookie. Safe because allowed_origins
+    // is an explicit list (never "*").
+    'supports_credentials' => true,
 
 ];

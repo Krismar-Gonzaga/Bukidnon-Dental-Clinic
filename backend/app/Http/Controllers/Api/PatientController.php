@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PatientRecordResource;
 use App\Models\Patient;
+use App\Models\PatientMedicalHistory;
 use App\Models\PatientRecord;
+use App\Support\BusinessTime;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -65,6 +67,32 @@ class PatientController extends Controller
             ]);
 
         return $this->ok($records);
+    }
+
+    /**
+     * The patient's own allergies, medications and conditions as most
+     * recently recorded by each clinic (right of access to their own data).
+     * The clinic's free-text notes are not included.
+     */
+    public function medicalHistory(Request $request)
+    {
+        $patient = $request->user()->patient ?? throw new AccessDeniedHttpException('Only patient accounts have a medical history.');
+
+        $latest = PatientMedicalHistory::where('patient_id', $patient->id)
+            ->orderByDesc('created_at')->orderByDesc('id')
+            ->get()
+            ->unique('clinic_id')
+            ->values();
+
+        $clinics = \App\Models\Clinic::whereIn('id', $latest->pluck('clinic_id'))->pluck('name', 'id');
+
+        return $this->ok($latest->map(fn ($entry) => [
+            'clinic' => $clinics[$entry->clinic_id] ?? null,
+            'allergies' => $entry->allergies,
+            'medications' => $entry->medications,
+            'conditions' => $entry->conditions,
+            'recorded_at' => BusinessTime::iso($entry->created_at),
+        ]));
     }
 
     private function profileData($user): array

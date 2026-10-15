@@ -23,6 +23,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->throttleApi();
 
+        // Requests from the web app's origin (SANCTUM_STATEFUL_DOMAINS) get
+        // session-cookie authentication (HttpOnly cookie + CSRF), so the
+        // browser never holds an API token. Mobile keeps using tokens.
+        $middleware->statefulApi();
+
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'active' => \App\Http\Middleware\EnsureAccountActive::class,

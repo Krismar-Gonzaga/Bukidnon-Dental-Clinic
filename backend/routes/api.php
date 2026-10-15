@@ -14,7 +14,9 @@ use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\PatientDashboardController;
 use App\Http\Controllers\Api\PatientReviewController;
 use App\Http\Controllers\Api\PublicClinicController;
+use App\Http\Controllers\Api\PublicDentistController;
 use App\Http\Controllers\Api\ReviewReportController;
+use App\Http\Controllers\Api\SavedClinicController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -36,7 +38,9 @@ Route::get('/clinics/search', [HomeController::class, 'searchClinics']);
 Route::get('/clinics/map', [PublicClinicController::class, 'map']);
 Route::get('/clinics/{id}', [HomeController::class, 'clinicDetails'])->whereNumber('id');
 Route::get('/clinics/{id}/availability', [PublicClinicController::class, 'availability'])->whereNumber('id');
+Route::get('/clinics/{id}/available-dates', [PublicClinicController::class, 'availableDates'])->whereNumber('id');
 Route::get('/clinics/{id}/reviews', [PublicClinicController::class, 'reviews'])->whereNumber('id');
+Route::get('/dentists', [PublicDentistController::class, 'index']);
 Route::get('/specializations', [HomeController::class, 'getSpecializations']);
 Route::get('/services', [HomeController::class, 'getServices']);
 Route::get('/cities', [HomeController::class, 'getCities']);
@@ -82,6 +86,10 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/reviews', [PatientReviewController::class, 'index']);
         Route::get('/reviews/eligible', [PatientReviewController::class, 'eligible']);
         Route::get('/records', [PatientController::class, 'records']);
+        Route::get('/medical-history', [PatientController::class, 'medicalHistory']);
+        Route::get('/saved-clinics', [SavedClinicController::class, 'index']);
+        Route::put('/saved-clinics/{clinicId}', [SavedClinicController::class, 'store']);
+        Route::delete('/saved-clinics/{clinicId}', [SavedClinicController::class, 'destroy']);
         Route::get('/profile', [PatientController::class, 'profile']);
         Route::put('/profile', [PatientController::class, 'updateProfile']);
     });

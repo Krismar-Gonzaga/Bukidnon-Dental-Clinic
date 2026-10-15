@@ -46,6 +46,11 @@ class DirectoryAndReviewsTest extends TestCase
         $this->assertCount(1, $this->getJson('/api/clinics/search?city=Malaybalay%20City')->json('data.data'));
         $this->assertCount(2, $this->getJson('/api/clinics/search?service=cleaning')->json('data.data'));
         $this->assertCount(0, $this->getJson('/api/clinics/search?service=implant')->json('data.data'));
+        $this->getJson('/api/clinics/search?sort=reviews')->assertOk();
+
+        $services = $this->getJson('/api/services')->assertOk()->json('data');
+        $this->assertEquals(800, $services[0]['price_min']);
+        $this->assertSame(2, $services[0]['clinic_count']);
     }
 
     private function completedAppointment(array $world, User $patient): int

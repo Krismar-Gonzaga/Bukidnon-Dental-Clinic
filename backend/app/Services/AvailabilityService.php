@@ -133,6 +133,70 @@ class AvailabilityService
         return $slots->sortBy([['starts_at', 'asc'], ['dentist_id', 'asc']])->values();
     }
 
+    /**
+     * Dates in [from, to] on which the dentist (or any clinic dentist) works
+     * long enough for the service at an open, non-holiday branch, inside the
+     * booking window. Cheap: does not look at existing bookings, so a date
+     * may still turn out fully booked when its slots are fetched.
+     *
+     * @return list<string> Y-m-d dates
+     */
+    public function availableDates(
+        Clinic $clinic,
+        CarbonImmutable $from,
+        CarbonImmutable $to,
+        ServiceRate $service,
+        ?Dentist $dentist = null,
+    ): array {
+        $today = BusinessTime::today();
+        $from = BusinessTime::parse($from->toDateString())->max($today);
+        $to = BusinessTime::parse($to->toDateString())->min($today->addDays(config('booking.max_days_ahead')));
+        if ($from->gt($to)) {
+            return [];
+        }
+
+        $dentistIds = $dentist ? [$dentist->id] : $clinic->dentistProfiles()->pluck('id')->all();
+        $duration = max(1, (int) $service->duration_minutes);
+
+        $schedules = \App\Models\DentistSchedule::whereIn('dentist_id', $dentistIds)
+            ->whereHas('branch', fn ($q) => $q->where('clinic_id', $clinic->id)->where('is_active', true))
+            ->with('branch.operatingHours')
+            ->get();
+
+        $holidays = ClinicHoliday::where('clinic_id', $clinic->id)
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->get();
+
+        $dates = [];
+        for ($day = $from; $day->lte($to); $day = $day->addDay()) {
+            $date = $day->toDateString();
+            $closed = $holidays->filter(fn ($h) => $h->date->toDateString() === $date);
+            if ($closed->contains(fn ($h) => $h->branch_id === null)) {
+                continue;
+            }
+
+            $works = $schedules->contains(function ($schedule) use ($day, $duration, $closed) {
+                if ($schedule->day_of_week !== $day->dayOfWeek || $closed->contains('branch_id', $schedule->branch_id)) {
+                    return false;
+                }
+                $hours = $schedule->branch->operatingHours->firstWhere('day_of_week', $day->dayOfWeek);
+                if (! $hours) {
+                    return false;
+                }
+                $start = max($this->at($day, $schedule->starts_at), $this->at($day, $hours->opens_at));
+                $end = min($this->at($day, $schedule->ends_at), $this->at($day, $hours->closes_at));
+
+                return $start->addMinutes($duration)->lte($end);
+            });
+
+            if ($works) {
+                $dates[] = $date;
+            }
+        }
+
+        return $dates;
+    }
+
     public function isBookable(
         Clinic $clinic,
         CarbonImmutable $start,

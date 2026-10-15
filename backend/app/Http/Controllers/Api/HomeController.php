@@ -124,9 +124,10 @@ class HomeController extends Controller
             'search' => ['nullable', 'string', 'max:100'],
             'city' => ['nullable', 'string', 'max:100'],
             'specialization_id' => ['nullable', 'integer'],
+            'specialization' => ['nullable', 'string', 'max:100'],
             'service_id' => ['nullable', 'integer'],
             'service' => ['nullable', 'string', 'max:100'],
-            'sort' => ['nullable', 'in:rating,newest,name,price'],
+            'sort' => ['nullable', 'in:rating,reviews,newest,name,price'],
         ]);
 
         $query = Clinic::publiclyListed()
@@ -152,6 +153,10 @@ class HomeController extends Controller
             $query->whereHas('specializations', fn ($q) => $q->where('specializations.id', $request->specialization_id));
         }
 
+        if ($request->filled('specialization')) {
+            $query->whereHas('specializations', fn ($q) => $q->where('specializations.name', $request->specialization));
+        }
+
         if ($request->filled('service_id')) {
             $query->whereHas('serviceRates', fn ($q) => $q->available()->where('service_id', $request->service_id));
         }
@@ -163,6 +168,7 @@ class HomeController extends Controller
 
         match ($request->get('sort', 'rating')) {
             'newest' => $query->orderBy('created_at', 'desc'),
+            'reviews' => $query->orderBy('reviews_count', 'desc')->orderBy('rating', 'desc'),
             'name' => $query->orderBy('name'),
             'price' => $query->orderByRaw('starting_price IS NULL')->orderBy('starting_price'),
             default => $query->orderBy('rating', 'desc')->orderBy('name'),
@@ -223,11 +229,35 @@ class HomeController extends Controller
         );
     }
 
-    /** Catalog services (categories) for filters. */
+    /**
+     * Catalog services with the published price and duration range across
+     * listed clinics that offer them (null when no clinic offers it yet).
+     */
     public function getServices()
     {
-        return $this->ok(
-            Service::orderBy('sort_order')->get(['id', 'name', 'slug', 'description', 'icon_name', 'category'])
-        );
+        $ranges = ServiceRate::available()
+            ->whereHas('clinic', fn ($q) => $q->publiclyListed())
+            ->selectRaw('service_id, MIN(price) as price_min, MAX(price) as price_max, MIN(duration_minutes) as duration_min, MAX(duration_minutes) as duration_max, COUNT(DISTINCT clinic_id) as clinic_count')
+            ->groupBy('service_id')
+            ->get()
+            ->keyBy('service_id');
+
+        return $this->ok(Service::orderBy('sort_order')->get()->map(function (Service $service) use ($ranges) {
+            $range = $ranges->get($service->id);
+
+            return [
+                'id' => $service->id,
+                'name' => $service->name,
+                'slug' => $service->slug,
+                'description' => $service->description,
+                'category' => $service->category,
+                'icon' => $service->icon_name,
+                'price_min' => $range ? (float) $range->price_min : null,
+                'price_max' => $range ? (float) $range->price_max : null,
+                'duration_min' => $range ? (int) $range->duration_min : null,
+                'duration_max' => $range ? (int) $range->duration_max : null,
+                'clinic_count' => $range ? (int) $range->clinic_count : 0,
+            ];
+        }));
     }
 }

@@ -138,6 +138,17 @@ class PatientRecordsTest extends TestCase
         $this->assertArrayNotHasKey('findings', $records[0]);
     }
 
+    public function test_patient_sees_their_latest_medical_history_without_clinic_notes(): void
+    {
+        $url = $this->manage($this->world, "/patients/{$this->patientId}/medical-history");
+        $this->asUser($this->world['dentistUser'])->postJson($url, ['allergies' => 'Penicillin', 'notes' => 'Internal note'])->assertCreated();
+
+        $this->asUser($this->patientUser)->getJson('/api/patient/medical-history')->assertOk()
+            ->assertJsonPath('data.0.allergies', 'Penicillin')
+            ->assertJsonPath('data.0.clinic', $this->world['clinic']->name)
+            ->assertJsonMissingPath('data.0.notes');
+    }
+
     public function test_medical_history_is_append_only_with_current_entry_first(): void
     {
         $url = $this->manage($this->world, "/patients/{$this->patientId}/medical-history");

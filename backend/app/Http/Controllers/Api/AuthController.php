@@ -14,9 +14,11 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
@@ -47,7 +49,7 @@ class AuthController extends Controller
 
         $this->audit->record('auth.registered', $user, ['role' => $role], actor: $user);
 
-        return $this->ok($this->authPayload($user), 'Registration successful', 201);
+        return $this->ok($this->authPayload($user, $request), 'Registration successful', 201);
     }
 
     public function login(LoginRequest $request): JsonResponse
@@ -68,13 +70,24 @@ class AuthController extends Controller
 
         $this->audit->record('auth.login', $user, actor: $user);
 
-        return $this->ok($this->authPayload($user));
+        return $this->ok($this->authPayload($user, $request));
     }
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
-        $this->audit->record('auth.logout', $request->user());
+        $user = $request->user();
+        $token = $user->currentAccessToken();
+
+        if ($token instanceof PersonalAccessToken) {
+            $token->delete();
+        } else {
+            // Web session: end it and rotate the CSRF token.
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
+
+        $this->audit->record('auth.logout', $user, actor: $user);
 
         return $this->ok(message: 'Logged out successfully');
     }
@@ -105,7 +118,13 @@ class AuthController extends Controller
         $user->update(['password' => $request->new_password]);
 
         // Sign out every other device; keep the session that made the change.
-        $user->tokens()->whereKeyNot($user->currentAccessToken()->getKey())->delete();
+        $token = $user->currentAccessToken();
+        $user->tokens()
+            ->when($token instanceof PersonalAccessToken, fn ($q) => $q->whereKeyNot($token->getKey()))
+            ->delete();
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
+        }
         $this->audit->record('auth.password_changed', $user);
 
         return $this->ok(message: 'Password changed successfully');
@@ -155,8 +174,20 @@ class AuthController extends Controller
         return $this->ok(message: 'Password has been reset. You can now sign in.');
     }
 
-    private function authPayload(User $user): array
+    /**
+     * Web app (stateful request with a session): sign in with an HttpOnly
+     * session cookie and return no token. Mobile and other API clients:
+     * return a Sanctum token.
+     */
+    private function authPayload(User $user, Request $request): array
     {
+        if ($request->hasSession()) {
+            Auth::guard('web')->login($user);
+            $request->session()->regenerate();
+
+            return ['user' => $this->userData($user), 'role' => $user->role];
+        }
+
         return [
             'user' => $this->userData($user),
             'token' => $user->createToken('auth_token')->plainTextToken,

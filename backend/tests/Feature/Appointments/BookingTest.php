@@ -152,6 +152,20 @@ class BookingTest extends TestCase
         $this->assertNotContains('17:00', $times);
     }
 
+    public function test_available_dates_follow_schedule_holidays_and_window(): void
+    {
+        $world = $this->makeClinic();
+        // Dentist works weekdays only at this clinic.
+        $world['dentist']->schedules()->whereIn('day_of_week', [0, 6])->delete();
+        $world['clinic']->holidays()->create(['date' => '2026-11-04', 'name' => 'Holiday']);
+
+        $dates = $this->getJson("/api/clinics/{$world['clinic']->id}/available-dates?service_rate_id={$world['service']->id}&from=2026-11-01&to=2026-11-09")
+            ->assertOk()->json('data');
+
+        // Nov 1 is past, Nov 4 a holiday, Nov 7-8 the weekend.
+        $this->assertSame(['2026-11-02', '2026-11-03', '2026-11-05', '2026-11-06', '2026-11-09'], $dates);
+    }
+
     public function test_patient_cannot_see_or_change_another_patients_appointment(): void
     {
         $world = $this->makeClinic();

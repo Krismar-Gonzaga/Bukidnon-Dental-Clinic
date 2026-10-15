@@ -58,6 +58,33 @@ class PublicClinicController extends Controller
         ]), meta: ['timezone' => BusinessTime::zone()]);
     }
 
+    /**
+     * Dates worth offering in a calendar (see AvailabilityService::availableDates).
+     * GET /clinics/{id}/available-dates?service_rate_id=3&dentist_id=1&from=2026-10-20&to=2026-11-20
+     */
+    public function availableDates(Request $request, int $id, AvailabilityService $availability)
+    {
+        $clinic = Clinic::publiclyListed()->findOrFail($id);
+
+        $data = $request->validate([
+            'service_rate_id' => ['required', 'integer'],
+            'dentist_id' => ['nullable', 'integer'],
+            'from' => ['required', 'date_format:Y-m-d'],
+            'to' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
+        ]);
+
+        $from = BusinessTime::parse($data['from']);
+        $to = BusinessTime::parse($data['to']);
+        if ($from->diffInDays($to) > 62) {
+            return $this->fail('Request at most 62 days at a time.', 422, ['to' => ['Request at most 62 days at a time.']]);
+        }
+
+        $service = $clinic->serviceRates()->available()->findOrFail($data['service_rate_id']);
+        $dentist = isset($data['dentist_id']) ? $clinic->dentistProfiles()->findOrFail($data['dentist_id']) : null;
+
+        return $this->ok($availability->availableDates($clinic, $from, $to, $service, $dentist), meta: ['timezone' => BusinessTime::zone()]);
+    }
+
     /** Published reviews, newest first. */
     public function reviews(Request $request, int $id)
     {
