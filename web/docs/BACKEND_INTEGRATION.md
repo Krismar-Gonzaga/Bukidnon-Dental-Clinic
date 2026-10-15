@@ -40,7 +40,7 @@ All endpoints are under `/api`. Those marked "token" need a logged-in user.
 |---|---|
 | `POST /logout` | Sidebar "Log Out" |
 | `GET /user` | Name and role in the sidebar and top bar |
-| `PUT /profile`, `POST /change-password` | My Profile (not built yet) |
+| `PUT /profile`, `POST /change-password` | Change Password page (`current_password`, `new_password`, `new_password_confirmation`; new password at least 8 characters) |
 
 ### Patient (token)
 
@@ -51,7 +51,7 @@ All endpoints are under `/api`. Those marked "token" need a logged-in user.
 | `PUT /patient/appointments/{id}` | Reschedule | Works |
 | `DELETE /patient/appointments/{id}` | Cancel Request / Cancel Appointment | Works |
 | `POST /patient/feedback` | Feedback & Ratings | Broken: `FeedbackController` does not exist |
-| `GET /patient/profile`, `PUT /patient/profile` | My Profile (not built yet) | Works |
+| `GET /patient/profile`, `PUT /patient/profile` | My Profile, Edit Profile | Works |
 
 The staff, dentist, clinic-admin, and system-admin route groups point to controllers or methods that do not exist yet. Report these to the backend owner; they are not needed for the patient screens.
 
@@ -89,8 +89,9 @@ Each of these pretends to succeed and saves nothing. Search the code for `MOCK` 
 | `layouts/PatientLayout.jsx` | Log Out | `POST /logout` |
 | `components/contact/ContactForm.jsx` | Send message | No endpoint yet |
 | `pages/NotificationsPage.jsx` (`handleMarkAllRead`) | Mark all as read | No endpoint yet |
-| `pages/EditProfilePage.jsx` (`// MOCK save`) | Save Changes | `PUT /patient/profile` |
-| `pages/ProfilePage.jsx`, `pages/EditProfilePage.jsx` | Password, Upload new photo | `POST /change-password`; no photo upload endpoint yet |
+| `pages/EditProfilePage.jsx` (`// MOCK save`) | Save Changes (shows Profile Updated) | `PUT /patient/profile` |
+| `pages/ChangePasswordPage.jsx` (`// MOCK change password`) | Update Password (shows Password Changed) | `POST /change-password`; show the backend's 422 errors, such as a wrong current password, on the form |
+| `pages/EditProfilePage.jsx` | Upload new photo | No photo upload endpoint yet |
 | `pages/SavedClinicsPage.jsx` (`handleUnsave`), `pages/ClinicDetailsPage.jsx` (save heart) | Save / unsave a clinic | No endpoint yet |
 
 ## Field mapping
@@ -148,7 +149,12 @@ These block a full integration. They are backend decisions; do not change `backe
 9. **Notifications:** no endpoint yet. The frontend needs a list with `type` (`reminder`, `confirmed`, or `message`), `title`, `message`, time, and `unread`, plus a mark-all-as-read action.
 10. **Saved clinics:** there is no endpoint to list, save, or unsave a patient's clinics.
 11. **Clinic profile fields:** Clinic Details and Clinic Locator show street address, operating hours, phone, email, and map coordinates. Confirm `GET /clinics/{id}` returns them; the frontend hides any that are missing.
-12. **Patient medical profile:** My Profile shows blood type, civil status, zip code, health tags, a medical alert, conditions, allergies, medications, and an emergency contact. Confirm which of these `GET /patient/profile` returns and which need new fields.
+12. **Patient medical profile:** My Profile shows blood type, civil status, zip code, health tags, and a medical alert. Its section tabs also show:
+    - Medical History: conditions, previous dental procedures (name, tooth, note, date), and vital notes (blood pressure, blood sugar, heart condition, pregnancy, bleeding disorder, recent surgery).
+    - Allergies & Medications: allergies (name, type, severity, reaction), medications (name, dosage, purpose, caution), and dental anxiety (level 1–5, preferred sedation, notes).
+    - Emergency Contact: name, relationship, phone, address, and five consent settings (`CONSENT_OPTIONS` in `config/profile.js`).
+
+    The shape is in `mocks/patientProfile.js`. Confirm which of these `GET /patient/profile` returns and which need new fields.
 13. **Controller folder case:** the namespace says `API` but the folder is `Api`. This breaks on case-sensitive hosting (Linux).
 
 ## Integration order (suggested)

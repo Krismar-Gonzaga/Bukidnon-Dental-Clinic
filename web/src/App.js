@@ -19,6 +19,7 @@ import ClinicLocatorPage from './pages/ClinicLocatorPage';
 import ClinicDetailsPage from './pages/ClinicDetailsPage';
 import ProfilePage from './pages/ProfilePage';
 import EditProfilePage from './pages/EditProfilePage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
 
 // TEMPORARY path switch until a router is approved and added.
 const PAGES_BY_PATH = {
@@ -39,6 +40,7 @@ const PAGES_BY_PATH = {
   '/patient/clinic-locator': ClinicLocatorPage,
   '/patient/profile': ProfilePage,
   '/patient/profile/edit': EditProfilePage,
+  '/patient/profile/password': ChangePasswordPage,
 };
 
 // Match /patient/appointments/<id> and /patient/appointments/<id>/reschedule

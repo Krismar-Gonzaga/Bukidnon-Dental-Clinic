@@ -1,0 +1,38 @@
+.profile-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-tag {
+  display: inline-block;
+  padding: 2px 12px;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.profile-tag--danger {
+  background-color: var(--color-danger-soft);
+  color: var(--color-danger-text);
+}
+
+.profile-tag--warning {
+  background-color: var(--color-pending-icon-bg);
+  color: var(--color-pending-text);
+}
+
+.profile-tag--success {
+  background-color: var(--color-success-icon-bg);
+  color: var(--color-success-text);
+}
+
+.profile-tag--neutral {
+  background-color: var(--color-neutral-soft);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+}

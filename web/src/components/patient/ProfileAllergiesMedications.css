@@ -1,0 +1,46 @@
+.profile-item--danger .profile-tag--danger {
+  background-color: var(--color-danger-chip);
+}
+
+.profile-medication-dosage {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.profile-medication-purpose {
+  color: var(--color-text);
+}
+
+.profile-medication-caution {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: 2px;
+  font-style: italic;
+  color: var(--color-caution-text);
+}
+
+.profile-medication-caution svg {
+  flex-shrink: 0;
+}
+
+.profile-anxiety-meter {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.profile-anxiety-step {
+  height: 5px;
+  border-radius: 999px;
+  background-color: var(--color-meter-track);
+}
+
+.profile-anxiety-step.is-filled {
+  background-color: var(--color-anxiety-fill);
+}
+
+.profile-anxiety-notes .profile-detail-tile-value {
+  font-weight: var(--font-weight-regular);
+}

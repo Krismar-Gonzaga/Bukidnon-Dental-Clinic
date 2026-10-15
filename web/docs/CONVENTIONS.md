@@ -6,7 +6,7 @@ How code in `web/src/` is named and organized. Follow the existing pattern when 
 
 | Folder | Holds | Example |
 |---|---|---|
-| `pages/` | One component per screen. It owns the screen's state and passes data down. Each page has a matching `.css` and `.test.js`. | `pages/BookAppointmentPage.jsx` |
+| `pages/` | One component per screen. It owns the screen's state and passes data down. Pages have a matching `.test.js` (`HomePage` is tested in `App.test.js`) and, when they need page-level styles, a matching `.css`. | `pages/BookAppointmentPage.jsx` |
 | `layouts/` | Page frames shared by several screens. | `layouts/PatientLayout.jsx` (patient sidebar and top bar) |
 | `components/` | Reusable UI used across areas. | `Icon.jsx`, `StarRating.jsx`, `ConfirmDialog.jsx` |
 | `components/<area>/` | UI for one area of the app. | `components/patient/`, `components/auth/`, `components/home/` |
@@ -63,7 +63,7 @@ The backend uses `confirmed` where the frontend shows `upcoming` (see [BACKEND_I
 
 No router library is installed yet. `src/App.js` has a temporary path switch:
 - Fixed paths go in the `PAGES_BY_PATH` object.
-- Paths with an id use a regular expression: `/patient/appointments/<id>` and `/patient/appointments/<id>/reschedule`.
+- Paths with an id use a regular expression: `/patient/appointments/<id>`, `/patient/appointments/<id>/reschedule`, and `/patient/clinics/<id>`.
 
 Always build links from `config/navigation.js` or `config/patientNavigation.js`. Do not type paths by hand.
 
@@ -85,6 +85,7 @@ Always build links from `config/navigation.js` or `config/patientNavigation.js`.
 | `/patient/clinic-locator` | `ClinicLocatorPage` |
 | `/patient/profile` | `ProfilePage` |
 | `/patient/profile/edit` | `EditProfilePage` |
+| `/patient/profile/password` | `ChangePasswordPage` |
 
 All patient sidebar pages are built. Unknown paths fall back to the homepage.
 
@@ -97,7 +98,8 @@ All patient sidebar pages are built. Unknown paths fall back to the homepage.
   - `.patient-btn-sm` and `.patient-btn-outline`: small card buttons.
   - `.patient-back-link`: the "‹ Back to …" link.
 - Shared buttons live in `styles/global.css`: `.btn`, `.btn-primary`, `.btn-outline`, `.btn-sm`, `.btn-lg`.
-- Patient pages render inside `PatientLayout`. Content is centered with a max width of 768px for lists and the booking flow, and 672px for detail, reschedule, and review screens.
+- Patient pages render inside `PatientLayout`. Content is centered with a max width of 768px for lists and the booking flow, 672px for detail, reschedule, review, and edit-profile screens, and 448px for Change Password.
+- Success screens (reschedule, review, profile updated, password changed) reuse `components/patient/SuccessCard.jsx`.
 - No inline styles. No emoji in place of icons; add an icon to `components/Icon.jsx` instead.
 
 ## Mock data and UI text
@@ -128,7 +130,7 @@ npm.cmd test
 npm.cmd run build
 ```
 
-- Each page has a `.test.js` using React Testing Library.
+- Each page has a `.test.js` using React Testing Library. `App.test.js` covers the homepage.
 - Tests that depend on today's date pin it with `jest.useFakeTimers().setSystemTime(...)`. Set it before `render`.
 
 If the build or dev server reports an ESLint error that does not match the code, delete `web/node_modules/.cache/.eslintcache` and run again. The project sits in a OneDrive folder, and the lint cache can fall behind saved files.

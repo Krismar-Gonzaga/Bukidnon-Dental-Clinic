@@ -181,6 +181,13 @@
   text-align: center;
 }
 
+/* Page heading for the not-found state, styled as body text. */
+.clinic-details-missing-title {
+  font-size: var(--font-size-base);
+  font-weight: inherit;
+  line-height: inherit;
+}
+
 @media (max-width: 600px) {
   .clinic-details-container {
     padding: 0 var(--space-4);

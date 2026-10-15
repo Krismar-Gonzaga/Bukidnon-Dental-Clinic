@@ -241,6 +241,12 @@ const PATHS = {
       <path d="M12 7.5v5.5M12 16.5h.01" />
     </>
   ),
+  alertTriangle: (
+    <>
+      <path d="M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0Z" />
+      <path d="M12 9.5v4M12 17h.01" />
+    </>
+  ),
   checkCircle: (
     <>
       <circle cx="12" cy="12" r="9" />
