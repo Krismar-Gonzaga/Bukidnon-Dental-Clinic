@@ -7,16 +7,18 @@ How code in `web/src/` is named and organized. Follow the existing pattern when 
 | Folder | Holds | Example |
 |---|---|---|
 | `pages/` | One component per screen. It owns the screen's state and passes data down. Pages have a matching `.test.js` (`HomePage` is tested in `App.test.js`) and, when they need page-level styles, a matching `.css`. | `pages/BookAppointmentPage.jsx` |
-| `layouts/` | Page frames shared by several screens. | `layouts/PatientLayout.jsx` (patient sidebar and top bar) |
+| `layouts/` | Page frames shared by several screens. | `layouts/PatientLayout.jsx`, `ClinicLayout.jsx`, `AdminLayout.jsx` (all built on `PortalLayout.jsx`) |
 | `components/` | Reusable UI used across areas. | `Icon.jsx`, `StarRating.jsx`, `ConfirmDialog.jsx` |
 | `components/<area>/` | UI for one area of the app. | `components/patient/`, `components/auth/`, `components/home/` |
 | `config/` | App settings that are not business data: routes, labels, step lists, status lists, fixed UI text. | `config/patientNavigation.js`, `config/appointments.js` |
-| `mocks/` | Sample data standing in for the API. Never real business data. | `mocks/appointmentHistory.js` |
+| `services/` | API calls and adapters (API JSON → UI objects). The only place that knows URLs. | `services/patientApi.js`, `services/adapters.js` |
+| `auth/` | Signed-in user state, route guard, home route per role. | `auth/AuthContext.jsx`, `auth/RequireAuth.jsx` |
+| `mocks/` | Static content with no API (About and Contact copy). Never real business data. | `mocks/aboutContent.js` |
 | `utils/` | Plain functions with no React. | `utils/bookingCalendar.js` |
 | `hooks/` | Custom React hooks shared by pages. | `hooks/useScheduleSelection.js` |
 | `styles/` | Global CSS: design tokens and base styles. | `styles/tokens.css`, `styles/global.css` |
 
-There is no API service layer yet. When integration starts, add one in `src/services/` (see [BACKEND_INTEGRATION.md](BACKEND_INTEGRATION.md#where-api-code-goes)).
+Pages call the API through `services/` using TanStack Query (see [BACKEND_INTEGRATION.md](BACKEND_INTEGRATION.md)).
 
 ## Naming
 
@@ -32,7 +34,7 @@ There is no API service layer yet. When integration starts, add one in `src/serv
 | Event handlers | `handle` + event or action | `handleSubmit`, `handleClinicSelect` |
 | Booleans | `is`, `has`, or `can` prefix | `isSubmitted`, `hasUnreadNotifications`, `canReschedule` |
 | Constants and fixed lists | `UPPER_SNAKE_CASE` | `BOOKING_STEPS`, `APPOINTMENT_STATUSES` |
-| Mock data exports | `MOCK_` prefix, or a clear domain name inside `mocks/` | `MOCK_APPOINTMENT_HISTORY`, `BOOKING_CLINICS` |
+| API functions | verb + noun in `services/*Api.js`; adapters `to` + UI shape | `getAppointments`, `toClinicProfile` |
 | Route constants | `UPPER_SNAKE_CASE` ending in `_HREF` | `PATIENT_HISTORY_HREF` |
 | Route builders | `get` + name + `Href` | `getAppointmentDetailsHref(id)` |
 | CSS class | kebab-case, prefixed with the component's name | `.appointment-history-card`, `.appointment-history-actions` |
@@ -40,7 +42,7 @@ There is no API service layer yet. When integration starts, add one in `src/serv
 | CSS variant class | `--` modifier | `.appointment-status-badge--pending` |
 | Design token | `--color-*`, `--space-*`, `--radius-*`, `--shadow-*`, `--font-*` | `--color-primary`, `--space-4` |
 
-Data field names use `camelCase` in the frontend, for example `durationLabel`. The Laravel API uses `snake_case`, for example `appointment_date`. Convert between them in the service layer, not in components (see [BACKEND_INTEGRATION.md](BACKEND_INTEGRATION.md#field-mapping)).
+Data field names use `camelCase` in the frontend, for example `durationLabel`. The Laravel API uses `snake_case`, for example `appointment_date`. Convert between them in `services/adapters.js`, not in components.
 
 ## Status values
 
@@ -57,37 +59,23 @@ Other rules in the same file:
 - `CANCELLABLE_STATUSES` is `pending` and `upcoming`.
 - `RESCHEDULABLE_STATUSES` is `upcoming`.
 
-The backend uses `confirmed` where the frontend shows `upcoming` (see [BACKEND_INTEGRATION.md](BACKEND_INTEGRATION.md#status-mapping)).
+`services/adapters.js` maps the backend's statuses onto these four: `confirmed`, `reschedule_requested`, `checked_in` and `in_progress` show as `upcoming`, and `rejected` and `no_show` show as `cancelled`. The original value stays available as `backendStatus`. The clinic portal shows backend statuses directly.
 
 ## Routes
 
-No router library is installed yet. `src/App.js` has a temporary path switch:
-- Fixed paths go in the `PAGES_BY_PATH` object.
-- Paths with an id use a regular expression: `/patient/appointments/<id>`, `/patient/appointments/<id>/reschedule`, and `/patient/clinics/<id>`.
+Routing uses React Router (`src/App.js`, future flags in `config/router.js`). Always build links from the `config/*Navigation.js` files (`navigation.js`, `patientNavigation.js`, `clinicNavigation.js`, `adminNavigation.js`). Do not type paths by hand. Plain `<a href>` links inside the app are routed client-side by `components/LinkInterceptor.jsx`.
 
-Always build links from `config/navigation.js` or `config/patientNavigation.js`. Do not type paths by hand.
+| Path | Who | Pages |
+|---|---|---|
+| `/`, `/clinics`, `/clinics/:clinicId`, `/dentists`, `/services`, `/about`, `/contact`, `/privacy`, `/terms` | Everyone | Public pages |
+| `/login`, `/register`, `/forgot-password`, `/reset-password` | Signed out | Account access |
+| `/patient/...` | Patients | dashboard, book (`?clinic=<id>`), appointments, appointments/:id, appointments/:id/reschedule, reviews (`?appointment=<id>`), notifications, clinics, clinics/:id, saved-clinics, clinic-locator, profile, profile/edit, profile/password |
+| `/clinic/apply` | Clinic owners | Clinic application and documents |
+| `/clinic/:clinicId/...` | Clinic members (menu items depend on permissions) | dashboard, appointments, patients, inventory, services, dentists, branches, staff, reviews, reports, settings, notifications, password |
+| `/admin/...` | System administrators | dashboard, applications, clinics, users, reviews, audit-logs, notifications, password |
+| `*` | Everyone | `NotFoundPage` |
 
-| Path | Page |
-|---|---|
-| `/` | `HomePage` |
-| `/clinics`, `/dentists`, `/services`, `/about`, `/contact` | Public pages |
-| `/login`, `/register` | `LoginPage`, `RegisterPage` |
-| `/patient/dashboard` | `PatientDashboardPage` |
-| `/patient/book` (optional `?clinic=<id>`) | `BookAppointmentPage` |
-| `/patient/appointments` | `AppointmentHistoryPage` |
-| `/patient/appointments/<id>` | `AppointmentDetailsPage` |
-| `/patient/appointments/<id>/reschedule` | `RescheduleAppointmentPage` |
-| `/patient/reviews` (optional `?appointment=<id>`) | `FeedbackPage` |
-| `/patient/notifications` | `NotificationsPage` |
-| `/patient/clinics` | `PatientFindClinicsPage`: the clinic directory with the signed-in header |
-| `/patient/clinics/<id>` | `ClinicDetailsPage` |
-| `/patient/saved-clinics` | `SavedClinicsPage` |
-| `/patient/clinic-locator` | `ClinicLocatorPage` |
-| `/patient/profile` | `ProfilePage` |
-| `/patient/profile/edit` | `EditProfilePage` |
-| `/patient/profile/password` | `ChangePasswordPage` |
-
-All patient sidebar pages are built. Unknown paths fall back to the homepage.
+Guards (`auth/RequireAuth.jsx`) only redirect. The API decides what each user may see and do.
 
 ## Styling
 
@@ -102,17 +90,12 @@ All patient sidebar pages are built. Unknown paths fall back to the homepage.
 - Success screens (reschedule, review, profile updated, password changed) reuse `components/patient/SuccessCard.jsx`.
 - No inline styles. No emoji in place of icons; add an icon to `components/Icon.jsx` instead.
 
-## Mock data and UI text
+## Static content and UI text
 
-- All sample data lives in `mocks/`, with a comment at the top of each file saying it is mock data.
-- Components receive data through props, and pages import the mocks. That way, swapping in API data touches the page, not the components.
-- Three older homepage sections still import their mocks directly. Move these to props when the homepage is connected:
-  - `components/home/ClinicsMapSection.jsx`
-  - `components/home/FeaturedClinics.jsx`
-  - `components/home/Testimonials.jsx`
-- Mocks reuse each other instead of copying values. For example, `mocks/bookingClinics.js` picks clinics from `mocks/directoryClinics.js`.
-- Fixed UI text taken from Figma is marked `PROVISIONAL` and kept in `config/`, for example `config/booking.js` and `config/reviews.js`.
-- Every place that should call the API but only pretends to is marked with a `// MOCK` comment. See the list in [BACKEND_INTEGRATION.md](BACKEND_INTEGRATION.md#mock-actions-to-replace).
+- Business data (clinics, services, prices, dentists, reviews, appointments) comes from the API. Don't add new mock business data.
+- The only remaining files in `mocks/` are the About and Contact page copy. Each has a comment saying it is static content.
+- Components receive data through props. Pages fetch it with services.
+- Fixed UI text taken from Figma is marked `PROVISIONAL` and kept in `config/`, for example `config/booking.js` and `config/reviews.js`. The privacy notice and terms in `config/legal.js` are drafts pending legal review.
 
 ## Accessibility patterns already used
 
