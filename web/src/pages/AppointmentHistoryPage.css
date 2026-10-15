@@ -1,0 +1,20 @@
+/* List column width estimated from Figma; centered like the booking flow. */
+.appointment-history {
+  max-width: 768px;
+  margin: 0 auto;
+}
+
+.appointment-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.appointment-history-empty {
+  margin-top: var(--space-6);
+  color: var(--color-text-muted);
+  text-align: center;
+}

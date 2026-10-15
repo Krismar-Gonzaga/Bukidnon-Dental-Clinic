@@ -1,0 +1,262 @@
+/* List and map columns, widths estimated from Figma. This page uses the full
+   content width because the map needs the room. */
+.clinic-locator {
+  display: grid;
+  grid-template-columns: 288px minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.clinic-locator-list-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.clinic-locator-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.clinic-locator-search:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 0;
+}
+
+.clinic-locator-search input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+}
+
+.clinic-locator-search input:focus {
+  outline: none;
+}
+
+/* Scrolls on its own so the map stays in view. */
+.clinic-locator-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 560px;
+  margin: 0;
+  padding: 2px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.clinic-locator-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  text-align: left;
+}
+
+.clinic-locator-item:hover {
+  border-color: var(--color-placeholder);
+}
+
+.clinic-locator-item.is-selected {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-soft);
+}
+
+.clinic-locator-item-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.clinic-locator-item-name {
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.clinic-locator-item-location {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.clinic-locator-empty {
+  color: var(--color-text-muted);
+}
+
+.clinic-locator-map-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* TEMPORARY placeholder map until a map provider is integrated. */
+.clinic-locator-map {
+  position: relative;
+  height: 480px;
+  border-radius: var(--radius-xl);
+  background-color: var(--color-map-placeholder);
+}
+
+.clinic-locator-map-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  transform: translate(-50%, -50%);
+  color: var(--color-text-muted);
+  font-size: 0.9375rem;
+}
+
+.clinic-locator-map-label svg {
+  color: var(--color-placeholder);
+}
+
+.clinic-locator-map-sub {
+  font-size: 0.8125rem;
+}
+
+.clinic-locator-pin {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--color-surface);
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  box-shadow: var(--shadow-md);
+  transform: translate(-50%, -50%);
+}
+
+.clinic-locator-pin.is-selected {
+  width: 40px;
+  height: 40px;
+  background-color: var(--color-primary-hover);
+  box-shadow: var(--shadow-lg);
+}
+
+.clinic-locator-selected {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.clinic-locator-selected-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.clinic-locator-selected-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.clinic-locator-selected-name {
+  color: var(--color-primary);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.clinic-locator-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px 10px;
+  border: 1px solid var(--color-success-border);
+  border-radius: 999px;
+  background-color: var(--color-success-soft);
+  color: var(--color-success-text);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.clinic-locator-selected-address,
+.clinic-locator-selected-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
+.clinic-locator-selected-address {
+  gap: var(--space-1);
+}
+
+.clinic-locator-selected-hours {
+  margin-left: var(--space-3);
+  font-size: 0.8125rem;
+}
+
+.clinic-locator-selected-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-3);
+}
+
+.clinic-locator-details {
+  border-color: var(--color-text-muted);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.clinic-locator-details:hover {
+  background-color: var(--color-neutral-soft);
+}
+
+@media (max-width: 1100px) {
+  .clinic-locator {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .clinic-locator-list {
+    max-height: 320px;
+  }
+
+  .clinic-locator-map {
+    height: 360px;
+  }
+}
+
+@media (max-width: 600px) {
+  .clinic-locator-selected {
+    flex-wrap: wrap;
+  }
+
+  .clinic-locator-selected-actions {
+    width: 100%;
+  }
+
+  .clinic-locator-selected-actions .btn {
+    flex: 1;
+  }
+}

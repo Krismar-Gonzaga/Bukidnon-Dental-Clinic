@@ -1,0 +1,107 @@
+.booking-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.booking-option:hover {
+  border-color: var(--color-placeholder);
+}
+
+.booking-option.is-selected {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-soft);
+}
+
+.booking-option:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.booking-option.is-disabled {
+  border-color: var(--color-neutral-soft);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Leading tile: square icon or initial on an accent color (--color-avatar-N) */
+.booking-option-media {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  color: var(--color-on-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.booking-option-media--1 {
+  background-color: var(--color-avatar-1);
+}
+
+.booking-option-media--2 {
+  background-color: var(--color-avatar-2);
+}
+
+.booking-option-media--3 {
+  background-color: var(--color-avatar-3);
+}
+
+.booking-option-media--4 {
+  background-color: var(--color-avatar-4);
+}
+
+.booking-option-media--5 {
+  background-color: var(--color-avatar-5);
+}
+
+.booking-option-media--6 {
+  background-color: var(--color-avatar-6);
+}
+
+.booking-option-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.booking-option-title {
+  font-weight: var(--font-weight-semibold);
+}
+
+.booking-option-subtitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* Reserves space so trailing info stays aligned whether or not a row is selected */
+.booking-option-check {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 18px;
+  color: var(--color-primary);
+}
+
+@media (max-width: 480px) {
+  .booking-option {
+    flex-wrap: wrap;
+  }
+
+  .booking-option-aside {
+    order: 1;
+    margin-left: calc(48px + var(--space-4));
+  }
+}

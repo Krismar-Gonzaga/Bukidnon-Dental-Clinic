@@ -1,0 +1,150 @@
+/* Two columns, ratio estimated from the Figma clinic details page. */
+.clinic-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.clinic-overview-main,
+.clinic-overview-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.clinic-overview-card {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.clinic-overview-title {
+  margin-bottom: var(--space-4);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.clinic-overview-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.clinic-overview-info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.clinic-overview-info-row svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-primary);
+}
+
+.clinic-overview-info-row dt {
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.clinic-overview-info-row dd {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.clinic-overview-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+/* TEMPORARY photo placeholders: the clinic's gradient at fading strengths */
+.clinic-overview-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-lg);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.clinic-overview-photo:nth-child(2) {
+  opacity: 0.7;
+}
+
+.clinic-overview-photo:nth-child(3) {
+  opacity: 0.4;
+}
+
+.clinic-overview-photo--accent-1 {
+  background: var(--gradient-accent-1);
+}
+
+.clinic-overview-photo--accent-2 {
+  background: var(--gradient-accent-2);
+}
+
+.clinic-overview-photo--accent-3 {
+  background: var(--gradient-accent-3);
+}
+
+.clinic-overview-photo--accent-4 {
+  background: var(--gradient-accent-4);
+}
+
+.clinic-overview-photo--accent-5 {
+  background: var(--gradient-accent-5);
+}
+
+.clinic-overview-photo--accent-6 {
+  background: var(--gradient-accent-6);
+}
+
+/* TEMPORARY map placeholder until a map provider is integrated */
+.clinic-overview-map {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 160px;
+  border-radius: var(--radius-lg);
+  background-color: var(--color-background);
+  color: var(--color-placeholder);
+}
+
+.clinic-overview-address {
+  margin-top: var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.clinic-overview-maps-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.clinic-overview-text {
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
+.clinic-overview-book {
+  width: 100%;
+  margin-top: var(--space-4);
+}
+
+@media (max-width: 900px) {
+  .clinic-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

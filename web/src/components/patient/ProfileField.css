@@ -1,0 +1,58 @@
+.profile-field-label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.profile-field-wrap {
+  position: relative;
+}
+
+.profile-field-control {
+  display: block;
+  width: 100%;
+  height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  font: inherit;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+}
+
+.profile-field-control:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 0;
+  border-color: var(--color-primary);
+}
+
+.profile-field-control.has-icon {
+  padding-left: 40px;
+}
+
+.profile-field-select {
+  padding-right: 40px;
+  appearance: none;
+}
+
+.profile-field-icon,
+.profile-field-chevron {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.profile-field-icon {
+  left: var(--space-3);
+}
+
+.profile-field-chevron {
+  right: var(--space-3);
+}

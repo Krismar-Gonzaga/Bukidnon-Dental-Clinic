@@ -1,0 +1,196 @@
+.clinic-details-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+}
+
+.clinic-details-page main {
+  flex: 1;
+}
+
+.clinic-details-container {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+/* Banner height and colors estimated from Figma; the large icon is a
+   TEMPORARY stand-in for a clinic cover photo. */
+.clinic-details-hero {
+  position: relative;
+  overflow: hidden;
+  padding: var(--space-9) 0 var(--space-6);
+  color: var(--color-on-dark);
+}
+
+.clinic-details-hero--accent-1 {
+  background: var(--gradient-accent-1);
+}
+
+.clinic-details-hero--accent-2 {
+  background: var(--gradient-accent-2);
+}
+
+.clinic-details-hero--accent-3 {
+  background: var(--gradient-accent-3);
+}
+
+.clinic-details-hero--accent-4 {
+  background: var(--gradient-accent-4);
+}
+
+.clinic-details-hero--accent-5 {
+  background: var(--gradient-accent-5);
+}
+
+.clinic-details-hero--accent-6 {
+  background: var(--gradient-accent-6);
+}
+
+.clinic-details-hero-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.clinic-details-hero .clinic-details-container {
+  position: relative;
+}
+
+.clinic-details-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clinic-details-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.12);
+  color: var(--color-on-dark);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.clinic-details-tag--verified {
+  border-color: var(--color-success-border);
+  background-color: var(--color-success-soft);
+  color: var(--color-success-text);
+}
+
+.clinic-details-name {
+  margin-top: var(--space-3);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+}
+
+.clinic-details-address {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--color-on-dark-muted);
+}
+
+/* Content column width estimated from Figma (left-aligned under the banner text). */
+.clinic-details-body {
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-8);
+}
+
+.clinic-details-body > * {
+  max-width: 1056px;
+}
+
+.clinic-details-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.clinic-details-rating {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.9375rem;
+}
+
+.clinic-details-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.clinic-details-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.clinic-details-save:hover {
+  background-color: var(--color-neutral-soft);
+}
+
+.clinic-details-save.is-saved {
+  color: var(--color-heart);
+}
+
+.clinic-details-save.is-saved svg {
+  fill: currentColor;
+}
+
+.clinic-details-panel {
+  padding-top: var(--space-6);
+}
+
+.clinic-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clinic-details-empty,
+.clinic-details-missing {
+  color: var(--color-text-muted);
+}
+
+.clinic-details-missing {
+  padding-top: var(--space-8);
+  padding-bottom: var(--space-8);
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .clinic-details-container {
+    padding: 0 var(--space-4);
+  }
+
+  .clinic-details-hero {
+    padding-top: var(--space-8);
+  }
+
+  .clinic-details-name {
+    font-size: var(--font-size-xl);
+  }
+}

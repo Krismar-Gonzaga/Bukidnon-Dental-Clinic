@@ -1,0 +1,49 @@
+.dashboard-stat-card {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+}
+
+.dashboard-stat-icon--blue {
+  background-color: var(--color-primary-soft);
+  color: var(--color-avatar-1);
+}
+
+.dashboard-stat-icon--green {
+  background-color: var(--color-success-icon-bg);
+  color: var(--color-success-icon);
+}
+
+.dashboard-stat-icon--red {
+  background-color: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.dashboard-stat-icon--amber {
+  background-color: var(--color-warning-soft);
+  color: var(--color-rating);
+}
+
+.dashboard-stat-value {
+  margin-top: var(--space-4);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.2;
+}
+
+.dashboard-stat-label {
+  margin-top: var(--space-1);
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}

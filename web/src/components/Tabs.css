@@ -1,0 +1,62 @@
+.tabs {
+  display: flex;
+  gap: var(--space-5);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tabs-tab {
+  position: relative;
+  padding: var(--space-3) 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.tabs-tab.is-active {
+  color: var(--color-primary);
+}
+
+.tabs-tab.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background-color: var(--color-primary);
+}
+
+/* Pill variant: segmented control on a grey track (profile pages). */
+.tabs--pill {
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-bottom: 0;
+  border-radius: var(--radius-md);
+  background-color: var(--color-neutral-soft);
+}
+
+.tabs--pill .tabs-tab {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.tabs--pill .tabs-tab.is-active {
+  background-color: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.tabs--pill .tabs-tab.is-active::after {
+  content: none;
+}

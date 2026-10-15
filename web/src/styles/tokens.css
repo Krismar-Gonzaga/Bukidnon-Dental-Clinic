@@ -43,6 +43,39 @@
   --color-avatar-4: #f2245a;
   --color-avatar-5: #fb6b0a;
   --color-avatar-6: #06b0d8;
+  /* Patient dashboard status and stat-icon tones, estimated from Figma */
+  --color-pending: #b7791f;
+  --color-pending-text: #a16207;
+  --color-pending-soft: #fdf8e8;
+  --color-pending-border: #f3e2a6;
+  --color-pending-icon-bg: #fdeeb5;
+  --color-highlight-on-dark: #ffd84d;
+  --color-danger: #ef3b3b;
+  --color-danger-soft: #fdecec;
+  --color-warning-soft: #fdf3e2;
+  --color-success-icon: #22a35a;
+  --color-success-icon-bg: #e8f7ee;
+  /* Appointment status badge tones, estimated from Figma */
+  --color-info-text: #1d4ed8;
+  --color-info-border: #bfd3fb;
+  --color-danger-text: #c81e1e;
+  --color-danger-border: #f8c4c4;
+  /* Clinic tile and banner gradients, numbered like --color-avatar-N
+     (1 blue, 2 teal, 3 purple, 4 pink, 5 orange, 6 cyan); estimated from Figma */
+  --gradient-accent-1: linear-gradient(135deg, #3f93ff 0%, #1b5cf5 100%);
+  --gradient-accent-2: linear-gradient(135deg, #00c9a7 0%, #00957a 100%);
+  --gradient-accent-3: linear-gradient(135deg, #c063f5 0%, #9b1cf2 100%);
+  --gradient-accent-4: linear-gradient(135deg, #ff5a7a 0%, #e8004d 100%);
+  --gradient-accent-5: linear-gradient(135deg, #ff8a00 0%, #f25a0c 100%);
+  --gradient-accent-6: linear-gradient(135deg, #00c2e8 0%, #0096c2 100%);
+  /* Saved-clinic heart */
+  --color-heart: #f25c5c;
+  /* Placeholder map background */
+  --color-map-placeholder: #e4e7ec;
+  /* Modal backdrop */
+  --color-overlay: rgba(19, 33, 59, 0.45);
+  /* Booking flow star color, estimated from Figma */
+  --color-rating-strong: #f58a2a;
   --color-footer-bg: #0a2a5e;
   --color-on-dark: #ffffff;
   --color-on-dark-muted: rgba(255, 255, 255, 0.72);

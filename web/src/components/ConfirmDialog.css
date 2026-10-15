@@ -1,0 +1,73 @@
+.confirm-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background-color: var(--color-overlay);
+}
+
+/* Dialog width estimated from the Figma cancel-request modal. */
+.confirm-dialog {
+  width: 100%;
+  max-width: 448px;
+  padding: var(--space-6);
+  border-radius: var(--radius-xl);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+
+.confirm-dialog-icon {
+  display: inline-flex;
+}
+
+.confirm-dialog--danger .confirm-dialog-icon {
+  color: var(--color-danger);
+}
+
+.confirm-dialog-title {
+  margin-top: var(--space-3);
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-bold);
+}
+
+.confirm-dialog-message {
+  margin-top: var(--space-2);
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
+.confirm-dialog-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.confirm-dialog-cancel {
+  border-color: var(--color-text-muted);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.confirm-dialog-cancel:hover {
+  background-color: var(--color-neutral-soft);
+}
+
+.confirm-dialog--danger .confirm-dialog-confirm {
+  background-color: var(--color-danger);
+  color: var(--color-on-primary);
+}
+
+.confirm-dialog--danger .confirm-dialog-confirm:hover {
+  background-color: var(--color-danger-text);
+}
+
+@media (max-width: 420px) {
+  .confirm-dialog-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

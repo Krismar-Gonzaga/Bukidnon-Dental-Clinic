@@ -1,0 +1,67 @@
+.dashboard-notifications-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background-color: var(--color-danger);
+  color: var(--color-on-primary);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.dashboard-notifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dashboard-notification {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-md);
+}
+
+.dashboard-notification.is-unread {
+  background-color: var(--color-primary-soft);
+}
+
+.dashboard-notification-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background-color: var(--color-placeholder);
+}
+
+.is-unread .dashboard-notification-dot {
+  background-color: var(--color-avatar-1);
+}
+
+.dashboard-notification-title {
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.4;
+}
+
+.dashboard-notification-time {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.dashboard-notifications-all {
+  display: block;
+  margin-top: var(--space-4);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}

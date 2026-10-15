@@ -6,6 +6,7 @@ import './DirectoryPageLayout.css';
 // header, intro band, optional filter bar, content area, footer.
 function DirectoryPageLayout({
   activeHref,
+  account,
   title,
   description,
   filters,
@@ -16,7 +17,7 @@ function DirectoryPageLayout({
 }) {
   return (
     <div className="directory-page">
-      <SiteHeader activeHref={activeHref} />
+      <SiteHeader activeHref={activeHref} account={account} />
 
       <main className="directory-page-main">
         <section

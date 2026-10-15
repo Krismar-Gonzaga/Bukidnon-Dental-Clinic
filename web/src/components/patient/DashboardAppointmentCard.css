@@ -1,0 +1,100 @@
+.dashboard-appointment {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-appointment.is-pending {
+  border-color: var(--color-pending-border);
+  background-color: var(--color-pending-soft);
+}
+
+.dashboard-appointment-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background-color: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.is-pending .dashboard-appointment-icon {
+  background-color: var(--color-pending-icon-bg);
+  color: var(--color-pending);
+}
+
+.dashboard-appointment-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard-appointment-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dashboard-appointment-service {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.dashboard-appointment-badge {
+  padding: 2px 10px;
+  border: 1px solid var(--color-pending-border);
+  border-radius: 999px;
+  background-color: var(--color-surface);
+  color: var(--color-pending-text);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.dashboard-appointment-meta {
+  margin-top: var(--space-1);
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
+.dashboard-appointment-note,
+.dashboard-appointment-time {
+  margin-top: 2px;
+  font-size: 0.8125rem;
+}
+
+.dashboard-appointment-note {
+  color: var(--color-pending-text);
+}
+
+.dashboard-appointment-time {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+}
+
+.dashboard-appointment-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-2);
+}
+
+@media (max-width: 600px) {
+  .dashboard-appointment {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .dashboard-appointment-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

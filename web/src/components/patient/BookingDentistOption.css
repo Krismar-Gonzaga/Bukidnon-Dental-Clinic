@@ -1,0 +1,13 @@
+.booking-availability {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-neutral-soft);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.booking-availability.is-available {
+  background-color: var(--color-success-soft);
+  color: var(--color-success-text);
+}

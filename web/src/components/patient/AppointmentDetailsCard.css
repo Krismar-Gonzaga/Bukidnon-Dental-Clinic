@@ -1,0 +1,133 @@
+.appointment-details {
+  padding: var(--space-6);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+
+.appointment-details-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.appointment-details-title {
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-bold);
+}
+
+.appointment-details-reference {
+  margin-top: var(--space-1);
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
+.appointment-details-rows {
+  margin: var(--space-3) 0 0;
+}
+
+.appointment-details-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+}
+
+.appointment-details-row + .appointment-details-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.appointment-details-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background-color: var(--color-background);
+  color: var(--color-primary);
+}
+
+.appointment-details-row dt {
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.appointment-details-row dd {
+  margin: 2px 0 0;
+  font-size: 0.9375rem;
+}
+
+/* Status-specific notice below the rows, e.g. awaiting approval */
+.appointment-details-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-pending-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-pending-soft);
+  color: var(--color-pending-text);
+}
+
+.appointment-details-notice svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-pending);
+}
+
+.appointment-details-notice-title {
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.appointment-details-notice-text {
+  margin-top: 2px;
+  font-size: 0.8125rem;
+}
+
+/* Pending: one full-width cancel button. Upcoming: Reschedule + Cancel side by side. */
+.appointment-details-actions {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.appointment-details-reschedule {
+  border-color: var(--color-text-muted);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.appointment-details-reschedule:hover {
+  background-color: var(--color-neutral-soft);
+}
+
+.appointment-details-cancel {
+  border-color: var(--color-danger-border);
+  background-color: var(--color-surface);
+  color: var(--color-danger-text);
+}
+
+.appointment-details-cancel:hover {
+  background-color: var(--color-danger-soft);
+}
+
+@media (max-width: 600px) {
+  .appointment-details {
+    padding: var(--space-5) var(--space-4);
+  }
+}
+
+@media (max-width: 480px) {
+  .appointment-details-actions {
+    grid-auto-flow: row;
+  }
+}

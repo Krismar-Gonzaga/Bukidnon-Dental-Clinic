@@ -8,9 +8,10 @@ import {
 } from '../config/navigation';
 import './SiteHeader.css';
 
-// Login and Register link to the account pages.
+// Login and Register link to the account pages. When `account` ({ name, href })
+// is given, a "My Account" link replaces them for a signed-in user.
 // Below the desktop breakpoint, nav and actions collapse into a menu panel.
-function SiteHeader({ activeHref = '/' }) {
+function SiteHeader({ activeHref = '/', account }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -68,16 +69,27 @@ function SiteHeader({ activeHref = '/' }) {
           </nav>
 
           <div className="site-header-actions">
-            <a href={LOGIN_HREF} className="btn btn-outline" onClick={closeMenu}>
-              Login
-            </a>
-            <a
-              href={REGISTER_HREF}
-              className="btn btn-primary"
-              onClick={closeMenu}
-            >
-              Register
-            </a>
+            {account ? (
+              <a href={account.href} className="site-header-account" onClick={closeMenu}>
+                <span className="site-header-account-avatar" aria-hidden="true">
+                  {account.name.trim().charAt(0).toUpperCase()}
+                </span>
+                My Account
+              </a>
+            ) : (
+              <>
+                <a href={LOGIN_HREF} className="btn btn-outline" onClick={closeMenu}>
+                  Login
+                </a>
+                <a
+                  href={REGISTER_HREF}
+                  className="btn btn-primary"
+                  onClick={closeMenu}
+                >
+                  Register
+                </a>
+              </>
+            )}
           </div>
         </div>
       </div>

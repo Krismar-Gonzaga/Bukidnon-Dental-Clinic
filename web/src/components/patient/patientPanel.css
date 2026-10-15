@@ -1,0 +1,50 @@
+/* Shared white side-panel card for the patient dashboard. */
+.patient-panel {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.patient-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.patient-panel-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Small action buttons used on patient appointment cards. */
+.patient-btn-sm {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-medium);
+}
+
+.patient-btn-outline {
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.patient-btn-outline:hover {
+  background-color: var(--color-neutral-soft);
+}
+
+/* "‹ Back to …" link above a patient page's main card. */
+.patient-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+  color: var(--color-text);
+  font-size: 0.9375rem;
+}
