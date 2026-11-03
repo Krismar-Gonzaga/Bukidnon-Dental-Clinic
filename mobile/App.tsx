@@ -26,10 +26,7 @@ function App() {
         <AuthProvider>
           {/* Offline-first data layer: local database, connectivity and background sync */}
           <SyncProvider>
-            <StatusBar
-              barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-              backgroundColor={isDarkMode ? '#1a202c' : '#ffffff'}
-            />
+            <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
             <AppNavigator />
           </SyncProvider>
         </AuthProvider>

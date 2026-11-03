@@ -1,0 +1,475 @@
+/* Admin data pages (Verification, Audit Logs). Colors: clinic design roles on
+   .clinic-shell (ClinicShell.css); cards and overlines: AdminLayout.css. */
+
+/* ---------- Page header ---------- */
+.admin-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.admin-page-heading {
+  margin: 0 0 var(--space-1);
+  font-size: 2rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.3;
+  color: var(--clinic-on-surface);
+}
+
+.admin-page-lead {
+  max-width: 42rem;
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--clinic-on-surface-variant);
+}
+
+.admin-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.admin-page-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* ---------- Metric cards ---------- */
+.admin-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+
+.admin-metric {
+  padding: var(--space-6);
+  border: 1px solid var(--admin-card-border);
+  border-radius: var(--admin-card-radius);
+  background-color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-metric .admin-overline {
+  margin: 0 0 var(--space-1);
+}
+
+.admin-metric-value {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.3;
+  color: var(--clinic-on-surface);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-metric-value.is-primary {
+  color: var(--clinic-primary);
+}
+
+.admin-metric-value.is-danger,
+.admin-metric-note.is-danger {
+  color: var(--clinic-error);
+}
+
+.admin-metric-value.is-success,
+.admin-metric-note.is-success {
+  color: var(--clinic-secondary);
+}
+
+.admin-metric-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: var(--space-3) 0 0;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--clinic-on-surface-variant);
+}
+
+/* ---------- Status pill ---------- */
+.admin-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.admin-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.admin-pill.is-success {
+  background-color: rgba(0, 108, 79, 0.1);
+  color: var(--clinic-secondary);
+}
+
+.admin-pill.is-primary {
+  background-color: rgba(0, 63, 135, 0.1);
+  color: var(--clinic-primary);
+}
+
+.admin-pill.is-warning {
+  background-color: #fff1d6;
+  color: #7a4b00;
+}
+
+.admin-pill.is-danger {
+  background-color: var(--clinic-error-container);
+  color: #93000a;
+}
+
+.admin-pill.is-neutral {
+  background-color: var(--clinic-surface-high);
+  color: var(--clinic-on-surface-variant);
+}
+
+/* ---------- Initials ---------- */
+.admin-initials {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-bold);
+}
+
+.admin-initials.is-square {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+.admin-initials.is-primary {
+  background-color: rgba(0, 63, 135, 0.1);
+  color: var(--clinic-primary);
+}
+
+.admin-initials.is-neutral {
+  background-color: var(--clinic-tertiary-fixed);
+  color: #141d23;
+}
+
+.admin-initials.is-danger {
+  background-color: var(--clinic-error-container);
+  color: #93000a;
+}
+
+/* ---------- Table card ---------- */
+.admin-table-card {
+  overflow: hidden;
+  border: 1px solid var(--admin-card-border);
+  border-radius: var(--admin-card-radius);
+  background-color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--admin-card-border);
+  background-color: rgba(241, 244, 249, 0.3);
+}
+
+.admin-table-card .admin-table td,
+.admin-table-card .admin-table th {
+  padding-left: var(--space-6);
+  padding-right: var(--space-6);
+}
+
+.admin-cell-person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.admin-cell-title {
+  margin: 0;
+  font-weight: var(--font-weight-bold);
+  color: var(--clinic-on-surface);
+}
+
+.admin-cell-sub {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--clinic-on-surface-variant);
+}
+
+.admin-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.admin-link-button {
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+  color: var(--clinic-primary);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.admin-link-button:hover,
+.admin-link-button:focus-visible {
+  text-decoration: underline;
+}
+
+.admin-icon-button {
+  display: inline-flex;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--clinic-on-surface-variant);
+  cursor: pointer;
+}
+
+.admin-icon-button:hover,
+.admin-icon-button:focus-visible {
+  background-color: var(--clinic-surface-high);
+  color: var(--clinic-primary);
+}
+
+/* ---------- Segmented tabs ---------- */
+.admin-segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--admin-card-border);
+  border-radius: 8px;
+  background-color: var(--clinic-surface);
+}
+
+.admin-segmented-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-4);
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+  color: var(--clinic-on-surface-variant);
+  cursor: pointer;
+}
+
+.admin-segmented-tab:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.admin-segmented-tab.is-active {
+  background-color: #ffffff;
+  box-shadow: var(--shadow-sm);
+  color: var(--clinic-primary);
+}
+
+.admin-segmented-count {
+  min-width: 1.25rem;
+  padding: 0 var(--space-1);
+  border-radius: 999px;
+  background-color: var(--clinic-surface-high);
+  font-size: 0.6875rem;
+  text-align: center;
+}
+
+/* ---------- Table footer ---------- */
+.admin-table-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--admin-card-border);
+  background-color: rgba(241, 244, 249, 0.3);
+}
+
+.admin-table-count {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--clinic-on-surface-variant);
+}
+
+.admin-table-footer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.admin-per-page {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--clinic-on-surface-variant);
+}
+
+.admin-per-page select {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--admin-card-border);
+  border-radius: 6px;
+  background-color: #ffffff;
+  font: inherit;
+  color: var(--clinic-on-surface);
+}
+
+.admin-table-footer .pagination-button {
+  min-width: 32px;
+  height: 32px;
+}
+
+.admin-page-gap {
+  align-self: center;
+  padding: 0 var(--space-1);
+  color: var(--clinic-on-surface-variant);
+}
+
+/* ---------- Filter bar ---------- */
+.admin-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  border: 1px solid var(--admin-card-border);
+  border-radius: var(--admin-card-radius);
+  background-color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-filter {
+  display: flex;
+  flex: 1 1 12rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.admin-filter-label {
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #727784;
+}
+
+.admin-filter select,
+.admin-filter input {
+  width: 100%;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--clinic-outline-variant);
+  border-radius: 8px;
+  background-color: var(--clinic-surface);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  color: var(--clinic-on-surface);
+}
+
+.admin-filter select:focus-visible,
+.admin-filter input:focus-visible {
+  outline: 2px solid var(--clinic-primary);
+  outline-offset: 1px;
+}
+
+.admin-filter.admin-filter-dates {
+  flex: 2 1 20rem;
+  flex-direction: row;
+  gap: var(--space-2);
+}
+
+.admin-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  background-color: var(--clinic-primary-fixed);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--clinic-on-primary-fixed);
+}
+
+.admin-chip button {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ---------- Notices ---------- */
+.admin-inline-status {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-sm);
+}
+
+.admin-inline-status.is-error {
+  color: var(--clinic-error);
+}
+
+.admin-inline-status.is-success {
+  color: var(--clinic-secondary);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1100px) {
+  .admin-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-metrics {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+  }
+
+  .admin-page-heading {
+    font-size: 1.75rem;
+  }
+
+  .admin-table-toolbar,
+  .admin-table-footer {
+    padding: var(--space-4);
+  }
+
+  .admin-table-card .admin-table td,
+  .admin-table-card .admin-table th {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+}

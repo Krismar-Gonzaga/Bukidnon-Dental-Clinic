@@ -9,6 +9,7 @@ use App\Models\InventoryItem;
 use App\Models\InventoryMovement;
 use App\Services\AuditLogger;
 use App\Services\InventoryService;
+use App\Support\BusinessTime;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -29,7 +30,7 @@ class InventoryController extends Controller
         ]);
 
         $items = $clinic->inventoryItems()
-            ->with(['category'])
+            ->with(['category', 'batches.supplier'])
             ->when($request->filled('search'), fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($request->search).'%']))
             ->when($request->filled('category_id'), fn ($q) => $q->where('category_id', $request->category_id))
             ->when($request->status === 'inactive', fn ($q) => $q->where('is_active', false), fn ($q) => $q->where('is_active', true))
@@ -42,6 +43,29 @@ class InventoryController extends Controller
         }
 
         return $this->ok($items);
+    }
+
+    /** Stock history across the clinic's items, newest first. */
+    public function movements(Request $request, Clinic $clinic)
+    {
+        $page = InventoryMovement::query()
+            ->whereIn('inventory_item_id', $clinic->inventoryItems()->select('id'))
+            ->with(['item:id,name,unit', 'performedBy:id,name'])
+            ->latest('created_at')->latest('id')
+            ->paginate($this->perPage($request, 15));
+
+        return $this->paginated($page, fn (InventoryMovement $m) => [
+            'id' => $m->id,
+            'item_id' => $m->inventory_item_id,
+            'item' => $m->item?->name,
+            'unit' => $m->item?->unit,
+            'type' => $m->type,
+            'quantity' => $m->quantity,
+            'balance_after' => $m->balance_after,
+            'reason' => $m->reason,
+            'performed_by' => $m->performedBy?->name,
+            'at' => BusinessTime::iso($m->created_at),
+        ]);
     }
 
     public function show(Clinic $clinic, InventoryItem $inventoryItem)
@@ -162,8 +186,10 @@ class InventoryController extends Controller
 
         return [
             'name' => [$need, 'string', 'max:255'],
+            'brand' => ['sometimes', 'nullable', 'string', 'max:100'],
             'description' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'unit' => [$need, 'string', 'max:30'],
+            'unit_cost' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:99999999'],
             'minimum_stock' => ['sometimes', 'integer', 'min:0', 'max:1000000'],
             'category_id' => ['sometimes', 'nullable', 'integer', Rule::exists('inventory_categories', 'id')->where('clinic_id', $clinic->id)],
             'branch_id' => ['sometimes', 'nullable', 'integer', Rule::exists('clinic_branches', 'id')->where('clinic_id', $clinic->id)],

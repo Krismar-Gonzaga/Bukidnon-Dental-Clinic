@@ -26,7 +26,8 @@ const matchesQuery = (clinic, query) => {
   return !term || clinic.name.toLowerCase().includes(term) || clinic.location.toLowerCase().includes(term);
 };
 
-function Locator({ clinics }) {
+// Also the guest map page (ClinicMapPage), which passes its own links.
+export function Locator({ clinics, getDetailsHref = getPatientClinicHref, getBookHref = getBookClinicHref }) {
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState(clinics[0]?.id ?? null);
   const [origin, setOrigin] = useState(null);
@@ -150,6 +151,17 @@ function Locator({ clinics }) {
                 <StarRating rating={selected.rating} size={15} />
                 <span>{selected.rating.toFixed(1)}</span>
               </p>
+              <p className="clinic-locator-selected-links">
+                <a href={directionsUrl(selected, origin)} target="_blank" rel="noreferrer">
+                  Directions
+                  <span className="visually-hidden"> (opens Google Maps in a new tab)</span>
+                </a>
+                {!origin && (
+                  <button type="button" onClick={handleUseLocation} disabled={isLocating}>
+                    {isLocating ? 'Locating…' : 'Use My Location'}
+                  </button>
+                )}
+              </p>
               {locationError && (
                 <p className="clinic-locator-location-error" role="alert">
                   {locationError}
@@ -157,29 +169,10 @@ function Locator({ clinics }) {
               )}
             </div>
             <div className="clinic-locator-selected-actions">
-              <a
-                href={directionsUrl(selected, origin)}
-                className="btn clinic-locator-details"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Directions
-                <span className="visually-hidden"> (opens Google Maps in a new tab)</span>
-              </a>
-              {!origin && (
-                <button
-                  type="button"
-                  className="btn clinic-locator-details"
-                  onClick={handleUseLocation}
-                  disabled={isLocating}
-                >
-                  {isLocating ? 'Locating…' : 'Use My Location'}
-                </button>
-              )}
-              <a href={getPatientClinicHref(selected.id)} className="btn clinic-locator-details">
+              <a href={getDetailsHref(selected.id)} className="btn clinic-locator-details">
                 Details
               </a>
-              <a href={getBookClinicHref(selected.id)} className="btn btn-primary">
+              <a href={getBookHref(selected.id)} className="btn btn-primary">
                 Book
               </a>
             </div>

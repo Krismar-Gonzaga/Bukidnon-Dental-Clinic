@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import ClinicLayout, { useClinic } from '../../layouts/ClinicLayout';
+import ClinicLayout, { useClinic, useClinicAccess } from '../../layouts/ClinicLayout';
+import { ClinicProfileTabs } from '../../components/clinic/ClinicUi';
 import { Badge, Checkbox, DataTable, Field, FormError, Modal, Section } from '../../components/portal/PortalUi';
 import WeeklyHoursEditor from '../../components/portal/WeeklyHoursEditor';
 import { QueryState } from '../../components/StatusMessage';
@@ -104,7 +106,11 @@ function HoursModal({ branch, onClose }) {
 
 function Branches() {
   const { clinicId, can } = useClinic();
-  const [modal, setModal] = useState(null);
+  // ?new=1 (the sidebar's Add New Branch) opens the add-branch form.
+  const [searchParams] = useSearchParams();
+  const [modal, setModal] = useState(() =>
+    searchParams.get('new') === '1' && can('clinic.branches.manage') ? { type: 'branch' } : null
+  );
   const query = useQuery({ queryKey: ['clinic', clinicId, 'branches'], queryFn: () => getBranches(clinicId) });
 
   return (
@@ -229,8 +235,10 @@ function ClosedDates() {
 }
 
 function ClinicBranchesPage() {
+  const { clinicId, can } = useClinicAccess();
   return (
-    <ClinicLayout section="branches" title="Branches & Hours" requires={['clinic.branches.manage', 'clinic.schedules.manage']}>
+    <ClinicLayout section="branches" title="Clinic Profile" subtitle="Branches & Hours" requires={['clinic.branches.manage', 'clinic.schedules.manage']}>
+      <ClinicProfileTabs clinicId={clinicId} can={can} active="branches" />
       <div className="portal-stack">
         <Branches />
         <ClosedDates />

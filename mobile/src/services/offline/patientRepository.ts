@@ -50,13 +50,16 @@ export const getCurrentUserId = async (): Promise<string | null> => {
 
 const userKey = (ownerId: string, name: string) => `patient:${ownerId}:${name}`;
 
-/** Network-first read that falls back to (and refreshes) the local copy. */
-const readThrough = async <T>(key: string, url: string, fallback: T) => {
+/**
+ * Network-first read that falls back to (and refreshes) the local copy. `forCache` chooses
+ * what is written to the device, for responses with parts that must not be stored there.
+ */
+const readThrough = async <T>(key: string, url: string, fallback: T, forCache: (value: T) => unknown = (value) => value) => {
   if (isOnline()) {
     try {
       const response = await api.get(url);
       const value = (response.data?.data ?? fallback) as T;
-      await writeCache(key, value);
+      await writeCache(key, forCache(value));
       return { value, offline: false, cachedAt: Date.now() };
     } catch (error) {
       if (!isNetworkError(error)) {
@@ -226,7 +229,8 @@ const getProfile = async (): Promise<OfflineResponse<Record<string, any>>> => {
   if (!ownerId) {
     return api.get('/patient/profile');
   }
-  const result = await readThrough<Record<string, any>>(userKey(ownerId, 'profile'), '/patient/profile', {});
+  // Health details are sensitive: they are shown when online and never stored on the device.
+  const result = await readThrough<Record<string, any>>(userKey(ownerId, 'profile'), '/patient/profile', {}, ({ health: _health, ...rest }) => rest);
   return respond(result.value ?? {}, { offline: result.offline, cachedAt: result.cachedAt });
 };
 
@@ -242,7 +246,32 @@ const updateProfile = async (data: Record<string, unknown>) => {
   return response;
 };
 
+const getDashboard = async () => {
+  const ownerId = await getCurrentUserId();
+  if (!ownerId) {
+    return api.get('/patient/dashboard');
+  }
+  const result = await readThrough<unknown>(userKey(ownerId, 'dashboard'), '/patient/dashboard', null);
+  return respond(result.value, { offline: result.offline, cachedAt: result.cachedAt });
+};
+
+const getSavedClinics = async () => {
+  const ownerId = await getCurrentUserId();
+  if (!ownerId) {
+    return api.get('/patient/saved-clinics');
+  }
+  const result = await readThrough<unknown[]>(userKey(ownerId, 'saved-clinics'), '/patient/saved-clinics', []);
+  return respond(result.value, { offline: result.offline, cachedAt: result.cachedAt });
+};
+
+const saveClinic = (clinicId: number | string) => api.put(`/patient/saved-clinics/${clinicId}`);
+const unsaveClinic = (clinicId: number | string) => api.delete(`/patient/saved-clinics/${clinicId}`);
+
 export const offlinePatientService = {
+  getDashboard,
+  getSavedClinics,
+  saveClinic,
+  unsaveClinic,
   getAppointments,
   createAppointment,
   rescheduleAppointment,

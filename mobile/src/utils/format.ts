@@ -3,6 +3,20 @@ export const formatPrice = (amount: number, currency = 'PHP') => {
   return `${symbol}${Math.round(amount).toLocaleString('en-US')}`;
 };
 
+export const formatPriceRange = (min: number | null, max: number | null, currency = 'PHP') => {
+  if (min === null) {
+    return 'Price on request';
+  }
+  return max === null || min === max ? formatPrice(min, currency) : `${formatPrice(min, currency)} – ${formatPrice(max, currency)}`;
+};
+
+export const formatDurationRange = (min: number | null, max: number | null) => {
+  if (min === null) {
+    return '';
+  }
+  return max === null || min === max ? `${min} min` : `${min}–${max} min`;
+};
+
 export const timeAgo = (timestamp: number | null | undefined) => {
   if (!timestamp) {
     return 'never';

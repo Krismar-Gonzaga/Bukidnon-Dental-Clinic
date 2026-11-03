@@ -1,612 +1,245 @@
-// src/screens/patient/PatientHomeScreen.tsx
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
-  RefreshControl,
-  SafeAreaView,
-  StatusBar,
-  Platform,
-} from 'react-native';
+// Patient dashboard, laid out like the website's. Reads through the offline layer, so the
+// last figures stay visible without a connection; notifications need one.
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useAuth } from '../../context/AuthContext';
-import { patientService } from '../../services/api';
-
-// Import common components
-import AppHeader from '../../components/navigation/AppHeader';
-import SideDrawer from '../../components/navigation/SideDrawer';
-import BottomNav from '../../components/navigation/BottomNav';
+import PatientShell from '../../components/patient/PatientShell';
+import { AppointmentCard } from '../../components/patient/PatientUi';
+import { Card, guestColors, Message } from '../../components/guest/GuestUi';
 import { useSync } from '../../context/SyncContext';
+import { patientService } from '../../services/api';
 import { AppNotification, fetchNotifications } from '../../services/notifications';
-import { formatClockTime, formatDateKey } from '../../services/booking';
+import { Appointment } from '../../services/patientPortal';
+import { spacing, type } from '../../theme/tokens';
+import { timeAgo } from '../../utils/format';
 
-// Types
-interface Appointment {
-  id: number;
-  clinic_name: string;
-  service: string;
-  /** YYYY-MM-DD in clinic time */
-  dateKey: string | null;
-  time: string;
-  location: string;
-  status: string;
-}
+type Dashboard = {
+  name: string;
+  upcoming: Appointment[];
+  counts: { upcoming: number; pending: number; completed: number; saved_clinics: number; reviews_given: number };
+  unread_notifications: number;
+};
 
-const UPCOMING = ['pending', 'confirmed', 'reschedule_requested', 'checked_in', 'in_progress'];
+const LATEST_NOTIFICATIONS = 3;
+
+const QUICK_ACTIONS = [
+  { label: 'Find a Clinic', icon: 'business-outline', route: 'GuestClinics' },
+  { label: 'Clinic Locator', icon: 'map-outline', route: 'ClinicLocator' },
+  { label: 'My Saved Clinics', icon: 'heart-outline', route: 'SavedClinics' },
+  { label: 'Leave a Review', icon: 'star-outline', route: 'Feedback' },
+];
+
+const greeting = (hour = new Date().getHours()) => (hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening');
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 const PatientHomeScreen = ({ navigation }: { navigation: any }) => {
-  const { user } = useAuth();
+  const { dataVersion, syncNow } = useSync();
+  const [data, setData] = useState<Dashboard | null>(null);
+  // Null until the first answer: "none yet" must not flash while they load.
+  const [notifications, setNotifications] = useState<AppNotification[] | null>(null);
+  const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
 
-  const { dataVersion, syncNow } = useSync();
-
-  // Re-read after each sync so offline bookings show their server status.
-  useEffect(() => {
-    fetchDashboardData();
-  }, [dataVersion]);
-
-  const fetchDashboardData = async () => {
+  const load = useCallback(async () => {
     try {
-      setLoading(true);
-      const appointmentsResponse = await patientService.getAppointments();
-      const transformedAppointments: Appointment[] = appointmentsResponse.data.data.map((apt: any) => ({
-        id: apt.id,
-        clinic_name: apt.clinic?.name || 'Dental Clinic',
-        service: apt.service?.name || apt.reason || 'Dental appointment',
-        dateKey: apt.appointment_date ?? null,
-        time: formatClockTime(apt.appointment_time),
-        location: apt.branch?.address || apt.clinic?.address || '',
-        status: apt.status || 'pending',
-      }));
-      setAppointments(transformedAppointments);
-
-      // Notifications are online-only; offline the section simply stays empty.
-      fetchNotifications()
-        .then((result) => {
-          setNotifications(result.notifications.slice(0, 3));
-          setUnreadCount(result.unreadCount);
-        })
-        .catch(() => undefined);
+      const response = await patientService.getDashboard();
+      setData(response.data.data as Dashboard | null);
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('Failed to load the dashboard:', error);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  };
+    try {
+      const latest = await fetchNotifications();
+      setNotifications(latest.notifications.slice(0, LATEST_NOTIFICATIONS));
+      setUnread(latest.unreadCount);
+    } catch {
+      // Offline: the section keeps what it last showed.
+      setNotifications((current) => current ?? []);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    return navigation.addListener?.('focus', load);
+  }, [load, navigation, dataVersion]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await syncNow();
-    fetchDashboardData();
+    await load();
+    setRefreshing(false);
   };
 
-  const toggleDrawer = () => {
-    setDrawerVisible(!drawerVisible);
-  };
+  const reschedule = (appointment: Appointment) => navigation.navigate('Reschedule', { appointment });
+  const counts = data?.counts;
+  const confirmed = counts ? Math.max(0, counts.upcoming - counts.pending) : 0;
 
-  const renderAppointmentCard = () => {
-    const upcomingAppointment = appointments
-      .filter((a) => UPCOMING.includes(a.status) && a.dateKey)
-      .sort((a, b) => `${a.dateKey} ${a.time}`.localeCompare(`${b.dateKey} ${b.time}`))[0];
-    if (!upcomingAppointment) {
-      return <Text style={styles.emptyText}>No upcoming visits. Book one when you're ready.</Text>;
-    }
-
-    return (
-      <View style={styles.appointmentCard}>
-        <View style={styles.appointmentBackgroundDecoration} />
-        <View style={styles.appointmentContent}>
-          <View style={styles.appointmentDateBox}>
-            <Text style={styles.appointmentMonth}>
-              {formatDateKey(upcomingAppointment.dateKey!, { month: 'short' })}
-            </Text>
-            <Text style={styles.appointmentDay}>
-              {formatDateKey(upcomingAppointment.dateKey!, { day: 'numeric' })}
-            </Text>
-          </View>
-          <View style={styles.appointmentInfo}>
-            <Text style={styles.appointmentService}>{upcomingAppointment.service}</Text>
-            <View style={styles.appointmentDetailRow}>
-              <Icon name="time-outline" size={16} color="#727784" />
-              <Text style={styles.appointmentDetailText}>{upcomingAppointment.time}</Text>
-            </View>
-            {upcomingAppointment.location ? (
-              <View style={styles.appointmentDetailRow}>
-                <Icon name="location-outline" size={16} color="#727784" />
-                <Text style={styles.appointmentDetailText}>{upcomingAppointment.location}</Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-        <View style={styles.appointmentActions}>
-          <TouchableOpacity style={styles.checkinButton} onPress={() => navigation.navigate('Appointments')}>
-            <Text style={styles.checkinButtonText}>View details</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
-
-  const renderNotificationItem = ({ item }: { item: AppNotification }) => (
-    <TouchableOpacity style={styles.notificationItem} onPress={() => navigation.navigate('Notifications')}>
-      <View style={[styles.notificationIcon, styles.notificationIcon_default]}>
-        <Icon name={item.readAt ? 'notifications-outline' : 'notifications'} size={24} color="#fff" />
-      </View>
-      <View style={styles.notificationContent}>
-        <View style={styles.notificationHeader}>
-          <Text style={styles.notificationTitle}>{item.title}</Text>
-          <Text style={styles.notificationTime}>
-            {item.createdAt
-              ? new Date(item.createdAt).toLocaleDateString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric' })
-              : ''}
-          </Text>
-        </View>
-        <Text style={styles.notificationMessage}>{item.message}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#003f87" />
-      </View>
-    );
-  }
+  const stats = counts
+    ? [
+        { label: 'Upcoming', value: counts.upcoming, icon: 'calendar-outline', color: '#2f80f7', background: '#eaf0fb' },
+        { label: 'Completed', value: counts.completed, icon: 'checkmark-circle-outline', color: '#22a35a', background: '#e8f7ee' },
+        { label: 'Saved Clinics', value: counts.saved_clinics, icon: 'heart-outline', color: '#ef3b3b', background: '#fdecec' },
+        { label: 'Reviews Given', value: counts.reviews_given, icon: 'star-outline', color: '#f5a524', background: '#fdf3e2' },
+      ]
+    : [];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f7f9ff" />
-
-      {/* Header */}
-      <AppHeader
-        onMenuPress={toggleDrawer}
-        onAvatarPress={() => navigation.navigate('Profile')}
-      />
-
-      {/* Main Content */}
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#003f87']} />
-        }
-      >
-        {/* Greeting Section */}
-        <View style={styles.greetingSection}>
-          <Text style={styles.greetingTitle}>Hello, {user?.name?.split(' ')[0] || 'there'}!</Text>
-          <Text style={styles.greetingSubtitle}>Welcome back to your dental health dashboard.</Text>
-        </View>
-
-        {/* Book Appointment Button */}
-        <TouchableOpacity
-          style={styles.bookAppointmentButton}
-          onPress={() => navigation.navigate('BookAppointment')}
-          activeOpacity={0.8}
+    <PatientShell navigation={navigation} title="Dashboard" active="Home">
+      {loading ? (
+        <ActivityIndicator style={styles.loader} size="large" color={guestColors.primary} />
+      ) : !data ? (
+        <Message icon="cloud-offline-outline" title="Your dashboard isn't saved yet" body="Connect to the internet to load it." actionLabel="Try again" onAction={load} />
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[guestColors.primary]} tintColor={guestColors.primary} />}
         >
-          <View>
-            <Text style={styles.bookAppointmentTitle}>Book Appointment</Text>
-            <Text style={styles.bookAppointmentSubtitle}>Schedule your next dental visit</Text>
-          </View>
-          <View style={styles.bookAppointmentIcon}>
-            <Icon name="add-circle" size={32} color="#003f87" />
-          </View>
-        </TouchableOpacity>
-
-        {/* Next Visit Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Next Visit</Text>
-          {renderAppointmentCard()}
-        </View>
-
-        {/* Health & Loyalty Bento */}
-        <View style={styles.bentoGrid}>
-          <View style={[styles.bentoCard, styles.healthTipCard]}>
-            <View style={styles.healthTipIcon}>
-              <Icon name="medkit-outline" size={24} color="#006c4f" />
-            </View>
-            <Text style={styles.healthTipTitle}>Daily Tip</Text>
-            <Text style={styles.healthTipDescription}>
-              Rinse after coffee to prevent staining.
+          <View style={styles.hero}>
+            <Text style={styles.heroGreeting}>{greeting()},</Text>
+            <Text style={styles.heroName}>{data.name}</Text>
+            <Text style={styles.heroText}>
+              You have <Text style={styles.heroStrong}>{plural(confirmed, 'confirmed appointment')}</Text> and{' '}
+              <Text style={styles.heroPending}>{counts?.pending ?? 0} pending approval</Text>.
             </Text>
+            <View style={styles.heroActions}>
+              <TouchableOpacity style={styles.heroPrimary} onPress={() => navigation.navigate('BookAppointment')} accessibilityRole="button">
+                <Text style={styles.heroPrimaryText}>Book Appointment</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.heroSecondary} onPress={() => navigation.navigate('GuestClinics')} accessibilityRole="button">
+                <Text style={styles.heroSecondaryText}>Find Clinics</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <TouchableOpacity
-            style={[styles.bentoCard, styles.loyaltyCard]}
-            onPress={() => navigation.navigate('Notifications')}
-            accessibilityRole="button"
-          >
-            <View style={styles.loyaltyHeader}>
-              <Icon name="notifications-outline" size={24} color="#003f87" />
-            </View>
-            <Text style={styles.loyaltyPoints}>{unreadCount}</Text>
-            <Text style={styles.loyaltyLabel}>Unread updates</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.stats}>
+            {stats.map((stat) => (
+              <View key={stat.label} style={styles.stat}>
+                <View style={[styles.statIcon, { backgroundColor: stat.background }]}>
+                  <Icon name={stat.icon} size={20} color={stat.color} />
+                </View>
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
+              </View>
+            ))}
+          </View>
 
-        {/* Recent Updates */}
-        <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>Recent Updates</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
-              <Text style={styles.viewAllText}>View All</Text>
+            <Text style={styles.sectionTitle}>Appointments</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Appointments')} accessibilityRole="link" hitSlop={8}>
+              <Text style={styles.link}>View All</Text>
             </TouchableOpacity>
           </View>
-          <FlatList
-            data={notifications}
-            renderItem={renderNotificationItem}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            ListEmptyComponent={<Text style={styles.emptyText}>No updates yet.</Text>}
-          />
-        </View>
+          {data.upcoming.length > 0 ? (
+            <View style={styles.stack}>
+              {data.upcoming.map((appointment) => (
+                <AppointmentCard
+                  key={appointment.id}
+                  appointment={appointment}
+                  highlightPending
+                  onView={() => navigation.navigate('AppointmentDetails', { appointment })}
+                  onReschedule={() => reschedule(appointment)}
+                />
+              ))}
+            </View>
+          ) : (
+            <Message icon="calendar-outline" title="No upcoming appointments" actionLabel="Book an Appointment" onAction={() => navigation.navigate('BookAppointment')} />
+          )}
 
-        <View style={styles.bottomPadding} />
-      </ScrollView>
+          <Card style={styles.sideCard}>
+            <View style={[styles.sectionHeader, styles.cardHeader]}>
+              <Text style={styles.cardTitle}>Notifications</Text>
+              {unread > 0 && (
+                <View style={styles.count}>
+                  <Text style={styles.countText}>{unread}</Text>
+                </View>
+              )}
+            </View>
+            {notifications === null ? (
+              <ActivityIndicator color={guestColors.primary} />
+            ) : notifications.length === 0 ? (
+              <Text style={styles.empty}>No notifications yet.</Text>
+            ) : (
+              notifications.map((item) => (
+                <View key={item.id} style={[styles.notification, !item.readAt && styles.notificationUnread]}>
+                  <View style={[styles.notificationDot, !item.readAt && styles.notificationDotUnread]} />
+                  <View style={styles.flex}>
+                    <Text style={styles.notificationTitle}>{item.title}</Text>
+                    <Text style={styles.notificationTime}>{item.createdAt ? timeAgo(Date.parse(item.createdAt)) : ''}</Text>
+                  </View>
+                </View>
+              ))
+            )}
+            <TouchableOpacity style={styles.viewAll} onPress={() => navigation.navigate('Notifications')} accessibilityRole="link">
+              <Text style={styles.link}>View all notifications</Text>
+            </TouchableOpacity>
+          </Card>
 
-      {/* Bottom Navigation */}
-      <BottomNav activeTab="Home" />
-
-      {/* Side Drawer */}
-      <SideDrawer
-        visible={drawerVisible}
-        onClose={toggleDrawer}
-        activeItem="Home"
-      />
-    </SafeAreaView>
+          <Card style={styles.sideCard}>
+            <Text style={styles.cardTitle}>Quick Actions</Text>
+            {QUICK_ACTIONS.map((action) => (
+              <TouchableOpacity key={action.label} style={styles.quickAction} onPress={() => navigation.navigate(action.route)} accessibilityRole="link">
+                <View style={styles.quickIcon}>
+                  <Icon name={action.icon} size={18} color={guestColors.primary} />
+                </View>
+                <Text style={styles.quickLabel}>{action.label}</Text>
+                <Icon name="chevron-forward" size={18} color={guestColors.textMuted} />
+              </TouchableOpacity>
+            ))}
+          </Card>
+        </ScrollView>
+      )}
+    </PatientShell>
   );
 };
 
 const styles = StyleSheet.create({
-  emptyText: {
-    fontSize: 14,
-    color: '#727784',
-    paddingVertical: 8,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#f7f9ff',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f7f9ff',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  greetingSection: {
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 16,
-  },
-  greetingTitle: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: '#181c20',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-    marginBottom: 4,
-  },
-  greetingSubtitle: {
-    fontSize: 14,
-    color: '#424752',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-  },
-  bookAppointmentButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#d7e2ff',
-    padding: 20,
-    marginHorizontal: 16,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  bookAppointmentTitle: {
-    fontSize: 20,
-    fontWeight: '500',
-    color: '#003f87',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-    marginBottom: 4,
-  },
-  bookAppointmentSubtitle: {
-    fontSize: 14,
-    color: 'rgba(0,63,135,0.8)',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-  },
-  bookAppointmentIcon: {
-    backgroundColor: 'rgba(0,63,135,0.2)',
-    padding: 8,
-    borderRadius: 50,
-  },
-  section: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#424752',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  viewAllText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#003f87',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-  },
-  appointmentCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#c2c6d4',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  appointmentBackgroundDecoration: {
-    position: 'absolute',
-    top: -24,
-    right: -24,
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: 'rgba(0,63,135,0.05)',
-  },
-  appointmentContent: {
-    flexDirection: 'row',
-    gap: 16,
-    zIndex: 1,
-  },
-  appointmentDateBox: {
-    backgroundColor: 'rgba(0,63,135,0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    alignItems: 'center',
-    minWidth: 64,
-  },
-  appointmentMonth: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#003f87',
-    textTransform: 'uppercase',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-  },
-  appointmentDay: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#181c20',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-  },
-  appointmentInfo: {
-    flex: 1,
-  },
-  appointmentService: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#181c20',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-    marginBottom: 4,
-  },
-  appointmentDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  appointmentDetailText: {
-    fontSize: 14,
-    color: '#424752',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-  },
-  appointmentActions: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 16,
-    zIndex: 1,
-  },
-  rescheduleButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#ebeef3',
-    alignItems: 'center',
-  },
-  rescheduleButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#003f87',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-  },
-  checkinButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#003f87',
-    alignItems: 'center',
-  },
-  checkinButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#fff',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-  },
-  bentoGrid: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    gap: 16,
-  },
-  bentoCard: {
-    flex: 1,
-    aspectRatio: 1,
-    padding: 16,
-    borderRadius: 16,
-    justifyContent: 'space-between',
-  },
-  healthTipCard: {
-    backgroundColor: 'rgba(0,108,79,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(0,108,79,0.2)',
-  },
-  healthTipIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#006c4f',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  healthTipTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#006c4f',
-    marginTop: 8,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-  },
-  healthTipDescription: {
-    fontSize: 12,
-    color: '#424752',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-    lineHeight: 16,
-  },
-  loyaltyCard: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#c2c6d4',
-  },
-  loyaltyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  loyaltyPercent: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#003f87',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-  },
-  loyaltyPoints: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: '#181c20',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-    marginTop: 4,
-  },
-  loyaltyLabel: {
-    fontSize: 12,
-    color: '#424752',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-  },
-  progressBar: {
-    width: '100%',
-    height: 6,
-    backgroundColor: '#e0e3e8',
-    borderRadius: 3,
-    marginTop: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#003f87',
-    borderRadius: 3,
-  },
-  notificationItem: {
-    flexDirection: 'row',
-    gap: 12,
-    padding: 12,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#c2c6d4',
-    marginBottom: 8,
-  },
-  notificationIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  notificationIcon_prescriptions: {
-    backgroundColor: '#bfc8d0',
-  },
-  notificationIcon_payments: {
-    backgroundColor: '#67fcc6',
-  },
-  notificationIcon_lab_panel: {
-    backgroundColor: '#d7e2ff',
-  },
-  notificationIcon_default: {
-    backgroundColor: '#e0e3e8',
-  },
-  notificationContent: {
-    flex: 1,
-  },
-  notificationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  notificationTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#181c20',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-  },
-  notificationTime: {
-    fontSize: 10,
-    color: '#424752',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-  },
-  notificationMessage: {
-    fontSize: 13,
-    color: '#424752',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-    marginBottom: 4,
-  },
-  notificationAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  notificationActionText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#003f87',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-  },
-  bottomPadding: {
-    height: 80,
-  },
+  flex: { flex: 1 },
+  loader: { marginTop: 64 },
+  content: { padding: spacing.marginMobile, paddingBottom: spacing.xl },
+
+  hero: { padding: spacing.lg, borderRadius: 20, backgroundColor: '#00479b' },
+  heroGreeting: { fontSize: 14, lineHeight: 20, color: 'rgba(255,255,255,0.8)' },
+  heroName: { fontSize: 24, lineHeight: 32, fontWeight: '700', color: '#ffffff', marginTop: 2 },
+  heroText: { fontSize: 14, lineHeight: 21, color: 'rgba(255,255,255,0.9)', marginTop: spacing.xs },
+  heroStrong: { fontWeight: '700', color: '#ffffff' },
+  heroPending: { fontWeight: '700', color: '#ffd84d' },
+  heroActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  heroPrimary: { paddingHorizontal: spacing.md, paddingVertical: 11, borderRadius: 10, backgroundColor: '#ffffff' },
+  heroPrimaryText: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: guestColors.primary },
+  heroSecondary: { paddingHorizontal: spacing.md, paddingVertical: 11, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', backgroundColor: 'rgba(255,255,255,0.1)' },
+  heroSecondaryText: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: '#ffffff' },
+
+  stats: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.sm, marginTop: spacing.md },
+  stat: { width: '48.5%', padding: spacing.md, borderRadius: 16, borderWidth: 1, borderColor: guestColors.border, backgroundColor: guestColors.surface },
+  statIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
+  statValue: { fontSize: 24, lineHeight: 30, fontWeight: '700', color: guestColors.text },
+  statLabel: { fontSize: 14, lineHeight: 20, color: guestColors.textMuted },
+
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.lg, marginBottom: spacing.sm },
+  cardHeader: { marginTop: 0 },
+  sectionTitle: { fontSize: 18, lineHeight: 24, fontWeight: '600', color: guestColors.text },
+  link: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: guestColors.primary },
+  stack: { gap: spacing.sm },
+
+  sideCard: { marginTop: spacing.md, padding: spacing.md },
+  cardTitle: { fontSize: 18, lineHeight: 24, fontWeight: '600', color: guestColors.text },
+  count: { minWidth: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ef3b3b' },
+  countText: { fontSize: 12, fontWeight: '700', color: '#ffffff' },
+  empty: { ...type.bodyMd, color: guestColors.textMuted },
+  notification: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: 10, marginBottom: spacing.xs },
+  notificationUnread: { backgroundColor: guestColors.primarySoft },
+  notificationDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#c5cad6' },
+  notificationDotUnread: { backgroundColor: '#2f80f7' },
+  notificationTitle: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: guestColors.text },
+  notificationTime: { fontSize: 12, lineHeight: 16, color: guestColors.textMuted },
+  viewAll: { alignItems: 'center', paddingTop: spacing.sm },
+  quickAction: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.base, marginTop: spacing.xs },
+  quickIcon: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: guestColors.primarySoft },
+  quickLabel: { flex: 1, fontSize: 15, lineHeight: 20, color: guestColors.text },
 });
 
 export default PatientHomeScreen;

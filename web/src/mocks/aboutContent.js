@@ -1,7 +1,6 @@
 // PROVISIONAL CONTENT — About page copy and figures copied from the Figma
 // sample content. Not backend data and not verified business information.
-// The statistics below are placeholders, NOT real figures; confirm them (or
-// load them from the backend) before launch.
+// The statistics are not here: AboutPage counts them from the API.
 export const ABOUT_HERO = {
   title: 'About BukidnonDental',
   subtitle:
@@ -15,14 +14,6 @@ export const ABOUT_MISSION = {
     'By creating a digital bridge between patients and verified dental clinics across the province, we empower communities with information, convenience, and trust.',
   ],
 };
-
-// PLACEHOLDER statistics — not real figures.
-export const ABOUT_STATS = [
-  { id: 'clinics', icon: 'building', value: '50+', label: 'Partner Clinics' },
-  { id: 'patients', icon: 'users', value: '5,000+', label: 'Patients Served' },
-  { id: 'satisfaction', icon: 'award', value: '98%', label: 'Satisfaction Rate' },
-  { id: 'municipalities', icon: 'mapPin', value: '22', label: 'Municipalities' },
-];
 
 // `tone` selects the icon tile color in AboutValueCard.css.
 export const ABOUT_VALUES = [

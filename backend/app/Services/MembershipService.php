@@ -94,6 +94,9 @@ class MembershipService
             if (isset($changes['status'])) {
                 $membership->status = $changes['status'];
             }
+            if (array_key_exists('phone', $changes)) {
+                $membership->phone = $changes['phone'];
+            }
             $membership->save();
 
             if ($membership->role === ClinicMembership::ROLE_DENTIST) {

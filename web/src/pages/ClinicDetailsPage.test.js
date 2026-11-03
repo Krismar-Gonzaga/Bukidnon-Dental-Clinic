@@ -18,6 +18,7 @@ test('shows the public profile with hours, directions and a sign-in booking link
   expect(screen.getByRole('link', { name: /Get Directions/ })).toHaveAttribute('href', expect.stringContaining('destination=7.906%2C125.094'));
   expect(screen.getAllByRole('link', { name: 'Book Appointment' })[0]).toHaveAttribute('href', '/login?next=%2Fpatient%2Fbook%3Fclinic%3D7');
   expect(screen.queryByRole('button', { name: /Save Valencia Smiles/ })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Sign in to save Valencia Smiles' })).toHaveAttribute('href', '/login?next=%2Fclinics%2F7');
 });
 
 test('tabs show the clinic’s real services, dentists and reviews', async () => {
@@ -31,10 +32,12 @@ test('tabs show the clinic’s real services, dentists and reviews', async () =>
 
   fireEvent.click(screen.getByRole('tab', { name: 'Dentists' }));
   expect(within(panel()).getByRole('heading', { name: 'Dr. Maria Santos' })).toBeInTheDocument();
+  expect(within(panel()).getByRole('link', { name: 'View profile of Dr. Maria Santos' })).toHaveAttribute('href', expect.stringMatching(/^\/dentists\/\d+$/));
 
   fireEvent.click(screen.getByRole('tab', { name: 'Reviews' }));
   expect(within(panel()).getByText('Very gentle.')).toBeInTheDocument();
-  expect(within(panel()).getByText(/Juan D\. · Verified visit/)).toBeInTheDocument();
+  expect(within(panel()).getByText('Juan D.')).toBeInTheDocument();
+  expect(within(panel()).getByText(/Verified visit/)).toBeInTheDocument();
 });
 
 test('a patient can save the clinic', async () => {

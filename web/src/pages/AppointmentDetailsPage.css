@@ -1,7 +1,7 @@
 /* Details column width estimated from Figma; centered like other patient pages. */
 .appointment-details-page {
   max-width: 672px;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .appointment-details-page .appointment-details-title:focus {

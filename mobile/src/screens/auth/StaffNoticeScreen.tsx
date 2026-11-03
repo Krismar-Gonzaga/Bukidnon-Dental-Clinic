@@ -1,8 +1,8 @@
 // src/screens/auth/StaffNoticeScreen.tsx
-// The mobile app is the patient app. Clinic owners, staff, dentists and
-// system administrators manage everything from the web portal, so signed-in
-// non-patient accounts land here instead of on patient pages the server
-// would refuse.
+// Signed-in accounts the mobile app has no screens for: clinic owners whose
+// clinic is not approved yet (no clinic membership). Members of an approved
+// clinic get the clinic portal (screens/clinic/) and system administrators
+// the admin portal (screens/admin/).
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';

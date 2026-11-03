@@ -1,20 +1,26 @@
-import SiteHeader from '../components/SiteHeader';
-import SiteFooter from '../components/SiteFooter';
 import AboutStatCard from '../components/about/AboutStatCard';
 import AboutValueCard from '../components/about/AboutValueCard';
-import {
-  ABOUT_HERO,
-  ABOUT_MISSION,
-  ABOUT_STATS,
-  ABOUT_VALUES,
-} from '../mocks/aboutContent';
+import { useHomeData } from '../hooks/useHomeData';
+import { ABOUT_HERO, ABOUT_MISSION, ABOUT_VALUES } from '../mocks/aboutContent';
 import './AboutPage.css';
 
+const count = (value) => (value == null ? '—' : new Intl.NumberFormat('en-PH').format(value));
+
+/** The four figures, counted from real records (GET /home). */
+export function aboutStats(stats) {
+  return [
+    { id: 'clinics', icon: 'building', value: count(stats?.verified_clinics), label: 'Partner Clinics' },
+    { id: 'patients', icon: 'users', value: count(stats?.patients), label: 'Patients Served' },
+    { id: 'satisfaction', icon: 'award', value: stats?.satisfaction_rate == null ? '—' : `${stats.satisfaction_rate}%`, label: 'Satisfaction Rate' },
+    { id: 'municipalities', icon: 'mapPin', value: count(stats?.municipalities), label: 'Municipalities' },
+  ];
+}
+
 function AboutPage() {
+  const home = useHomeData();
+
   return (
     <div className="about">
-      <SiteHeader activeHref="/about" />
-
       <main className="about-main">
         <section className="about-hero" aria-labelledby="about-hero-title">
           <div className="about-container">
@@ -39,7 +45,7 @@ function AboutPage() {
             </div>
 
             <ul className="about-stats" aria-label="BukidnonDental at a glance">
-              {ABOUT_STATS.map(({ id, ...stat }) => (
+              {aboutStats(home.data?.stats).map(({ id, ...stat }) => (
                 <li key={id}>
                   <AboutStatCard {...stat} />
                 </li>
@@ -66,8 +72,6 @@ function AboutPage() {
           </div>
         </section>
       </main>
-
-      <SiteFooter />
     </div>
   );
 }

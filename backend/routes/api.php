@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\PatientDashboardController;
 use App\Http\Controllers\Api\PatientReviewController;
 use App\Http\Controllers\Api\PublicClinicController;
+use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\PublicDentistController;
 use App\Http\Controllers\Api\ReviewReportController;
 use App\Http\Controllers\Api\SavedClinicController;
@@ -41,6 +42,8 @@ Route::get('/clinics/{id}/availability', [PublicClinicController::class, 'availa
 Route::get('/clinics/{id}/available-dates', [PublicClinicController::class, 'availableDates'])->whereNumber('id');
 Route::get('/clinics/{id}/reviews', [PublicClinicController::class, 'reviews'])->whereNumber('id');
 Route::get('/dentists', [PublicDentistController::class, 'index']);
+Route::get('/dentists/{id}', [PublicDentistController::class, 'show'])->whereNumber('id');
+Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:5,1');
 Route::get('/specializations', [HomeController::class, 'getSpecializations']);
 Route::get('/services', [HomeController::class, 'getServices']);
 Route::get('/cities', [HomeController::class, 'getCities']);
@@ -53,6 +56,8 @@ Route::get('/documents/{document}/download', DocumentDownloadController::class)
 // ---------------------------------------------------------------- Authentication
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+// Session check for app start-up: 200 with data null when signed out.
+Route::get('/session', [AuthController::class, 'session']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:password-reset');
 Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:password-reset');
 
@@ -92,6 +97,9 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::delete('/saved-clinics/{clinicId}', [SavedClinicController::class, 'destroy']);
         Route::get('/profile', [PatientController::class, 'profile']);
         Route::put('/profile', [PatientController::class, 'updateProfile']);
+        Route::put('/profile/health', [PatientController::class, 'updateHealth']);
+        Route::get('/profile/photo', [PatientController::class, 'photo']);
+        Route::post('/profile/photo', [PatientController::class, 'uploadPhoto'])->middleware('throttle:10,1');
     });
 
     // ------------------------------------------------------------ Clinic applications (owners)
@@ -113,6 +121,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::put('/', [Manage\ClinicController::class, 'update'])->middleware('clinic.permission:clinic.profile.manage');
         Route::put('/publish', [Manage\ClinicController::class, 'publish'])->middleware('clinic.permission:clinic.profile.manage');
         Route::get('/dashboard', [Manage\ClinicController::class, 'dashboard'])->middleware('clinic.permission:clinic.view');
+        Route::get('/dashboard/insights', Manage\DashboardInsightsController::class)->middleware('clinic.permission:reports.view');
+        Route::get('/reports/analytics', Manage\ReportAnalyticsController::class)->middleware('clinic.permission:reports.view');
         Route::get('/reports/appointments', [Manage\ClinicController::class, 'report'])->middleware('clinic.permission:reports.view');
 
         Route::get('/branches', [Manage\BranchController::class, 'index'])->middleware('clinic.permission:clinic.view');
@@ -142,6 +152,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         $viewAppointments = 'clinic.permission:appointments.view_all|appointments.view_assigned';
         Route::get('/appointments', [Manage\AppointmentController::class, 'index'])->middleware($viewAppointments);
         Route::post('/appointments', [Manage\AppointmentController::class, 'store'])->middleware('clinic.permission:appointments.manage');
+        Route::get('/appointments/calendar', [Manage\AppointmentController::class, 'calendar'])->middleware($viewAppointments);
         Route::get('/appointments/{appointmentId}', [Manage\AppointmentController::class, 'show'])->middleware($viewAppointments);
         foreach (['confirm', 'reject', 'cancel', 'reschedule', 'approve-reschedule' => 'approveReschedule', 'check-in' => 'checkIn'] as $path => $action) {
             $path = is_int($path) ? $action : $path;
@@ -157,10 +168,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::put('/patients/{patientId}', [Manage\PatientController::class, 'update'])->middleware('clinic.permission:patients.manage');
         Route::get('/patients/{patientId}/medical-history', [Manage\PatientController::class, 'medicalHistory'])->middleware('clinic.permission:records.view');
         Route::post('/patients/{patientId}/medical-history', [Manage\PatientController::class, 'storeMedicalHistory'])->middleware('clinic.permission:records.write');
-        Route::get('/patients/{patientId}/records', [Manage\RecordController::class, 'index'])->middleware('clinic.permission:records.view');
+        Route::get('/records', [Manage\RecordController::class, 'clinicIndex'])->middleware('clinic.permission:records.view');
+        Route::get('/patients/{patientId}/records',[Manage\RecordController::class, 'index'])->middleware('clinic.permission:records.view');
         Route::post('/patients/{patientId}/records', [Manage\RecordController::class, 'store'])->middleware('clinic.permission:records.write');
         Route::post('/patients/{patientId}/records/{recordId}/amend', [Manage\RecordController::class, 'amend'])->middleware('clinic.permission:records.write');
 
+        Route::get('/inventory/movements', [Manage\InventoryController::class, 'movements'])->middleware('clinic.permission:inventory.view');
         Route::get('/inventory/items', [Manage\InventoryController::class, 'index'])->middleware('clinic.permission:inventory.view');
         Route::post('/inventory/items', [Manage\InventoryController::class, 'store'])->middleware('clinic.permission:inventory.manage');
         Route::get('/inventory/items/{inventoryItem}', [Manage\InventoryController::class, 'show'])->middleware('clinic.permission:inventory.view');
@@ -179,19 +192,35 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // ------------------------------------------------------------ System administration
     Route::middleware('role:system_admin')->prefix('admin')->group(function () {
         Route::get('/dashboard', Admin\DashboardController::class);
+        Route::get('/system/health', Admin\SystemHealthController::class)->middleware('throttle:20,1');
+        Route::post('/confirm-password', [Admin\PasswordConfirmationController::class, 'store'])->middleware('throttle:5,1');
         Route::get('/clinic-applications', [Admin\ClinicApplicationController::class, 'index']);
-        Route::get('/clinic-applications/{id}', [Admin\ClinicApplicationController::class, 'show']);
+        Route::get('/clinic-applications/summary', [Admin\ClinicApplicationController::class, 'summary']);
+        Route::get('/clinic-applications/{id}', [Admin\ClinicApplicationController::class, 'show'])->whereNumber('id');
         Route::post('/clinic-applications/{id}/start-review', [Admin\ClinicApplicationController::class, 'startReview']);
-        Route::post('/clinic-applications/{id}/approve', [Admin\ClinicApplicationController::class, 'approve']);
-        Route::post('/clinic-applications/{id}/reject', [Admin\ClinicApplicationController::class, 'reject']);
+        Route::post('/clinic-applications/{id}/notes', [Admin\ClinicApplicationController::class, 'storeNote'])->middleware('throttle:30,1');
         Route::get('/clinic-applications/{id}/documents/{documentId}/link', [Admin\ClinicApplicationController::class, 'documentLink']);
         Route::get('/clinics', [Admin\ClinicController::class, 'index']);
-        Route::post('/clinics/{clinic}/suspend', [Admin\ClinicController::class, 'suspend']);
-        Route::post('/clinics/{clinic}/reactivate', [Admin\ClinicController::class, 'reactivate']);
         Route::get('/users', [Admin\UserController::class, 'index']);
-        Route::put('/users/{user}', [Admin\UserController::class, 'update']);
         Route::get('/audit-logs', [Admin\AuditLogController::class, 'index']);
+        Route::get('/audit-logs/summary', [Admin\AuditLogController::class, 'summary']);
+        Route::post('/audit-logs/integrity', [Admin\AuditLogController::class, 'integrity'])->middleware('throttle:6,1');
         Route::get('/reviews', [Admin\ReviewModerationController::class, 'index']);
-        Route::post('/reviews/{review}/moderate', [Admin\ReviewModerationController::class, 'moderate']);
+
+        // High-impact actions: the password must have been re-entered recently.
+        Route::middleware(['password.recent', 'throttle:30,1'])->group(function () {
+            Route::post('/clinic-applications/{id}/approve', [Admin\ClinicApplicationController::class, 'approve']);
+            Route::post('/clinic-applications/{id}/reject', [Admin\ClinicApplicationController::class, 'reject']);
+            Route::post('/clinics/{clinic}/suspend', [Admin\ClinicController::class, 'suspend']);
+            Route::post('/clinics/{clinic}/reactivate', [Admin\ClinicController::class, 'reactivate']);
+            Route::put('/users/{user}', [Admin\UserController::class, 'update']);
+            Route::post('/reviews/{review}/moderate', [Admin\ReviewModerationController::class, 'moderate']);
+        });
+
+        // Bulk exports of personal data (emails, IP addresses): password re-confirmed, few per minute.
+        Route::middleware(['password.recent', 'throttle:5,1'])->group(function () {
+            Route::get('/clinic-applications/export', [Admin\ClinicApplicationController::class, 'export']);
+            Route::get('/audit-logs/export', [Admin\AuditLogController::class, 'export']);
+        });
     });
 });

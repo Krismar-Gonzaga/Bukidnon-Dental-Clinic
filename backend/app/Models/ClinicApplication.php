@@ -54,7 +54,10 @@ class ClinicApplication extends Model
 
     public function missingDocuments(): array
     {
-        $present = $this->documents()->pluck('document_type')->all();
+        // Lists load documents up front: reuse them instead of a query per row.
+        $present = $this->relationLoaded('documents')
+            ? $this->documents->pluck('document_type')->all()
+            : $this->documents()->pluck('document_type')->all();
 
         return array_values(array_diff(self::REQUIRED_DOCUMENTS, $present));
     }

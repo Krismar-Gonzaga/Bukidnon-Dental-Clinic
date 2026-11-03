@@ -97,7 +97,7 @@ class DirectoryAndReviewsTest extends TestCase
 
         $sysadmin = User::factory()->role('system_admin')->create();
         $this->asUser($sysadmin)->getJson('/api/admin/reviews')->assertOk()->assertJsonPath('data.0.open_reports', 1);
-        $this->asUser($sysadmin)->postJson("/api/admin/reviews/{$reviewId}/moderate", ['status' => 'rejected', 'note' => 'Spam content'])->assertOk();
+        $this->asConfirmedAdmin($sysadmin)->postJson("/api/admin/reviews/{$reviewId}/moderate", ['status' => 'rejected', 'note' => 'Spam content'])->assertOk();
 
         $this->getJson("/api/clinics/{$world['clinic']->id}/reviews")->assertJsonCount(0, 'data');
         $this->assertDatabaseHas('reviews', ['id' => $reviewId, 'status' => 'rejected', 'moderated_by' => $sysadmin->id]);

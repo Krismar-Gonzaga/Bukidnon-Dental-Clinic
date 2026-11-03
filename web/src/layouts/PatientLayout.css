@@ -4,7 +4,8 @@
   --patient-topbar-height: 68px;
 
   display: flex;
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
   background-color: var(--color-background);
 }
 
@@ -106,8 +107,8 @@
   font-weight: var(--font-weight-medium);
 }
 
-.patient-sidebar-bottom {
-  padding: var(--space-4);
+.patient-sidebar-footer {
+  padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--color-border);
 }
 
@@ -120,13 +121,39 @@
   border: 0;
   border-radius: var(--radius-md);
   background: none;
-  color: var(--color-danger);
+  color: var(--color-danger-text);
+  font: inherit;
   font-size: 0.9375rem;
-  text-align: left;
+  cursor: pointer;
 }
 
 .patient-logout:hover {
   background-color: var(--color-danger-soft);
+}
+
+.patient-topbar-start {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.patient-menu-button {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.patient-sidebar-scrim {
+  display: none;
 }
 
 .patient-main {
@@ -168,6 +195,11 @@
   color: var(--color-text);
 }
 
+.patient-topbar-bell:hover,
+.patient-topbar-bell.is-active {
+  color: var(--color-primary);
+}
+
 .patient-topbar-bell-dot {
   position: absolute;
   top: 2px;
@@ -187,48 +219,46 @@
   padding: var(--space-6);
 }
 
-/* Below tablet width the sidebar stacks above content with a scrolling nav. */
+/* Below tablet width the sidebar slides in from the top bar's menu button. */
 @media (max-width: 900px) {
-  .patient-layout {
-    flex-direction: column;
-  }
-
   .patient-sidebar {
-    position: static;
-    width: 100%;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    width: min(var(--patient-sidebar-width), 85vw);
     height: auto;
-    border-right: 0;
-    border-bottom: 1px solid var(--color-border);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-105%);
+    visibility: hidden;
+    transition: transform 0.2s ease, visibility 0.2s;
   }
 
-  .patient-sidebar-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-4);
-    padding: var(--space-4);
+  .patient-sidebar.is-open {
+    transform: translateX(0);
+    visibility: visible;
   }
 
-  .patient-sidebar-brand {
-    margin-bottom: 0;
+  .patient-sidebar-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: block;
+    background-color: rgba(19, 33, 59, 0.45);
   }
 
-  .patient-sidebar-nav {
-    overflow-x: auto;
-    padding: var(--space-2) var(--space-4);
-  }
-
-  .patient-sidebar-nav ul {
-    flex-direction: row;
-  }
-
-  .patient-sidebar-bottom {
-    padding: var(--space-2) var(--space-4);
+  .patient-menu-button {
+    display: inline-flex;
   }
 
   .patient-topbar {
-    position: static;
     padding: 0 var(--space-4);
+  }
+
+  .patient-topbar-title {
+    font-size: 1.0625rem;
+    line-height: 1.25;
   }
 
   .patient-content {

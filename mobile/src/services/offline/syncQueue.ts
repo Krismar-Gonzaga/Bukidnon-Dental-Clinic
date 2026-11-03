@@ -188,7 +188,6 @@ const runFlush = async (ownerId: string): Promise<FlushResult> => {
         url: item.url,
         data: item.payload ? body : undefined,
         headers,
-        timeout: 15000,
       });
       await db.runAsync('DELETE FROM sync_queue WHERE id = ?', item.id);
       synced += 1;

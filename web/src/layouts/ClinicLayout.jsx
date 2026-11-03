@@ -1,13 +1,16 @@
 import { createContext, useContext } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import PortalLayout from './PortalLayout';
+import ClinicShell from './ClinicShell';
+import Icon from '../components/Icon';
+import WalkInAction from '../components/portal/WalkInAction';
 import { useAuth } from '../auth/AuthContext';
 import {
   canAny,
   CLINIC_PORTAL_HREF,
   CLINIC_ROLE_LABELS,
-  CLINIC_SECTIONS,
   getClinicHref,
+  getClinicSections,
+  isDentistMember,
 } from '../config/clinicNavigation';
 import '../components/portal/portal.css';
 
@@ -43,11 +46,26 @@ function ClinicSwitcher({ memberships, clinicId }) {
 }
 
 /**
+ * The clinic from the URL and the member's permissions, for page components
+ * that render ClinicLayout themselves (their header buttons and subtitle sit
+ * outside its provider). `useClinic` is for everything inside the layout.
+ */
+export function useClinicAccess() {
+  const { clinicId } = useParams();
+  const { memberships } = useAuth();
+  const membership = memberships.find((m) => String(m.clinic_id) === String(clinicId));
+  const permissions = membership?.permissions ?? [];
+  return { clinicId, membership, can: (...anyOf) => canAny(permissions, anyOf) };
+}
+
+/**
  * Frame for /clinic/:clinicId/* pages. Navigation shows only the sections the
  * member's permissions allow; the API enforces the same permissions.
  * `requires` (list of permissions, any of) guards the page itself.
+ * `subtitle`, `search`, `hideSearch`, `showWalkIn` and `headerActions`
+ * customise the top bar (see ClinicShell).
  */
-function ClinicLayout({ section, title, requires, children }) {
+function ClinicLayout({ section, title, subtitle, requires, search, hideSearch = false, showWalkIn = false, headerActions, children }) {
   const { clinicId } = useParams();
   const { memberships } = useAuth();
   const membership = memberships.find((m) => String(m.clinic_id) === String(clinicId));
@@ -59,25 +77,49 @@ function ClinicLayout({ section, title, requires, children }) {
 
   if (requires && !can(...requires)) return <Navigate to={getClinicHref(clinicId)} replace />;
 
-  const navItems = CLINIC_SECTIONS.filter(({ anyOf }) => canAny(permissions, anyOf)).map((item) => ({
+  const sections = getClinicSections(membership).filter(({ anyOf }) => canAny(permissions, anyOf));
+  const navItems = sections.map((item) => ({
     label: item.label,
     href: getClinicHref(clinicId, item.section),
     icon: item.icon,
+    group: item.group,
   }));
+  // Pages without their own sidebar entry (e.g. appointments for dentists) highlight their alias.
+  const activeSection = sections.find((item) => item.aliases?.includes(section))?.section ?? section;
+  const isDentist = isDentistMember(membership);
 
   return (
     <ClinicContext.Provider value={{ clinicId, membership, clinicName: membership.clinic_name, can }}>
-      <PortalLayout
+      <ClinicShell
+        clinicId={clinicId}
+        clinicName={membership.clinic_name}
         title={title}
+        subtitle={subtitle}
         navItems={navItems}
-        activeHref={getClinicHref(clinicId, section)}
+        activeHref={getClinicHref(clinicId, activeSection)}
+        scheduleHref={getClinicHref(clinicId, isDentist ? 'schedule' : 'appointments')}
+        showSignOut={isDentist}
+        grouped={!isDentist}
         roleLabel={`${CLINIC_ROLE_LABELS[membership.role] ?? membership.role} · ${membership.clinic_name}`}
-        notificationsHref={getClinicHref(clinicId, 'notifications')}
-        navLabel="Clinic"
+        shortRoleLabel={CLINIC_ROLE_LABELS[membership.role] ?? membership.role}
+        can={can}
+        search={search}
+        hideSearch={hideSearch}
+        headerActions={
+          <>
+            {headerActions}
+            {showWalkIn && !isDentist && can('appointments.manage') && can('patients.view') && (
+              <WalkInAction clinicId={clinicId} can={can} className="btn btn-primary btn-sm clinic-walkin-button">
+                <Icon name="plus" size={18} />
+                Walk-in
+              </WalkInAction>
+            )}
+          </>
+        }
         sidebarExtra={<ClinicSwitcher memberships={memberships} clinicId={clinicId} />}
       >
         {children}
-      </PortalLayout>
+      </ClinicShell>
     </ClinicContext.Provider>
   );
 }

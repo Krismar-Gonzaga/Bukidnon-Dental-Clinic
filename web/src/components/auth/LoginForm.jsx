@@ -1,19 +1,21 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Icon from '../Icon';
 import AuthField from './AuthField';
-import { FORGOT_PASSWORD_HREF, SIGN_IN_ROLES } from '../../config/auth';
+import { FORGOT_PASSWORD_HREF } from '../../config/auth';
 import { REGISTER_HREF } from '../../config/navigation';
-import { login, logout } from '../../services/authService';
+import { DEMO_ACCOUNTS } from '../../config/demoAccounts';
+import { login } from '../../services/authService';
 import { getErrorMessage } from '../../services/apiErrors';
 import { useAuth } from '../../auth/AuthContext';
 import { getHomeHref, safeNextPath } from '../../auth/homeRoutes';
 import './auth.css';
 import './LoginForm.css';
 
-// Signs in through the Laravel API (session cookie). The clicked role button
-// must match the account's role; on a mismatch the session is ended at once.
-// ?next=/path returns the user there afterwards (same-site paths only).
+// Signs in through the Laravel API (session cookie). One Sign In button for
+// every account type: the account's role (from the API) decides where it
+// lands (see auth/homeRoutes.js). ?next=/path returns the user there
+// afterwards (same-site paths only; portal guards still apply).
 function LoginForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -22,27 +24,20 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState({ text: '', isError: false });
   const [submitting, setSubmitting] = useState(false);
-  // Set by the clicked role button just before the form submits.
-  const pendingRoleRef = useRef(SIGN_IN_ROLES[0]);
+
+  const autoFill = (account) => {
+    setEmail(account.email);
+    setPassword(account.password);
+    setNotice({ text: `Filled in the ${account.label} demo account. Press Sign In.`, isError: false });
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    const role = pendingRoleRef.current;
     setSubmitting(true);
     setNotice({ text: '', isError: false });
 
     try {
       const user = await login({ email, password });
-
-      if (user.role !== role.backendRole) {
-        await logout();
-        setNotice({
-          text: `This account is not a ${role.label} account. Use the sign-in button for your account type.`,
-          isError: true,
-        });
-        return;
-      }
-
       setUser(user);
       navigate(safeNextPath(searchParams.get('next')) ?? getHomeHref(user), { replace: true });
     } catch (error) {
@@ -91,22 +86,30 @@ function LoginForm() {
         Forgot password?
       </a>
 
-      <div className="login-form-actions">
-        {SIGN_IN_ROLES.map((role) => (
-          <button
-            key={role.id}
-            type="submit"
-            className={`btn login-role login-role--${role.variant}`}
-            disabled={submitting}
-            onClick={() => {
-              pendingRoleRef.current = role;
-            }}
-          >
-            {role.icon && <Icon name={role.icon} size={17} />}
-            Sign In as {role.label}
-          </button>
-        ))}
-      </div>
+      <button type="submit" className="btn btn-primary login-submit" disabled={submitting}>
+        {submitting ? 'Signing in…' : 'Sign In'}
+      </button>
+
+      {DEMO_ACCOUNTS.length > 0 && (
+        <section className="login-demo" aria-labelledby="login-demo-title">
+          <p id="login-demo-title" className="login-demo-title">
+            Auto fill a demo account <span className="login-demo-tag">Development only</span>
+          </p>
+          <div className="login-demo-list">
+            {DEMO_ACCOUNTS.map((account) => (
+              <button
+                key={account.email}
+                type="button"
+                className="login-demo-chip"
+                onClick={() => autoFill(account)}
+                aria-label={`Auto fill the ${account.label} demo account`}
+              >
+                {account.label}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <p className={`auth-notice${notice.isError ? ' auth-notice--error' : ''}`} role="status">
         {notice.text}

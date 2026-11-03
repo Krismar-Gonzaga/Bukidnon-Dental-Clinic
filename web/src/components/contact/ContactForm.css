@@ -81,17 +81,6 @@ textarea.contact-form-input {
   border-radius: var(--radius-sm);
 }
 
-.contact-form-notice {
-  margin-top: var(--space-3);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  text-align: center;
-}
-
-.contact-form-notice:empty {
-  display: none;
-}
-
 @media (max-width: 480px) {
   .contact-form {
     padding: var(--space-5);
@@ -104,4 +93,46 @@ textarea.contact-form-input {
   .contact-form-field.is-half {
     grid-column: 1 / -1;
   }
+}
+
+/* Off-screen, not display:none: simple bots skip fields they can tell are hidden. */
+.contact-form-trap {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.contact-form-error {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-danger-text);
+}
+
+.contact-form-sent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+  text-align: center;
+}
+
+.contact-form-sent > svg {
+  color: var(--color-success-icon);
+}
+
+.contact-form-sent-title {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.contact-form-sent-text {
+  max-width: 44ch;
+  margin-bottom: var(--space-5);
+  line-height: 1.6;
+  color: var(--color-text-muted);
 }

@@ -12,12 +12,27 @@ export const getClinicOverview = (clinicId) => getData(base(clinicId));
 export const updateClinicProfile = (clinicId, body) => send('put', base(clinicId), body);
 export const setClinicPublished = (clinicId, isPublished) => send('put', `${base(clinicId)}/publish`, { is_published: isPublished });
 export const getClinicDashboard = (clinicId) => getData(`${base(clinicId)}/dashboard`);
+export const getClinicInsights = (clinicId) => getData(`${base(clinicId)}/dashboard/insights`);
+export const getReportAnalytics = (clinicId, year) => getData(`${base(clinicId)}/reports/analytics`, { year });
+export const getAppointmentCalendar = (clinicId, month) => getData(`${base(clinicId)}/appointments/calendar`, { month });
 export const getAppointmentReport = (clinicId, params) => getData(`${base(clinicId)}/reports/appointments`, params);
 
 // Appointments
 export async function getClinicAppointments(clinicId, params) {
   const { items, meta } = await getPage(`${base(clinicId)}/appointments`, params);
   return { appointments: items.map(toAppointment), meta };
+}
+// Every appointment in a date range (calendar views): follows the pages up
+// to MAX_CALENDAR_PAGES × 100 appointments.
+const MAX_CALENDAR_PAGES = 5;
+export async function getClinicAppointmentsInRange(clinicId, params) {
+  const appointments = [];
+  for (let page = 1; page <= MAX_CALENDAR_PAGES; page += 1) {
+    const { items, meta } = await getPage(`${base(clinicId)}/appointments`, { ...params, page, per_page: 100 });
+    appointments.push(...items.map(toAppointment));
+    if (page >= (meta?.last_page ?? 1)) return { appointments, complete: true };
+  }
+  return { appointments, complete: false };
 }
 export const getClinicAppointment = async (clinicId, id) => toAppointment(await getData(`${base(clinicId)}/appointments/${id}`));
 export const appointmentAction = (clinicId, id, action, body) =>
@@ -33,7 +48,9 @@ export const getPatientMedicalHistory = (clinicId, id) => getData(`${base(clinic
 export const addMedicalHistory = (clinicId, id, body) => send('post', `${base(clinicId)}/patients/${id}/medical-history`, body);
 export const getPatientRecords = (clinicId, id, includeSuperseded = false) =>
   getData(`${base(clinicId)}/patients/${id}/records`, includeSuperseded ? { include_superseded: 1 } : undefined);
-export const createRecord = (clinicId, patientId, body) => send('post', `${base(clinicId)}/patients/${patientId}/records`, body);
+// Current records across the clinic (dentists: their patients only). Reads are audit-logged.
+export const getClinicRecords = (clinicId, params) => getPage(`${base(clinicId)}/records`, params);
+export const createRecord =(clinicId, patientId, body) => send('post', `${base(clinicId)}/patients/${patientId}/records`, body);
 export const amendRecord = (clinicId, patientId, recordId, body) =>
   send('post', `${base(clinicId)}/patients/${patientId}/records/${recordId}/amend`, body);
 
@@ -44,6 +61,7 @@ export const createInventoryItem = (clinicId, body) => send('post', `${base(clin
 export const updateInventoryItem = (clinicId, id, body) => send('put', `${base(clinicId)}/inventory/items/${id}`, body);
 export const recordMovement = (clinicId, id, body) => send('post', `${base(clinicId)}/inventory/items/${id}/movements`, body);
 export const getInventoryAlerts = (clinicId) => getData(`${base(clinicId)}/inventory/alerts`);
+export const getStockHistory = (clinicId, params) => getPage(`${base(clinicId)}/inventory/movements`, params);
 export const getInventoryCategories = (clinicId) => getData(`${base(clinicId)}/inventory/categories`);
 export const createInventoryCategory = (clinicId, name) => send('post', `${base(clinicId)}/inventory/categories`, { name });
 export const getSuppliers = (clinicId) => getData(`${base(clinicId)}/inventory/suppliers`);

@@ -100,6 +100,22 @@ class AuthController extends Controller
         return $this->ok($this->userData($user));
     }
 
+    /**
+     * Who is signed in, for apps checking the session on start-up. Unlike
+     * GET /user it answers 200 with data null for guests (and suspended
+     * accounts), so a normal guest visit does not log a failed request.
+     */
+    public function session(): JsonResponse
+    {
+        $user = Auth::guard('sanctum')->user();
+
+        if (! $user || ! $user->isActive()) {
+            return $this->ok(null);
+        }
+
+        return $this->ok($this->userData($user->load('patient')));
+    }
+
     public function updateProfile(UpdateProfileRequest $request): JsonResponse
     {
         $user = $request->user();

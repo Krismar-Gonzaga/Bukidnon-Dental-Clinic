@@ -1,16 +1,17 @@
-import { useHomeData } from '../../hooks/useHomeData';
+import { useQuery } from '@tanstack/react-query';
 import { SERVICES_HREF } from '../../config/navigation';
+import { getServiceCatalog } from '../../services/publicApi';
 import './AffordableCare.css';
 
-const peso = (amount) => `₱${Number(amount).toLocaleString('en-PH')}`;
+const SHOWN = 4;
 
-// Lowest published price per service across listed clinics (GET /home).
-// Hidden until clinics publish prices.
+// Published price ranges across listed clinics, for services clinics offer
+// (GET /services). Hidden until clinics publish prices.
 function AffordableCare() {
-  const home = useHomeData();
-  const rates = home.data?.serviceRates ?? [];
+  const catalog = useQuery({ queryKey: ['services', 'catalog'], queryFn: getServiceCatalog });
+  const services = (catalog.data ?? []).filter((s) => s.clinicCount > 0).slice(0, SHOWN);
 
-  if (rates.length === 0) return null;
+  if (services.length === 0) return null;
 
   return (
     <section className="affordable-care" aria-labelledby="affordable-care-title">
@@ -20,20 +21,18 @@ function AffordableCare() {
           <h2 id="affordable-care-title" className="affordable-care-title">
             Affordable Care for Everyone
           </h2>
-          <p className="affordable-care-text">
-            We bridge the gap between high-quality dental care and transparency in pricing across Bukidnon.{' '}
-            <a href={SERVICES_HREF}>See all services</a>
-          </p>
+          <p className="affordable-care-text">We bridge the gap between high-quality dental care and transparency in pricing across Bukidnon.</p>
+          <a href={SERVICES_HREF} className="affordable-care-link">
+            See all services
+          </a>
         </div>
 
         <ul className="affordable-care-grid">
-          {rates.map((rate) => (
-            <li key={rate.name} className="service-price-card">
-              <h3 className="service-price-card-name">{rate.name}</h3>
-              <p className="service-price-card-text">
-                Offered by {rate.clinicCount} {rate.clinicCount === 1 ? 'clinic' : 'clinics'}. Prices vary by clinic.
-              </p>
-              <p className="service-price-card-price">Starts at {peso(rate.startingPrice)}</p>
+          {services.map((service) => (
+            <li key={service.id} className="service-price-card">
+              <h3 className="service-price-card-name">{service.name}</h3>
+              <p className="service-price-card-text">{service.description}</p>
+              <p className="service-price-card-price">{service.priceLabel}</p>
             </li>
           ))}
         </ul>

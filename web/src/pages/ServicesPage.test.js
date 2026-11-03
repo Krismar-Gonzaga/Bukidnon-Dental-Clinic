@@ -16,9 +16,9 @@ test('shows published price ranges and filters by category from the data', async
   renderWithProviders(<ServicesPage />);
 
   expect(await screen.findByText('₱500 – ₱1,500')).toBeInTheDocument();
-  expect(within(screen.getByRole('main')).getByRole('link', { name: 'Find Clinics' })).toHaveAttribute('href', '/clinics?service=Dental%20Cleaning');
+  expect(within(screen.getByRole('main')).getByRole('link', { name: 'Book This Service' })).toHaveAttribute('href', '/clinics?service=Dental%20Cleaning');
   // A service no clinic offers yet has no action.
-  expect(within(screen.getByRole('main')).getAllByRole('link', { name: 'Find Clinics' })).toHaveLength(1);
+  expect(within(screen.getByRole('main')).getAllByRole('link', { name: 'Book This Service' })).toHaveLength(1);
 
   fireEvent.click(screen.getByRole('button', { name: 'Restorative' }));
   expect(screen.queryByText('₱500 – ₱1,500')).not.toBeInTheDocument();

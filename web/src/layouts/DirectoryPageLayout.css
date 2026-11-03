@@ -1,7 +1,7 @@
 .directory-page {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  flex: 1;
 }
 
 .directory-page-main {
@@ -16,6 +16,19 @@
 
 .directory-page-intro {
   padding: var(--space-7) 0 var(--space-8);
+}
+
+.directory-page-eyebrow {
+  display: inline-block;
+  margin-bottom: var(--space-3);
+  padding: var(--space-1) var(--space-4);
+  border-radius: 999px;
+  background-color: #0056b3;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffffff;
 }
 
 .directory-page-title {

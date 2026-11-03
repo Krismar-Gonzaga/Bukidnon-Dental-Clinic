@@ -35,7 +35,7 @@ test('shows the sidebar, welcome summary and stats from the API', async () => {
   expect(screen.getByText('4')).toBeInTheDocument(); // saved clinics
   expect(screen.getAllByRole('link', { name: 'View Dental Cleaning' })).toHaveLength(2);
   expect(await screen.findByText('Appointment confirmed')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Notifications, 1 unread' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Notifications, 1 unread' })).toBeInTheDocument();
 });
 
 test('shows an empty state with a booking link when nothing is upcoming', async () => {

@@ -178,12 +178,20 @@ class ClinicApplicationService
         return $application;
     }
 
-    /** Relative signed URL valid for 5 minutes; prefix with the API origin. */
-    public function temporaryDownloadUrl(VerificationDocument $document, User $viewer): string
+    /**
+     * Relative signed URL valid for 5 minutes; prefix with the API origin.
+     * `download` (part of the signature) saves the file instead of opening it.
+     */
+    public function temporaryDownloadUrl(VerificationDocument $document, User $viewer, bool $download = false): string
     {
-        $this->audit->record('clinic_application.document_accessed', $document->application, ['document_id' => $document->id], actor: $viewer);
+        $this->audit->record('clinic_application.document_accessed', $document->application, array_filter([
+            'document_id' => $document->id,
+            'download' => $download ?: null,
+        ]), actor: $viewer);
 
-        return URL::temporarySignedRoute('documents.download', now()->addMinutes(5), ['document' => $document->id], absolute: false);
+        $parameters = ['document' => $document->id] + ($download ? ['download' => 1] : []);
+
+        return URL::temporarySignedRoute('documents.download', now()->addMinutes(5), $parameters, absolute: false);
     }
 
     private function assertEditable(ClinicApplication $application): void

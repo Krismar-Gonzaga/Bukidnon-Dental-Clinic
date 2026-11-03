@@ -34,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'active' => \App\Http\Middleware\EnsureAccountActive::class,
             'clinic.permission' => \App\Http\Middleware\EnsureClinicPermission::class,
+            'password.recent' => \App\Http\Middleware\RequireRecentPassword::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

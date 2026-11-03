@@ -54,7 +54,7 @@ function ClinicSearchPanel() {
   };
 
   return (
-    <form className="clinic-search" role="search" aria-label="Search dental clinics" onSubmit={handleSubmit}>
+    <form className="home-search" role="search" aria-label="Search dental clinics" onSubmit={handleSubmit}>
       <div className="search-field">
         <label htmlFor="search-clinic-name" className="search-field-label">
           Clinic Name
@@ -90,8 +90,7 @@ function ClinicSearchPanel() {
         onChange={setSpecialization}
       />
 
-      <button type="submit" className="btn btn-accent clinic-search-submit">
-        <Icon name="search" size={18} />
+      <button type="submit" className="btn btn-accent home-search-submit">
         Search Now
       </button>
     </form>

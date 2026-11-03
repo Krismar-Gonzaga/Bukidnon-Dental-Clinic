@@ -1,0 +1,239 @@
+/* Public dentist profile (guest design). */
+
+.dentist-profile-state {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-5);
+}
+
+.dentist-profile-banner {
+  height: 190px;
+  background: var(--gradient-accent-1);
+}
+
+.dentist-profile-container {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-5) var(--space-7);
+}
+
+.dentist-profile-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+
+.dentist-profile-avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  margin-top: -48px;
+  border: 4px solid #ffffff;
+  border-radius: var(--radius-lg);
+  background-color: var(--color-avatar-1);
+  box-shadow: var(--shadow-md);
+  font-size: 2.25rem;
+  font-weight: var(--font-weight-bold);
+  color: #ffffff;
+}
+
+.dentist-profile-identity {
+  flex: 1 1 16rem;
+  min-width: 0;
+  padding-top: var(--space-2);
+}
+
+.dentist-profile-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.dentist-profile-name {
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.dentist-profile-accepting {
+  padding: 2px var(--space-3);
+  border: 1px solid var(--color-success-border);
+  border-radius: 999px;
+  background-color: var(--color-success-soft);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-success-text);
+}
+
+.dentist-profile-meta {
+  color: var(--color-text-muted);
+}
+
+.dentist-profile-rating {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.dentist-profile-book {
+  margin-top: var(--space-2);
+  min-height: 44px;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+}
+
+.dentist-profile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.dentist-profile-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.dentist-profile-card {
+  padding: var(--space-5);
+  border: 1px solid #eceef3;
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.dentist-profile-card-title {
+  margin-bottom: var(--space-3);
+  font-size: 1.1875rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.dentist-profile-text {
+  line-height: 1.6;
+  color: var(--color-text-muted);
+  white-space: pre-line;
+}
+
+.dentist-profile-credentials {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.dentist-profile-credentials > div {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.dentist-profile-credentials svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-primary);
+}
+
+.dentist-profile-credentials dt {
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.dentist-profile-credentials dd {
+  margin: 0;
+  color: var(--color-text);
+  white-space: pre-line;
+}
+
+.dentist-profile-hours {
+  margin: 0;
+}
+
+.dentist-profile-hours div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid #eceef3;
+  font-size: var(--font-size-sm);
+}
+
+.dentist-profile-hours div:last-child {
+  border-bottom: 0;
+}
+
+.dentist-profile-hours dt {
+  color: var(--color-text-muted);
+}
+
+.dentist-profile-hours dd {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.dentist-profile-clinic-name {
+  display: block;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.dentist-profile-clinic-address {
+  margin: var(--space-1) 0 var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.dentist-profile-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.dentist-profile-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 860px) {
+  .dentist-profile-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .dentist-profile-banner {
+    height: 120px;
+  }
+
+  .dentist-profile-container {
+    padding: 0 var(--space-4) var(--space-6);
+  }
+
+  .dentist-profile-head {
+    gap: var(--space-3);
+  }
+
+  .dentist-profile-identity {
+    flex-basis: 100%;
+    padding-top: 0;
+  }
+
+  .dentist-profile-book {
+    width: 100%;
+  }
+}

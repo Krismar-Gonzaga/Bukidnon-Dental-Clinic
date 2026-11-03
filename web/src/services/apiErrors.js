@@ -18,6 +18,10 @@ export function getFieldErrors(error) {
 
 // One user-facing sentence describing the failure.
 export function getErrorMessage(error) {
+  // Stopped on this device (e.g. a password confirmation was cancelled).
+  if (error?.isCancelled) {
+    return error.message;
+  }
   if (!error?.response) {
     return NETWORK_ERROR;
   }

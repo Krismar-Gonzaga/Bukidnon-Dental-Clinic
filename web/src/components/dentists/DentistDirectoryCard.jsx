@@ -5,9 +5,8 @@ import './DentistDirectoryCard.css';
 const ACCENT_COUNT = 6;
 const MAX_STARS = 5;
 
-// Directory listing card. profileHref (optional) links the action to the
-// dentist's clinic page. Reviews are collected per clinic, so dentists
-// without a rating show no stars.
+// Directory listing card. profileHref links the action to the dentist's
+// profile. Dentists without published reviews show no stars.
 // The letter avatar is a TEMPORARY stand-in for dentist photos.
 function DentistDirectoryCard({ dentist, accentIndex = 0, profileHref }) {
   const {
@@ -29,7 +28,7 @@ function DentistDirectoryCard({ dentist, accentIndex = 0, profileHref }) {
   const filledStars = hasRating ? Math.floor(rating) : 0;
 
   return (
-    <article className="dentist-card" aria-labelledby={titleId}>
+    <article className="public-dentist-card" aria-labelledby={titleId}>
       <div
         className={`dentist-card-avatar dentist-card-avatar--${accent}`}
         aria-hidden="true"
@@ -85,14 +84,10 @@ function DentistDirectoryCard({ dentist, accentIndex = 0, profileHref }) {
         </li>
       </ul>
 
-      {profileHref ? (
-        <a href={profileHref} className="btn btn-primary dentist-card-action">
-          View Clinic
-        </a>
-      ) : (
-        <button type="button" className="btn btn-primary dentist-card-action">
+      {profileHref && (
+        <a href={profileHref} className="btn btn-primary dentist-card-action" aria-label={`View profile of ${name}`}>
           View Profile
-        </button>
+        </a>
       )}
     </article>
   );

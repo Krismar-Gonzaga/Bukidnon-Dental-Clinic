@@ -1,33 +1,30 @@
 import Icon from './Icon';
 import './ClinicCard.css';
 
-// Featured clinic card. bookHref / detailsHref link the actions.
+// Featured clinic card. bookHref / detailsHref link the actions. Clinics
+// without a photo show a colored placeholder.
 function ClinicCard({ clinic, bookHref, detailsHref }) {
   const { name, location, rating, reviewCount, tags, imageSrc } = clinic;
   const titleId = `${clinic.id}-name`;
 
   return (
-    <article className="clinic-card" aria-labelledby={titleId}>
-      {imageSrc ? (
-        <img className="clinic-card-image" src={imageSrc} alt={name} />
-      ) : (
-        // TEMPORARY placeholder until real clinic photos are available
-        <div
-          className="clinic-card-image clinic-card-image-placeholder"
-          role="img"
-          aria-label="Placeholder for clinic photo"
-        >
-          <Icon name="building" size={36} />
-        </div>
-      )}
+    <article className="public-clinic-card" aria-labelledby={titleId}>
+      <div className="clinic-card-media">
+        {imageSrc ? (
+          <img className="clinic-card-image" src={imageSrc} alt={name} />
+        ) : (
+          <div className="clinic-card-image clinic-card-image-placeholder" role="img" aria-label="Clinic photo not available yet">
+            <Icon name="building" size={48} />
+          </div>
+        )}
+        <p className="clinic-card-rating">
+          <span className="clinic-card-rating-value">{rating.toFixed(1)}</span>
+          {reviewCount != null && <span>({reviewCount} reviews)</span>}
+          <Icon name="star" size={16} className="clinic-card-star" />
+        </p>
+      </div>
 
       <div className="clinic-card-body">
-        <p className="clinic-card-rating">
-          <Icon name="star" size={16} className="clinic-card-star" />
-          <span className="clinic-card-rating-value">{rating.toFixed(1)}</span>
-          {reviewCount != null && <span className="clinic-card-reviews">({reviewCount} reviews)</span>}
-        </p>
-
         <h3 id={titleId} className="clinic-card-name">
           {name}
         </h3>
@@ -46,10 +43,10 @@ function ClinicCard({ clinic, bookHref, detailsHref }) {
         </ul>
 
         <div className="clinic-card-actions">
-          <a href={bookHref} className="btn btn-primary btn-sm">
+          <a href={bookHref} className="btn btn-primary clinic-card-book">
             Book Appointment
           </a>
-          <a href={detailsHref} className="btn btn-outline btn-sm">
+          <a href={detailsHref} className="btn btn-outline clinic-card-details">
             View Details
           </a>
         </div>

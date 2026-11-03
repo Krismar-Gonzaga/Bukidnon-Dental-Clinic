@@ -75,6 +75,16 @@ export const saveClinic = (clinicId) => apiClient.put(`/patient/saved-clinics/${
 export const unsaveClinic = (clinicId) => apiClient.delete(`/patient/saved-clinics/${clinicId}`);
 
 const GENDER_LABEL = { male: 'Male', female: 'Female', other: 'Other' };
+const CIVIL_STATUS_LABEL = { single: 'Single', married: 'Married', widowed: 'Widowed', separated: 'Separated' };
+
+const toHealth = (health) => ({
+  conditions: health?.conditions ?? [],
+  procedures: health?.procedures ?? [],
+  vitals: health?.vitals ?? {},
+  allergies: health?.allergies ?? [],
+  medications: health?.medications ?? [],
+  anxiety: health?.anxiety ?? {},
+});
 
 export async function getProfile() {
   const p = await getData('/patient/profile');
@@ -85,8 +95,18 @@ export async function getProfile() {
     address: p.address ?? '',
     birthDate: p.birth_date ?? '',
     gender: GENDER_LABEL[p.gender] ?? '',
+    civilStatus: CIVIL_STATUS_LABEL[p.civil_status] ?? '',
+    bloodType: p.blood_type ?? '',
+    city: p.city ?? '',
+    province: p.province ?? '',
+    zipCode: p.zip_code ?? '',
     emergencyContactName: p.emergency_contact_name ?? '',
     emergencyContactPhone: p.emergency_contact_phone ?? '',
+    emergencyContactRelationship: p.emergency_contact_relationship ?? '',
+    emergencyContactAddress: p.emergency_contact_address ?? '',
+    photoVersion: p.photo_version ?? null,
+    health: toHealth(p.health),
+    consents: p.consents ?? {},
     emailNotifications: p.notification_preferences?.email !== false,
   };
 }
@@ -99,10 +119,41 @@ export async function updateProfile(form) {
     address: form.address,
     birth_date: form.birthDate || null,
     gender: form.gender ? form.gender.toLowerCase() : null,
+    civil_status: form.civilStatus ? form.civilStatus.toLowerCase() : null,
+    blood_type: form.bloodType || null,
+    city: form.city || null,
+    province: form.province || null,
+    zip_code: form.zipCode || null,
     emergency_contact_name: form.emergencyContactName || null,
     emergency_contact_phone: form.emergencyContactPhone || null,
+    emergency_contact_relationship: form.emergencyContactRelationship || null,
+    emergency_contact_address: form.emergencyContactAddress || null,
   });
   return data.data;
+}
+
+/** What the patient reports about their own health. Sent sections replace the saved ones. */
+export async function updateHealth(health) {
+  const { data } = await apiClient.put('/patient/profile/health', health);
+  return data.data;
+}
+
+export async function updateConsents(consents) {
+  const { data } = await apiClient.put('/patient/profile', { consents });
+  return data.data;
+}
+
+export async function uploadProfilePhoto(file) {
+  const body = new FormData();
+  body.append('photo', file);
+  const { data } = await apiClient.post('/patient/profile/photo', body);
+  return data.data;
+}
+
+/** The private photo, as a blob: it needs the session, so it has no public URL. */
+export async function getProfilePhoto() {
+  const { data } = await apiClient.get('/patient/profile/photo', { responseType: 'blob' });
+  return data;
 }
 
 /** Records a clinic shared with the patient (procedures and care instructions). */

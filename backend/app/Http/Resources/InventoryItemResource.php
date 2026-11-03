@@ -17,8 +17,13 @@ class InventoryItemResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'brand' => $this->brand,
             'description' => $this->description,
             'unit' => $this->unit,
+            'unit_cost' => $this->unit_cost,
+            'next_expiry' => $this->whenLoaded('batches', fn () => $this->batches
+                ->filter(fn ($b) => $b->quantity_on_hand > 0 && $b->expires_on && ! $b->isExpired())
+                ->min(fn ($b) => $b->expires_on->toDateString())),
             'category' => $this->category?->name,
             'category_id' => $this->category_id,
             'branch_id' => $this->branch_id,

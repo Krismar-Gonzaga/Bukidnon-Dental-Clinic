@@ -374,3 +374,89 @@ textarea.portal-field-control {
 .portal-details-row {
   display: contents;
 }
+
+/* Unstyled list inside detail values (e.g. a member's clinics). */
+.portal-plain-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+/* Confirmation dialogs (ConfirmDialog) */
+.portal-confirm-message {
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  color: var(--color-text);
+}
+
+.btn-danger {
+  background-color: var(--color-danger);
+  border-color: var(--color-danger);
+  color: #ffffff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+.portal-record-fields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.portal-confirm-box {
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-neutral-soft);
+}
+
+.portal-confirm-box .portal-form-actions {
+  margin-top: var(--space-3);
+}
+
+/* Patient picker (NewRecordModal) */
+.portal-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.portal-pick-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.portal-pick-item:hover,
+.portal-pick-item:focus-visible {
+  border-color: var(--color-primary);
+}
+
+.portal-pick-name {
+  font-weight: var(--font-weight-semibold);
+}
+
+.portal-record-patient {
+  margin-bottom: var(--space-4);
+  font-size: var(--font-size-sm);
+}

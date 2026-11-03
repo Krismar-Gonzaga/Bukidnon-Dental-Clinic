@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import Icon from './Icon';
 import './Tabs.css';
 
@@ -8,6 +8,10 @@ import './Tabs.css';
 // Left/Right/Home/End move between tabs.
 function Tabs({ tabs, activeId, onChange, idPrefix, label, variant = 'underline' }) {
   const tabRefs = useRef({});
+
+  useEffect(() => {
+    tabRefs.current[activeId]?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }, [activeId]);
 
   const focusTab = (index) => {
     const tab = tabs[(index + tabs.length) % tabs.length];

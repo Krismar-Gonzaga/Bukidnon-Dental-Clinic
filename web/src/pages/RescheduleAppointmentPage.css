@@ -1,7 +1,7 @@
 /* Same column as the appointment details page. */
 .reschedule-page {
   max-width: 672px;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .reschedule-card {

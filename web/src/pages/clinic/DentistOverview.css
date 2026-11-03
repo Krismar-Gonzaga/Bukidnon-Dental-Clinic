@@ -1,0 +1,514 @@
+/* Dentist dashboard (dentist design "Overview"). Colors come from the
+   clinic design roles set on .clinic-shell (ClinicShell.css). Sizes follow
+   the design's scale: 24px card padding, 12px card radius, 8px control radius. */
+
+.dentist-overview {
+  --dentist-card-radius: 12px;
+  --dentist-control-radius: 8px;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* ---------- Welcome ---------- */
+.dentist-welcome-title {
+  margin-bottom: var(--space-1);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.3;
+  color: var(--clinic-on-surface);
+}
+
+.dentist-welcome-text {
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  color: var(--clinic-on-surface-variant);
+}
+
+/* ---------- Metric cards ---------- */
+.dentist-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+.dentist-metric {
+  padding: var(--space-5);
+  border: 1px solid var(--clinic-outline-variant);
+  border-radius: var(--dentist-card-radius);
+  background-color: #ffffff;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.15s ease;
+}
+
+.dentist-metric:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.dentist-metric-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.dentist-metric-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--dentist-control-radius);
+}
+
+.dentist-metric-icon.is-primary {
+  background-color: rgba(0, 63, 135, 0.1);
+  color: var(--clinic-primary);
+}
+
+.dentist-metric-icon.is-secondary {
+  background-color: rgba(0, 108, 79, 0.1);
+  color: var(--clinic-secondary);
+}
+
+.dentist-metric-change {
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+  text-align: right;
+}
+
+.dentist-metric-change.is-up {
+  color: var(--clinic-secondary);
+}
+
+.dentist-metric-change.is-down {
+  color: var(--clinic-error);
+}
+
+.dentist-metric-change.is-flat {
+  color: var(--clinic-on-surface-variant);
+}
+
+.dentist-metric-label,
+.dentist-overline {
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--clinic-on-surface-variant);
+}
+
+.dentist-metric-value {
+  font-size: 3rem;
+  font-weight: var(--font-weight-bold);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--clinic-on-surface);
+}
+
+/* ---------- Two-column area ---------- */
+.dentist-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.dentist-main-column,
+.dentist-side-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.dentist-card {
+  border: 1px solid var(--clinic-outline-variant);
+  border-radius: var(--dentist-card-radius);
+  background-color: #ffffff;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.dentist-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--clinic-outline-variant);
+}
+
+.dentist-card-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.4;
+}
+
+.dentist-card-link {
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+  color: var(--clinic-primary);
+  text-decoration: none;
+}
+
+.dentist-card-link:hover {
+  text-decoration: underline;
+}
+
+.dentist-empty {
+  padding: var(--space-5);
+  font-size: var(--font-size-sm);
+  color: var(--clinic-on-surface-variant);
+}
+
+/* ---------- Today's schedule ---------- */
+.dentist-schedule-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dentist-schedule-list > li + li {
+  border-top: 1px solid var(--clinic-outline-variant);
+}
+
+.dentist-schedule-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.dentist-schedule-row:hover,
+.dentist-schedule-row:focus-visible {
+  background-color: var(--clinic-surface-low);
+}
+
+.dentist-schedule-row.is-muted {
+  opacity: 0.6;
+}
+
+.dentist-schedule-time {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
+  text-align: center;
+}
+
+.dentist-schedule-clock {
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.5;
+}
+
+.dentist-schedule-period {
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+  color: var(--clinic-on-surface-variant);
+}
+
+.dentist-schedule-divider {
+  flex-shrink: 0;
+  width: 1px;
+  height: 48px;
+  background-color: var(--clinic-outline-variant);
+}
+
+.dentist-schedule-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.dentist-schedule-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.dentist-schedule-patient {
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.dentist-schedule-meta {
+  font-size: var(--font-size-sm);
+  color: var(--clinic-on-surface-variant);
+}
+
+.dentist-schedule-chevron {
+  flex-shrink: 0;
+  color: var(--clinic-primary);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.dentist-schedule-row:hover .dentist-schedule-chevron,
+.dentist-schedule-row:focus-visible .dentist-schedule-chevron {
+  opacity: 1;
+}
+
+.dentist-schedule-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-4);
+  border: 0;
+  border-top: 1px solid var(--clinic-outline-variant);
+  background-color: var(--clinic-surface-low);
+  color: var(--clinic-on-surface-variant);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+.dentist-schedule-more:hover {
+  color: var(--clinic-primary);
+}
+
+.dentist-schedule-more .is-flipped {
+  transform: rotate(180deg);
+}
+
+/* ---------- Quick actions ---------- */
+.dentist-panel {
+  padding: var(--space-5);
+  border: 1px solid var(--clinic-outline-variant);
+  border-radius: var(--dentist-card-radius);
+  background-color: var(--clinic-surface-low);
+}
+
+.dentist-panel .dentist-overline {
+  margin-bottom: var(--space-5);
+}
+
+.dentist-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dentist-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-4);
+  border: 1px solid var(--clinic-outline-variant);
+  border-radius: var(--dentist-control-radius);
+  background-color: #ffffff;
+  color: var(--clinic-on-surface);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dentist-action:hover,
+.dentist-action:focus-visible {
+  border-color: var(--clinic-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.dentist-action-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.dentist-action-icon {
+  color: var(--clinic-primary);
+}
+
+.dentist-action-arrow {
+  color: var(--clinic-on-surface-variant);
+}
+
+.dentist-action:hover .dentist-action-arrow {
+  color: var(--clinic-primary);
+}
+
+.dentist-saved {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--clinic-secondary);
+}
+
+/* ---------- Clinical notes ---------- */
+.dentist-notes {
+  padding: var(--space-5);
+}
+
+.dentist-notes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-5);
+}
+
+.dentist-notes-more {
+  display: inline-flex;
+  color: var(--clinic-on-surface-variant);
+}
+
+.dentist-notes-more svg {
+  transform: rotate(90deg);
+}
+
+.dentist-notes-more:hover {
+  color: var(--clinic-primary);
+}
+
+.dentist-note-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dentist-note {
+  position: relative;
+  padding-left: var(--space-5);
+  border-left: 2px solid var(--clinic-outline-variant);
+}
+
+.dentist-note::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -9px;
+  width: 16px;
+  height: 16px;
+  border: 4px solid #ffffff;
+  border-radius: 50%;
+  background-color: var(--clinic-outline-variant);
+}
+
+.dentist-note.is-latest {
+  border-left-color: var(--clinic-primary-fixed);
+}
+
+.dentist-note.is-latest::before {
+  background-color: var(--clinic-primary);
+}
+
+.dentist-note-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+}
+
+.dentist-note-head a {
+  color: var(--clinic-on-surface);
+  text-decoration: none;
+}
+
+.dentist-note.is-latest .dentist-note-head a {
+  color: var(--clinic-primary);
+}
+
+.dentist-note-head a:hover {
+  text-decoration: underline;
+}
+
+.dentist-note-time {
+  font-weight: var(--font-weight-regular);
+  color: var(--clinic-on-surface-variant);
+}
+
+.dentist-note-text {
+  display: -webkit-box;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.dentist-notes-all {
+  display: block;
+  margin-top: var(--space-5);
+  padding: var(--space-2);
+  border: 1px solid rgba(0, 63, 135, 0.2);
+  border-radius: var(--dentist-control-radius);
+  color: var(--clinic-primary);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+  text-align: center;
+  text-decoration: none;
+}
+
+.dentist-notes-all:hover {
+  background-color: rgba(0, 63, 135, 0.05);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1100px) {
+  .dentist-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .dentist-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dentist-welcome-title {
+    font-size: 1.75rem;
+  }
+
+  .dentist-schedule-row {
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .dentist-schedule-time {
+    min-width: 56px;
+  }
+
+  .dentist-schedule-patient {
+    font-size: var(--font-size-base);
+  }
+
+  .dentist-schedule-chevron {
+    opacity: 1;
+  }
+}

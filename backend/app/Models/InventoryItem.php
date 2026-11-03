@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class InventoryItem extends Model
 {
-    protected $fillable = ['branch_id', 'category_id', 'name', 'description', 'unit', 'minimum_stock', 'is_active'];
+    protected $fillable = ['branch_id', 'category_id', 'name', 'brand', 'description', 'unit', 'unit_cost', 'minimum_stock', 'is_active'];
 
     protected $casts = [
         'minimum_stock' => 'integer',
+        'unit_cost' => 'float',
         'is_active' => 'boolean',
     ];
 
@@ -43,11 +44,16 @@ class InventoryItem extends Model
     /** Stock that can be used: batches with quantity that have not expired. */
     public function usableQuantity(): int
     {
-        return (int) $this->batches()->usable()->sum('quantity_on_hand');
+        // Lists load batches up front: reuse them instead of queries per item.
+        return $this->relationLoaded('batches')
+            ? (int) $this->batches->filter(fn ($b) => $b->quantity_on_hand > 0 && ! $b->isExpired())->sum('quantity_on_hand')
+            : (int) $this->batches()->usable()->sum('quantity_on_hand');
     }
 
     public function expiredQuantity(): int
     {
-        return (int) $this->batches()->expired()->sum('quantity_on_hand');
+        return $this->relationLoaded('batches')
+            ? (int) $this->batches->filter(fn ($b) => $b->quantity_on_hand > 0 && $b->isExpired())->sum('quantity_on_hand')
+            : (int) $this->batches()->expired()->sum('quantity_on_hand');
     }
 }

@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import App from './App';
-import { getCities, getClinicMap, getHome, getSpecializations } from './services/publicApi';
+import { getCities, getClinicMap, getHome, getServiceCatalog, getSpecializations } from './services/publicApi';
 import { getPatientDashboard } from './services/patientApi';
 import { getNotifications } from './services/notificationApi';
 import { PATIENT_USER, renderWithProviders } from './testUtils';
@@ -8,6 +8,8 @@ import { PATIENT_USER, renderWithProviders } from './testUtils';
 jest.mock('./services/publicApi');
 jest.mock('./services/patientApi');
 jest.mock('./services/notificationApi');
+jest.mock('./services/clinicPortalApi');
+jest.mock('./services/adminApi');
 
 const HOME = {
   featuredClinics: [
@@ -21,6 +23,7 @@ const HOME = {
 
 beforeEach(() => {
   getHome.mockResolvedValue(HOME);
+  getServiceCatalog.mockResolvedValue([{ id: '3', name: 'Dental Cleaning', category: 'Preventive', priceLabel: '₱800 – ₱1,500', durationLabel: '45 min', description: 'Prophylaxis', clinicCount: 2 }]);
   getClinicMap.mockResolvedValue([
     { id: '1', name: 'Malaybalay Dental Care', location: 'Malaybalay City', latitude: 8.1575, longitude: 125.1278 },
     { id: '2', name: 'No Coordinates Clinic', location: 'Valencia City', latitude: null, longitude: null },
@@ -41,7 +44,7 @@ test('renders the guest home page with live featured clinics, prices and reviews
   expect(await screen.findByRole('heading', { level: 3, name: 'Malaybalay Dental Care' })).toBeInTheDocument();
   const featured = screen.getByRole('heading', { level: 2, name: /featured clinics/i }).closest('section');
   expect(within(featured).getByRole('link', { name: /book appointment/i })).toHaveAttribute('href', '/login?next=%2Fpatient%2Fbook%3Fclinic%3D1');
-  expect(screen.getByText('Starts at ₱800')).toBeInTheDocument();
+  expect(await screen.findByText('₱800 – ₱1,500')).toBeInTheDocument();
   expect(screen.getByText('Booking took two minutes.')).toBeInTheDocument();
 });
 
@@ -72,4 +75,39 @@ test('a patient cannot open the admin portal', async () => {
 test('unknown paths show a not-found page', () => {
   renderApp('/no-such-page');
   expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();
+});
+
+test('the guest site header and footer show on public pages only, not on sign-in or in the patient portal', () => {
+  const home = renderApp('/');
+  expect(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'Home' })).toBeInTheDocument();
+  expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+  home.unmount();
+
+  // Sign-in: only the login page (its own Back to Home link), no site header or footer.
+  const login = renderApp('/login');
+  expect(screen.getByRole('heading', { level: 1, name: 'Welcome Back' })).toBeInTheDocument();
+  expect(screen.queryByRole('navigation', { name: 'Main navigation' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /Back to Home/ })).toHaveAttribute('href', '/');
+  login.unmount();
+  renderApp('/patient/dashboard', PATIENT_USER);
+  expect(screen.getByRole('navigation', { name: 'Patient' })).toBeInTheDocument();
+  expect(screen.queryByRole('navigation', { name: 'Main navigation' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
+});
+
+test('clinic and admin portals use their own frame, not the patient site header and footer', async () => {
+  const { clinicUser } = jest.requireActual('./testUtils');
+  const clinicApi = require('./services/clinicPortalApi');
+  clinicApi.getClinicDashboard.mockResolvedValue({ alerts: [] });
+
+  const { unmount } = renderApp('/clinic/7/dashboard', clinicUser(['clinic.view'], 'dentist'));
+  expect(screen.getByRole('navigation', { name: 'Clinic' })).toBeInTheDocument();
+  expect(screen.queryByRole('navigation', { name: 'Main navigation' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
+  unmount();
+
+  renderApp('/admin', { id: 3, name: 'Sam Admin', email: 'sam@example.com', role: 'system_admin', memberships: [] });
+  expect(screen.getByRole('navigation', { name: 'Administration' })).toBeInTheDocument();
+  expect(screen.queryByRole('navigation', { name: 'Main navigation' })).not.toBeInTheDocument();
 });

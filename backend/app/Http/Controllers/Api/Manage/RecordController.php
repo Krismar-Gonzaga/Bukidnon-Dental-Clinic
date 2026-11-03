@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\PatientRecordResource;
 use App\Models\Appointment;
 use App\Models\Clinic;
+use App\Models\ClinicMembership;
 use App\Models\Patient;
 use App\Models\PatientRecord;
 use App\Services\AuditLogger;
@@ -38,6 +39,42 @@ class RecordController extends Controller
         $this->audit->record('records.viewed', $patient, ['count' => $records->count()], $clinic->id);
 
         return $this->ok(PatientRecordResource::collection($records)->resolve());
+    }
+
+    /**
+     * Current records across the clinic's patients, newest first. Dentists
+     * only see records of patients who have an appointment with them;
+     * `mine` keeps the records the signed-in member wrote.
+     */
+    public function clinicIndex(Request $request, Clinic $clinic)
+    {
+        $data = $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+            'record_type' => ['nullable', Rule::in(PatientRecord::TYPES)],
+            'mine' => ['sometimes', 'boolean'],
+        ]);
+        $isDentist = $this->membership($request)->role === ClinicMembership::ROLE_DENTIST;
+        $dentistId = $this->actingDentist($request)?->id ?? 0;
+
+        $query = PatientRecord::where('clinic_id', $clinic->id)
+            ->current()
+            ->when($isDentist, fn ($q) => $q->whereHas('patient.appointments', fn ($a) => $a
+                ->where('clinic_id', $clinic->id)->where('dentist_id', $dentistId)))
+            ->when($request->boolean('mine'), fn ($q) => $q->where('created_by', $request->user()->id))
+            ->when($data['record_type'] ?? null, fn ($q, $type) => $q->where('record_type', $type))
+            ->when($data['search'] ?? null, function ($q, $search) {
+                $term = '%'.mb_strtolower($search).'%';
+                $q->whereHas('patient', fn ($p) => $p->where(fn ($w) => $w
+                    ->whereRaw('LOWER(full_name) LIKE ?', [$term])
+                    ->orWhereHas('user', fn ($u) => $u->whereRaw('LOWER(name) LIKE ?', [$term]))));
+            })
+            ->with(['dentist.user', 'author', 'patient.user'])
+            ->latest()->latest('id');
+
+        $page = $query->paginate($this->perPage($request, 20));
+        $this->audit->record('records.listed', null, ['count' => count($page->items()), 'page' => $page->currentPage()], $clinic->id);
+
+        return $this->paginated($page, fn ($record) => (new PatientRecordResource($record))->withPatient()->resolve());
     }
 
     public function store(Request $request, Clinic $clinic, int $patientId)

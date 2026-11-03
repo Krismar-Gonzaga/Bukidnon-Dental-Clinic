@@ -33,6 +33,17 @@ test('register sends the password confirmation the backend requires', async () =
   );
 });
 
+test('fetchCurrentUser asks GET /session and returns the user', async () => {
+  apiClient.get.mockResolvedValue({ data: { success: true, data: { id: 7, name: 'Juan', role: 'patient' } } });
+  await expect(fetchCurrentUser()).resolves.toEqual({ id: 7, name: 'Juan', role: 'patient' });
+  expect(apiClient.get).toHaveBeenCalledWith('/session', { skipSessionExpiry: true });
+});
+
+test('fetchCurrentUser returns null for a guest (200 with no data)', async () => {
+  apiClient.get.mockResolvedValue({ data: { success: true } });
+  await expect(fetchCurrentUser()).resolves.toBeNull();
+});
+
 test('fetchCurrentUser returns null when signed out', async () => {
   apiClient.get.mockRejectedValue(Object.assign(new Error('401'), { response: { status: 401 } }));
   await expect(fetchCurrentUser()).resolves.toBeNull();

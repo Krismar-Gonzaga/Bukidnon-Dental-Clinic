@@ -24,20 +24,32 @@ jest.mock('@react-navigation/bottom-tabs', () => ({
 }));
 
 jest.mock('../src/screens/patient/PatientHomeScreen', () => ({__esModule: true, default: 'PatientHomeScreen'}), { virtual: true });
-jest.mock('../src/screens/patient/ClinicsScreen', () => ({__esModule: true, default: 'ClinicsScreen'}), { virtual: true });
-jest.mock('../src/screens/patient/ClinicDetailsScreen', () => ({__esModule: true, default: 'ClinicDetailsScreen'}), { virtual: true });
 jest.mock('../src/screens/patient/AppointmentsScreen', () => ({__esModule: true, default: 'AppointmentsScreen'}), { virtual: true });
 jest.mock('../src/screens/patient/ProfileScreen', () => ({__esModule: true, default: 'ProfileScreen'}), { virtual: true });
 jest.mock('../src/screens/auth/LoginScreen', () => ({__esModule: true, default: 'LoginScreen'}), { virtual: true });
 jest.mock('../src/screens/auth/RegisterScreen', () => ({__esModule: true, default: 'RegisterScreen'}), { virtual: true });
 jest.mock('../src/screens/patient/BookAppointmentScreen', () => ({__esModule: true, default: 'BookAppointmentScreen'}), { virtual: true });
 jest.mock('../src/screens/patient/FeedbackScreen', () => ({__esModule: true, default: 'FeedbackScreen'}), { virtual: true });
+jest.mock('../src/screens/patient/AppointmentDetailsScreen', () => ({__esModule: true, default: 'AppointmentDetailsScreen'}), { virtual: true });
+jest.mock('../src/screens/patient/RescheduleScreen', () => ({__esModule: true, default: 'RescheduleScreen'}), { virtual: true });
+jest.mock('../src/screens/patient/SavedClinicsScreen', () => ({__esModule: true, default: 'SavedClinicsScreen'}), { virtual: true });
+jest.mock('../src/screens/patient/ClinicLocatorScreen', () => ({__esModule: true, default: 'ClinicLocatorScreen'}), { virtual: true });
+jest.mock('../src/screens/patient/EditProfileScreen', () => ({__esModule: true, default: 'EditProfileScreen'}), { virtual: true });
+jest.mock('../src/screens/patient/ChangePasswordScreen', () => ({__esModule: true, default: 'ChangePasswordScreen'}), { virtual: true });
 jest.mock('../src/screens/auth/ClinicRequirementsScreen', () => ({__esModule: true, default: 'ClinicRequirementsScreen'}), { virtual: true });
 jest.mock('../src/screens/auth/StaffNoticeScreen', () => ({__esModule: true, default: 'StaffNoticeScreen'}), { virtual: true });
 jest.mock('../src/screens/patient/NotificationsScreen', () => ({__esModule: true, default: 'NotificationsScreen'}), { virtual: true });
+jest.mock('../src/screens/clinic/ClinicDashboardScreen', () => ({__esModule: true, default: 'ClinicDashboardScreen'}), { virtual: true });
+jest.mock('../src/screens/clinic/ClinicStaffScreen', () => ({__esModule: true, default: 'ClinicStaffScreen'}), { virtual: true });
 jest.mock('../src/screens/guest/GuestHomeScreen', () => ({__esModule: true, default: 'GuestHomeScreen'}), { virtual: true });
 jest.mock('../src/screens/guest/GuestClinicsScreen', () => ({__esModule: true, default: 'GuestClinicsScreen'}), { virtual: true });
 jest.mock('../src/screens/guest/GuestClinicDetailsScreen', () => ({__esModule: true, default: 'GuestClinicDetailsScreen'}), { virtual: true });
+jest.mock('../src/screens/guest/GuestDentistsScreen', () => ({__esModule: true, default: 'GuestDentistsScreen'}), { virtual: true });
+jest.mock('../src/screens/guest/GuestDentistProfileScreen', () => ({__esModule: true, default: 'GuestDentistProfileScreen'}), { virtual: true });
+jest.mock('../src/screens/guest/GuestServicesScreen', () => ({__esModule: true, default: 'GuestServicesScreen'}), { virtual: true });
+jest.mock('../src/screens/guest/GuestAboutScreen', () => ({__esModule: true, default: 'GuestAboutScreen'}), { virtual: true });
+jest.mock('../src/screens/guest/GuestContactScreen', () => ({__esModule: true, default: 'GuestContactScreen'}), { virtual: true });
+jest.mock('../src/screens/guest/GuestLegalScreen', () => ({__esModule: true, default: 'GuestLegalScreen'}), { virtual: true });
 jest.mock('expo-constants', () => ({ __esModule: true, default: { expoConfig: { extra: {} } } }));
 // The offline layer needs native SQLite; the smoke test only checks the app tree mounts.
 jest.mock('../src/context/SyncContext', () => ({

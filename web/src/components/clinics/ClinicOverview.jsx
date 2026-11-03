@@ -20,7 +20,7 @@ function ClinicOverview({ clinic, bookHref }) {
   const mapSrc = embedUrl(clinic);
 
   return (
-    <div className="clinic-overview">
+    <div className="public-clinic-overview">
       <div className="clinic-overview-main">
         <section className="clinic-overview-card" aria-labelledby="clinic-info-title">
           <h2 id="clinic-info-title" className="clinic-overview-title">

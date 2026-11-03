@@ -1,0 +1,409 @@
+/* Pieces shared by the clinic admin pages. Colors: design roles on .clinic-shell. */
+
+.clinic-card-soft {
+  padding: var(--space-6);
+  border: 1px solid #eef0f4;
+  border-radius: 20px;
+  background-color: #ffffff;
+  box-shadow: 0 4px 16px rgba(24, 28, 32, 0.06);
+}
+
+.clinic-card-soft-title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--clinic-on-surface);
+}
+
+.clinic-card-soft-sub {
+  margin: 2px 0 0;
+  font-size: 0.9375rem;
+  color: var(--clinic-on-surface-variant);
+}
+
+.clinic-card-soft-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.clinic-overview-link {
+  font-weight: var(--font-weight-semibold);
+  color: var(--clinic-primary);
+  text-decoration: none;
+}
+
+.clinic-overview-link:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Stat tiles ---------- */
+.clinic-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-5);
+}
+
+.clinic-tile {
+  display: block;
+  padding: var(--space-5);
+  border: 1px solid #eef0f4;
+  border-radius: 20px;
+  background-color: #ffffff;
+  box-shadow: 0 4px 16px rgba(24, 28, 32, 0.06);
+  color: inherit;
+  text-decoration: none;
+  transition: box-shadow 0.15s ease;
+}
+
+a.clinic-tile:hover,
+a.clinic-tile:focus-visible {
+  box-shadow: 0 8px 22px rgba(24, 28, 32, 0.12);
+}
+
+.clinic-tile-icon {
+  display: inline-flex;
+  padding: 13px;
+  border-radius: 14px;
+}
+
+.clinic-tile-icon.is-blue { background-color: #e8f0fe; color: #1d5fd1; }
+.clinic-tile-icon.is-amber { background-color: #fff7e0; color: #b7791f; }
+.clinic-tile-icon.is-green { background-color: #e6f8ef; color: #0f9d58; }
+.clinic-tile-icon.is-purple { background-color: #f3e8ff; color: #7e22ce; }
+.clinic-tile-icon.is-teal { background-color: #e3f8fb; color: #0e8fa3; }
+.clinic-tile-icon.is-red { background-color: #fdeaea; color: #c81e1e; }
+
+.clinic-tile-value {
+  margin: var(--space-3) 0 0;
+  font-size: 2rem;
+  font-weight: var(--font-weight-bold);
+  line-height: 1.2;
+  color: var(--clinic-on-surface);
+  font-variant-numeric: tabular-nums;
+}
+
+.clinic-tile-label {
+  margin: 2px 0 0;
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--clinic-on-surface);
+}
+
+.clinic-tile-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 2px 0 0;
+  font-size: 0.8125rem;
+  color: var(--clinic-on-surface-variant);
+}
+
+/* ---------- Pills, initials ---------- */
+.clinic-pill {
+  display: inline-block;
+  padding: 3px var(--space-3);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.clinic-pill.is-success { border-color: #b7ebcd; background-color: #ecfbf3; color: #0a7d45; }
+.clinic-pill.is-warning { border-color: #f6e3a1; background-color: #fff9e5; color: #92660a; }
+.clinic-pill.is-danger { border-color: #f7c6c6; background-color: #fff0f0; color: #b91c1c; }
+.clinic-pill.is-info { border-color: #c4d9fb; background-color: #eef5ff; color: #1d4fb8; }
+.clinic-pill.is-neutral { border-color: #dfe2e8; background-color: #f1f3f6; color: #5b616e; }
+.clinic-pill.is-purple { border-color: #e6d3fb; background-color: #f8f1ff; color: #6b21a8; }
+
+.clinic-initials {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-weight: var(--font-weight-bold);
+  color: #ffffff;
+}
+
+.clinic-initials.is-sm { width: 40px; height: 40px; font-size: 0.875rem; }
+.clinic-initials.is-md { width: 70px; height: 70px; border-radius: 16px; font-size: 1.375rem; }
+
+.clinic-initials.is-blue { background-color: #2f7cf6; }
+.clinic-initials.is-green { background-color: #0bb574; }
+.clinic-initials.is-purple { background-color: #8b4ff0; }
+.clinic-initials.is-orange { background-color: #f4730b; }
+.clinic-initials.is-teal { background-color: #0e8fa3; }
+.clinic-initials.is-pink { background-color: #d9468f; }
+.clinic-initials.is-navy { background-color: var(--clinic-primary); }
+.clinic-initials.is-soft { background-color: #dfe8fb; color: var(--clinic-primary); }
+
+/* ---------- Search and filters ---------- */
+.clinic-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.clinic-search {
+  position: relative;
+  display: flex;
+  flex: 0 1 320px;
+  align-items: center;
+  color: var(--clinic-on-surface-variant);
+}
+
+.clinic-search > svg {
+  position: absolute;
+  left: 14px;
+  pointer-events: none;
+}
+
+.clinic-search input,
+.clinic-filter select,
+.clinic-date-filter {
+  width: 100%;
+  height: 52px;
+  border: 1px solid var(--clinic-outline-variant);
+  border-radius: 10px;
+  background-color: #ffffff;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--clinic-on-surface);
+}
+
+.clinic-search input {
+  padding: 0 var(--space-4) 0 44px;
+}
+
+.clinic-filter {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  color: var(--clinic-on-surface-variant);
+}
+
+.clinic-filter select {
+  min-width: 96px;
+  padding: 0 40px 0 var(--space-4);
+  appearance: none;
+  cursor: pointer;
+}
+
+.clinic-filter > svg {
+  position: absolute;
+  right: 14px;
+  pointer-events: none;
+}
+
+.clinic-date-filter {
+  width: 190px;
+  padding: 0 var(--space-4);
+}
+
+.clinic-search input:focus-visible,
+.clinic-filter select:focus-visible,
+.clinic-date-filter:focus-visible {
+  outline: 2px solid var(--clinic-primary);
+  outline-offset: 1px;
+}
+
+/* ---------- Tabs ---------- */
+.clinic-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-6);
+  padding: var(--space-1);
+  border: 1px solid #eef0f4;
+  border-radius: 14px;
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(24, 28, 32, 0.05);
+}
+
+.clinic-tab {
+  padding: 10px var(--space-5);
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--clinic-on-surface-variant);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.clinic-tab:hover {
+  background-color: var(--clinic-surface-low);
+}
+
+.clinic-tab.is-active {
+  background-color: var(--clinic-primary);
+  color: #ffffff;
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ---------- Data tables ---------- */
+.clinic-data-card {
+  overflow: hidden;
+  border: 1px solid #eef0f4;
+  border-radius: 20px;
+  background-color: #ffffff;
+  box-shadow: 0 4px 16px rgba(24, 28, 32, 0.06);
+}
+
+.clinic-data-scroll {
+  overflow-x: auto;
+}
+
+.clinic-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.clinic-data-table th {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--clinic-surface-high);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--clinic-on-surface-variant);
+  white-space: nowrap;
+}
+
+.clinic-data-table td {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--clinic-surface-low);
+  font-size: 0.9375rem;
+  color: var(--clinic-on-surface-variant);
+}
+
+.clinic-data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.clinic-data-table tbody tr:hover {
+  background-color: #fafbfd;
+}
+
+.clinic-data-table .is-end {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.clinic-data-table .is-center {
+  text-align: center;
+}
+
+.clinic-cell-person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.clinic-cell-title {
+  display: block;
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  color: var(--clinic-on-surface);
+  text-decoration: none;
+}
+
+a.clinic-cell-title:hover {
+  text-decoration: underline;
+}
+
+.clinic-cell-sub {
+  display: block;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--clinic-on-surface-variant);
+}
+
+.clinic-row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.clinic-icon-action {
+  display: inline-flex;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--clinic-on-surface-variant);
+  cursor: pointer;
+}
+
+.clinic-icon-action:hover,
+.clinic-icon-action:focus-visible {
+  background-color: var(--clinic-surface-high);
+  color: var(--clinic-primary);
+}
+
+.clinic-icon-action.is-danger { color: #dc2626; }
+.clinic-icon-action.is-success { color: #0f9d58; }
+
+.clinic-mini-button {
+  padding: 7px 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.clinic-mini-button.is-primary { background-color: var(--clinic-primary); color: #ffffff; }
+.clinic-mini-button.is-primary:hover { background-color: var(--clinic-primary-container); }
+.clinic-mini-button.is-success { background-color: #12b76a; color: #ffffff; }
+.clinic-mini-button.is-success:hover { background-color: #0e9f5c; }
+.clinic-mini-button.is-danger { border-color: #f7c6c6; color: #dc2626; }
+.clinic-mini-button.is-danger:hover { background-color: #fff0f0; }
+.clinic-mini-button.is-positive { border-color: #b7ebcd; color: #0a7d45; }
+.clinic-mini-button.is-positive:hover { background-color: #ecfbf3; }
+
+.clinic-empty-row {
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--clinic-on-surface-variant);
+}
+
+.clinic-header-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 12px var(--space-5);
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .clinic-search {
+    flex-basis: 100%;
+  }
+
+  .clinic-card-soft {
+    padding: var(--space-4);
+  }
+
+  .clinic-tile-value {
+    font-size: 1.5rem;
+  }
+}

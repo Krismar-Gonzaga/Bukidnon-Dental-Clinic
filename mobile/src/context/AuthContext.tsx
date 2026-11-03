@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import api, { isNetworkError } from '../services/api';
+import api, { API_BASE_URL, isNetworkError } from '../services/api';
 import { setSessionExpiredHandler } from '../services/http';
 import { clearUserOfflineData } from '../services/offline/patientRepository';
 import { clearSession, readToken, readUser, saveToken, saveUser } from '../services/session';
@@ -21,12 +21,18 @@ type AuthContextType = {
   register: (userData: Record<string, unknown>) => Promise<AuthResult>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<boolean>;
+  /** Apply saved account changes (name, email) to the signed-in user. */
+  updateUser: (changes: Partial<User>) => void;
   isAuthenticated: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const OFFLINE_MESSAGE = "You're offline. Connect to the internet to continue.";
+// No answer from the API. Usually no connection, but in development often the
+// API is not reachable from the phone (see docs/SETUP.md), so say how to fix it.
+const OFFLINE_MESSAGE = __DEV__
+  ? `Can't reach the server at ${API_BASE_URL}. Start the API with "php artisan serve" (SERVER_HOST=0.0.0.0 in backend/.env) and keep the phone on the same network as the computer.`
+  : "Can't reach the server. Check your internet connection and try again.";
 
 const getErrorMessage = (err: unknown, fallback: string) => {
   if (isNetworkError(err)) {
@@ -93,8 +99,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await api.post('/logout');
     } catch (err) {
-      // Offline logout still signs out locally; the token simply expires server-side.
-      console.error('Logout error:', err);
+      // Offline logout still signs out locally; the token simply expires
+      // server-side. Not an error for the user, so only a quiet warning.
+      console.warn(isNetworkError(err) ? 'Logged out on this device; the server could not be reached.' : 'Logout request failed:', isNetworkError(err) ? '' : err);
     } finally {
       // Don't leave a patient's saved appointments/profile (or unsent changes) on a
       // device someone else may use next.
@@ -106,6 +113,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await clearSession();
       setUser(null);
     }
+  };
+
+  const updateUser = (changes: Partial<User>) => {
+    setUser((current) => {
+      if (!current) return current;
+      const next = { ...current, ...changes };
+      saveUser(next).catch(() => undefined);
+      return next;
+    });
   };
 
   const checkAuth = async () => {
@@ -144,6 +160,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         register,
         logout,
         checkAuth,
+        updateUser,
         isAuthenticated: !!user,
       }}
     >

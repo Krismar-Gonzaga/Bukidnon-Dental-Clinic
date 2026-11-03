@@ -1,13 +1,12 @@
 .affordable-care {
-  padding: var(--space-9) 0;
-  background-color: var(--color-primary-soft);
+  padding: var(--space-6) 0;
+  background-color: #f1f4f9;
 }
 
 .affordable-care-inner {
   display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.4fr);
-  align-items: center;
-  gap: var(--space-8);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--space-6);
   max-width: var(--content-max-width);
   margin: 0 auto;
   padding: 0 var(--space-5);
@@ -15,36 +14,40 @@
 
 .affordable-care-label {
   display: inline-block;
-  padding: var(--space-1) var(--space-3);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
+  padding: var(--space-1) var(--space-4);
+  border-radius: 999px;
+  background-color: #0056b3;
   font-size: 0.75rem;
   font-weight: var(--font-weight-bold);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-primary);
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
+  color: #ffffff;
 }
 
 .affordable-care-title {
-  font-size: var(--font-size-3xl);
+  margin-bottom: var(--space-3);
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
-  letter-spacing: -0.02em;
+  line-height: 1.25;
   color: var(--color-text);
-  margin-bottom: var(--space-4);
 }
 
 .affordable-care-text {
-  max-width: 42ch;
-  font-size: var(--font-size-lg);
+  margin-bottom: var(--space-3);
+  line-height: 1.6;
   color: var(--color-text-muted);
+}
+
+.affordable-care-link {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary);
 }
 
 .affordable-care-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-5);
+  gap: var(--space-4);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -53,62 +56,51 @@
 .service-price-card {
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  padding: var(--space-6);
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
+  padding: var(--space-5);
   border-radius: var(--radius-lg);
+  background-color: #fafbfd;
   box-shadow: var(--shadow-sm);
 }
 
 .service-price-card-name {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
+  font-size: 1.0625rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
 }
 
 .service-price-card-text {
+  margin-bottom: var(--space-4);
   font-size: var(--font-size-sm);
+  line-height: 1.6;
   color: var(--color-text-muted);
-  margin-bottom: var(--space-5);
 }
 
 .service-price-card-price {
-  /* Pin price to the card bottom so prices align across a row */
   margin-top: auto;
-  font-size: var(--font-size-xl);
+  font-size: 1.5rem;
   font-weight: var(--font-weight-bold);
-  color: var(--color-primary);
+  color: var(--color-text);
 }
 
 @media (max-width: 960px) {
   .affordable-care-inner {
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-6);
-  }
-
-  .affordable-care-title {
-    font-size: var(--font-size-2xl);
   }
 }
 
-@media (max-width: 600px) {
-  .affordable-care {
-    padding: var(--space-8) 0;
-  }
-
+@media (max-width: 560px) {
   .affordable-care-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .affordable-care-title {
+    font-size: 1.625rem;
   }
 }
 
 @media (max-width: 480px) {
   .affordable-care-inner {
     padding: 0 var(--space-4);
-  }
-
-  .service-price-card {
-    padding: var(--space-5);
   }
 }

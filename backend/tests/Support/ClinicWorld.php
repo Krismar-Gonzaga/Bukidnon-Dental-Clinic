@@ -81,6 +81,16 @@ trait ClinicWorld
         ]);
     }
 
+    /** System admin whose password was just re-confirmed (RequireRecentPassword). */
+    protected function asConfirmedAdmin(User $admin): static
+    {
+        $this->app['auth']->forgetGuards();
+        $token = $admin->createToken('test');
+        \Illuminate\Support\Facades\Cache::put("admin-password-confirmed:{$admin->id}:token:{$token->accessToken->getKey()}", true, 600);
+
+        return $this->withToken($token->plainTextToken);
+    }
+
     protected function asUser(User $user): static
     {
         // Fresh token per call keeps tests independent of Sanctum's guard cache.

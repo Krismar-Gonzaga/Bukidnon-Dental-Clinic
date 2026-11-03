@@ -17,6 +17,11 @@ class Patient extends Model
 {
     use HasFactory;
 
+    /** Private: photos are only served to their owner, never from a public URL. */
+    public const PHOTO_DISK = 'local';
+
+    public const CONSENTS = ['email_follow_up', 'share_medical_history', 'emergency_contact_consent', 'promotions'];
+
     protected $fillable = [
         'phone',
         'address',
@@ -26,11 +31,26 @@ class Patient extends Model
         'email',
         'emergency_contact_name',
         'emergency_contact_phone',
+        'civil_status',
+        'blood_type',
+        'city',
+        'province',
+        'zip_code',
+        'emergency_contact_relationship',
+        'emergency_contact_address',
+        'health_profile',
+        'consents',
     ];
 
     protected $casts = [
         'birth_date' => 'date:Y-m-d',
+        'health_profile' => 'encrypted:array',
+        'consents' => 'array',
     ];
+
+    // Patients are serialized in some responses (e.g. the signed-in user), so these
+    // must be asked for explicitly, by someone allowed to see them.
+    protected $hidden = ['health_profile', 'consents', 'photo_path'];
 
     public function user(): BelongsTo
     {
@@ -70,6 +90,14 @@ class Patient extends Model
     public function getDisplayNameAttribute(): ?string
     {
         return $this->user?->name ?? $this->full_name;
+    }
+
+    /** Every consent, off until the patient turns it on. */
+    public function consentValues(): array
+    {
+        return collect(self::CONSENTS)
+            ->mapWithKeys(fn (string $key) => [$key => (bool) ($this->consents[$key] ?? false)])
+            ->all();
     }
 
     public function getContactEmailAttribute(): ?string

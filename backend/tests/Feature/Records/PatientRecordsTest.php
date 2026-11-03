@@ -86,6 +86,48 @@ class PatientRecordsTest extends TestCase
         $this->asUser($second)->getJson($this->manage($this->world, "/patients/{$this->patientId}"))->assertNotFound();
     }
 
+    public function test_dentist_lists_current_records_of_their_patients_and_the_list_is_audited(): void
+    {
+        $id = $this->createRecord()->json('data.id');
+        $this->asUser($this->world['dentistUser'])->postJson($this->recordsUrl("/{$id}/amend"), [
+            'record_type' => 'examination',
+            'findings' => 'Moderate gingivitis',
+            'amendment_reason' => 'Wrong type',
+        ])->assertOk();
+
+        $list = $this->asUser($this->world['dentistUser'])->getJson($this->manage($this->world, '/records?mine=1'))
+            ->assertOk()->assertJsonPath('meta.total', 1)->json('data');
+        $this->assertSame('examination', $list[0]['record_type']);
+        $this->assertSame(['id' => $this->patientId, 'name' => $this->patientUser->name], $list[0]['patient']);
+
+        $url = $this->manage($this->world, '/records');
+        $this->asUser($this->world['dentistUser'])->getJson("{$url}?record_type=treatment")->assertOk()->assertJsonCount(0, 'data');
+        $this->asUser($this->world['dentistUser'])->getJson("{$url}?search=".urlencode(mb_substr($this->patientUser->name, 0, 4)))
+            ->assertOk()->assertJsonCount(1, 'data');
+        $this->asUser($this->world['dentistUser'])->getJson("{$url}?search=nobody-matches")->assertOk()->assertJsonCount(0, 'data');
+        $this->assertTrue(AuditLog::where('action', 'records.listed')->where('clinic_id', $this->world['clinic']->id)->exists());
+    }
+
+    public function test_record_list_is_limited_to_the_dentists_patients_and_clinical_roles(): void
+    {
+        $this->createRecord()->assertCreated();
+        $url = $this->manage($this->world, '/records');
+
+        $second = \App\Models\User::factory()->role('dentist')->memberOf($this->world['clinic'], 'dentist')->create();
+        $profile = new \App\Models\Dentist(['is_active' => true]);
+        $profile->user_id = $second->id;
+        $profile->save();
+        $this->asUser($second)->getJson($url)->assertOk()->assertJsonCount(0, 'data');
+
+        foreach (['staff', 'admin'] as $who) {
+            $this->asUser($this->world[$who])->getJson($url)->assertForbidden();
+        }
+
+        $other = $this->makeClinic();
+        $this->asUser($other['dentistUser'])->getJson($url)->assertNotFound();
+        $this->asUser($other['dentistUser'])->getJson($this->manage($other, '/records'))->assertOk()->assertJsonCount(0, 'data');
+    }
+
     public function test_corrections_create_amendments_and_preserve_history(): void
     {
         $id = $this->createRecord()->json('data.id');

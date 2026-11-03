@@ -15,6 +15,9 @@ export const formatShortDate = (iso) => format(iso, { month: 'short', day: 'nume
 /** "9:00 AM" */
 export const formatTime = (iso) => format(iso, { hour: 'numeric', minute: '2-digit' });
 
+/** "14:22:15" (24-hour, with seconds; audit log) */
+export const formatTimeWithSeconds = (iso) => format(iso, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+
 /** "July 25, 2026 at 9:00 AM" */
 export const formatDateTime = (iso) => (iso ? `${formatDate(iso)} at ${formatTime(iso)}` : '');
 
@@ -71,3 +74,22 @@ export function dateFromKey(key) {
 
 export const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 export const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Minutes since midnight, Philippine time (calendar block positions). */
+export function businessMinutes(iso) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: BUSINESS_TIMEZONE,
+    hour: 'numeric',
+    minute: 'numeric',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(iso));
+  const value = (type) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return value('hour') * 60 + value('minute');
+}
+
+/** YYYY-MM-DD key moved by a number of days. */
+export function addDaysToKey(key, days) {
+  const date = dateFromKey(key);
+  date.setDate(date.getDate() + days);
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+}

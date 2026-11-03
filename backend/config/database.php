@@ -97,6 +97,23 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Reuse the connection between requests. Opening a TLS connection to a
+            // remote (Supabase) database costs seconds, and `php artisan serve`
+            // would pay it on every request. On by default only for the local web
+            // server: never for console commands (migrations, seeders, queue),
+            // where a reused connection can carry an aborted transaction over.
+            // Send each query and its values in one round trip instead of
+            // prepare + execute (two). Halves the wait on a remote database, and
+            // the Supabase transaction pooler (port 6543) cannot keep named
+            // prepared statements anyway ("prepared statement does not exist").
+            // Values stay separate from the SQL, so this is still injection-safe.
+            'options' => extension_loaded('pdo_pgsql') ? [
+                PDO::ATTR_PERSISTENT => filter_var(
+                    env('DB_PERSISTENT', env('APP_ENV') === 'local' && PHP_SAPI !== 'cli'),
+                    FILTER_VALIDATE_BOOL
+                ),
+                PDO::PGSQL_ATTR_DISABLE_PREPARES => true,
+            ] : [],
         ],
 
         'sqlsrv' => [

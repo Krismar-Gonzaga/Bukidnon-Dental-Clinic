@@ -1,101 +1,136 @@
-// Book an appointment, or move an existing one (route.params.reschedule).
+// Book an appointment in the website's five steps: clinic, dentist, service, schedule, confirm.
 //
-// Every option comes from the API: the clinic's services and dentists, the
-// dates the chosen dentist works, and the open times on the chosen date. The
-// server checks the slot again when the request arrives, so two patients can
-// never get the same time.
+// Every option comes from the API or the saved directory: the clinic's services and
+// dentists, the dates the chosen dentist works, and the open times on the chosen date. The
+// server checks the slot again when the request arrives, so two patients can never get the
+// same time.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import axios from 'axios';
-import { isNetworkError, patientService } from '../../services/api';
+import Icon from 'react-native-vector-icons/Ionicons';
+import PatientShell from '../../components/patient/PatientShell';
+import { CalendarPicker, Notice, SectionLabel, StatusBadge, TimeSlots } from '../../components/patient/PatientUi';
+import { accentFor, Card, guestColors, initialOf, Message, OutlineButton, PrimaryButton, Stars } from '../../components/guest/GuestUi';
 import {
-  ClinicDetails,
-  fetchClinicDetails,
-  getCachedClinicDetails,
-} from '../../services/offline/publicRepository';
+  BOOKING_APPROVAL_NOTICE,
+  BOOKING_ARRIVAL_NOTICE,
+  BOOKING_QUEUED_MESSAGE,
+  BOOKING_STEPS,
+  BOOKING_SUBMITTED_MESSAGE,
+} from '../../content/patientContent';
+import { useSync } from '../../context/SyncContext';
+import { isNetworkError, patientService } from '../../services/api';
+import { fetchAvailableDates, fetchSlots, formatClockTime, formatDateKey, Slot, upcomingBusinessDates } from '../../services/booking';
 import { newIdempotencyKey } from '../../services/offline/patientRepository';
 import {
-  fetchAvailableDates,
-  fetchSlots,
-  formatClockTime,
-  formatDateKey,
-  Slot,
-  upcomingBusinessDates,
-} from '../../services/booking';
+  ClinicDetails,
+  ClinicSummary,
+  fetchClinicDetails,
+  getCachedClinicDetails,
+  queryClinics,
+} from '../../services/offline/publicRepository';
+import { spacing, type } from '../../theme/tokens';
 import { formatPrice } from '../../utils/format';
 
 const CALENDAR_DAYS = 28;
-const REASONS = ['Checkup', 'Cleaning', 'Toothache', 'Braces', 'Follow-up', 'Other'];
+const SCHEDULE_STEP = BOOKING_STEPS.findIndex(({ id }) => id === 'schedule');
 
-export type RescheduleParams = {
-  appointmentId: number | string;
-  clinicId: number | string;
-  serviceRateId: number;
-  dentistId: number;
-  currentLabel: string;
-};
-
-const serverMessage = (error: unknown, fallback: string) => {
+export const serverMessage = (error: unknown, fallback: string) => {
   if (isNetworkError(error)) {
     return "You're offline. Connect to the internet to see open times.";
   }
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as { message?: string; errors?: Record<string, string[]> } | undefined;
-    const firstFieldError = data?.errors ? Object.values(data.errors)[0]?.[0] : undefined;
-    return data?.message ?? firstFieldError ?? fallback;
+    return (data?.errors ? Object.values(data.errors)[0]?.[0] : undefined) ?? data?.message ?? fallback;
   }
   return fallback;
 };
 
+const Stepper = ({ current }: { current: number }) => (
+  <View style={styles.stepper} accessibilityLabel={`Step ${current + 1} of ${BOOKING_STEPS.length}: ${BOOKING_STEPS[current].label}`}>
+    {BOOKING_STEPS.map((step, index) => {
+      const done = index < current;
+      const active = index === current;
+      return (
+        <View key={step.id} style={styles.step}>
+          <View style={[styles.stepCircle, (done || active) && styles.stepCircleOn]}>
+            {done ? <Icon name="checkmark" size={15} color="#ffffff" /> : <Text style={[styles.stepNumber, active && styles.stepNumberOn]}>{index + 1}</Text>}
+          </View>
+          <Text style={[styles.stepLabel, (done || active) && styles.stepLabelOn]} numberOfLines={1}>
+            {step.label}
+          </Text>
+        </View>
+      );
+    })}
+  </View>
+);
+
+const Row = ({ label, value }: { label: string; value?: string | null }) => (
+  <View style={styles.reviewRow}>
+    <Text style={styles.reviewLabel}>{label}</Text>
+    <Text style={styles.reviewValue}>{value ?? '—'}</Text>
+  </View>
+);
+
 const BookAppointmentScreen = ({ route, navigation }: { route: any; navigation: any }) => {
-  const reschedule: RescheduleParams | undefined = route.params?.reschedule;
-  const clinicId: number | string | undefined = reschedule?.clinicId ?? route.params?.clinicId;
+  const { isReady, dataVersion } = useSync();
+  const [stepIndex, setStepIndex] = useState(0);
 
+  const [clinics, setClinics] = useState<ClinicSummary[] | null>(null);
+  const [clinicId, setClinicId] = useState<number | null>(route.params?.clinicId ?? null);
   const [clinic, setClinic] = useState<ClinicDetails | null>(null);
-  const [loadingClinic, setLoadingClinic] = useState(Boolean(clinicId));
-  const [clinicError, setClinicError] = useState<string | null>(null);
+  const [clinicProblem, setClinicProblem] = useState<string | null>(null);
+  const [dentistId, setDentistId] = useState<number | null>(route.params?.dentistId ?? null);
+  const [serviceId, setServiceId] = useState<number | null>(null);
 
-  const [serviceId, setServiceId] = useState<number | null>(reschedule?.serviceRateId ?? null);
-  const [dentistId, setDentistId] = useState<number | null>(reschedule?.dentistId ?? null);
   const [openDates, setOpenDates] = useState<Set<string> | null>(null);
   const [date, setDate] = useState<string | null>(null);
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [slot, setSlot] = useState<Slot | null>(null);
-  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
   const [datesAttempt, setDatesAttempt] = useState(0);
-  const [reason, setReason] = useState('');
-  const [notes, setNotes] = useState('');
+
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState<{ queued: boolean } | null>(null);
   // One key per booking attempt: a retry after a lost response cannot book twice.
   const idempotencyKey = useRef(newIdempotencyKey());
 
   const calendar = useMemo(() => upcomingBusinessDates(CALENDAR_DAYS), []);
-  const service = clinic?.services.find((s) => s.id === serviceId) ?? null;
-  const dentist = clinic?.dentists.find((d) => d.id === dentistId) ?? null;
+  const service = clinic?.services.find(({ id }) => id === serviceId) ?? null;
+  const dentist = clinic?.dentists.find(({ id }) => id === dentistId) ?? null;
+  const step = BOOKING_STEPS[stepIndex];
+
+  // Arriving again from a clinic or dentist page chooses that clinic and starts over.
+  useEffect(() => {
+    if (route.params?.clinicId) {
+      setClinicId(route.params.clinicId);
+      setDentistId(route.params.dentistId ?? null);
+      setServiceId(null);
+      setStepIndex(0);
+      setSubmitted(null);
+    }
+  }, [route.params?.clinicId, route.params?.dentistId]);
+
+  useEffect(() => {
+    if (isReady) {
+      queryClinics({ sort: 'name' })
+        .then(setClinics)
+        .catch(() => setClinics([]));
+    }
+  }, [isReady, dataVersion]);
 
   // Clinic details: saved copy first, then the latest from the server.
   useEffect(() => {
     if (!clinicId) {
+      setClinic(null);
       return;
     }
     let active = true;
+    setClinicProblem(null);
     (async () => {
       const cached = await getCachedClinicDetails(clinicId);
       if (active && cached && 'services' in cached.clinic) {
         setClinic(cached.clinic as ClinicDetails);
-        setLoadingClinic(false);
       }
       try {
         const fresh = await fetchClinicDetails(clinicId);
@@ -103,12 +138,9 @@ const BookAppointmentScreen = ({ route, navigation }: { route: any; navigation: 
           setClinic(fresh);
         }
       } catch (error) {
-        if (active && !cached) {
-          setClinicError(serverMessage(error, 'This clinic could not be loaded.'));
-        }
-      } finally {
-        if (active) {
-          setLoadingClinic(false);
+        if (active && !(cached && 'services' in cached.clinic)) {
+          setClinic(null);
+          setClinicProblem(serverMessage(error, 'This clinic could not be loaded.'));
         }
       }
     })();
@@ -123,20 +155,14 @@ const BookAppointmentScreen = ({ route, navigation }: { route: any; navigation: 
     setDate(null);
     setSlots(null);
     setSlot(null);
-    setAvailabilityError(null);
+    setProblem(null);
     if (!clinicId || !serviceId || !dentistId) {
       return;
     }
     let active = true;
-    fetchAvailableDates({
-      clinicId,
-      serviceRateId: serviceId,
-      dentistId,
-      from: calendar[0],
-      to: calendar[calendar.length - 1],
-    })
+    fetchAvailableDates({ clinicId, serviceRateId: serviceId, dentistId, from: calendar[0], to: calendar[calendar.length - 1] })
       .then((dates) => active && setOpenDates(new Set(dates)))
-      .catch((error) => active && setAvailabilityError(serverMessage(error, 'Open dates could not be loaded.')));
+      .catch((error) => active && setProblem(serverMessage(error, 'Open dates could not be loaded.')));
     return () => {
       active = false;
     };
@@ -148,11 +174,11 @@ const BookAppointmentScreen = ({ route, navigation }: { route: any; navigation: 
     }
     setSlots(null);
     setSlot(null);
-    setAvailabilityError(null);
+    setProblem(null);
     try {
       setSlots(await fetchSlots({ clinicId, serviceRateId: serviceId, dentistId, date: day }));
     } catch (error) {
-      setAvailabilityError(serverMessage(error, 'Open times could not be loaded.'));
+      setProblem(serverMessage(error, 'Open times could not be loaded.'));
     }
   };
 
@@ -161,52 +187,35 @@ const BookAppointmentScreen = ({ route, navigation }: { route: any; navigation: 
     loadSlots(day);
   };
 
-  const handleSubmit = async () => {
-    if (!slot || !service || (!reschedule && !dentist)) {
+  // Dentists and services belong to a clinic, so a new clinic clears them.
+  const chooseClinic = (id: number) => {
+    if (id !== clinicId) {
+      setClinic(null);
+      setDentistId(null);
+      setServiceId(null);
+    }
+    setClinicId(id);
+  };
+
+  const confirm = async () => {
+    if (!slot || !service || !dentist) {
       return;
     }
     setSubmitting(true);
+    setProblem(null);
     try {
-      if (reschedule) {
-        const response = await patientService.rescheduleAppointment(reschedule.appointmentId, slot.startsAt);
-        const requested = response.data?.data?.status === 'reschedule_requested';
-        Alert.alert(
-          requested ? 'Request sent' : 'Appointment moved',
-          requested
-            ? 'The clinic will confirm your new time. Your original appointment is kept until then.'
-            : `Your request is now for ${formatDateKey(date!)} at ${formatClockTime(slot.time)}. The clinic will review it.`,
-          [{ text: 'OK', onPress: () => navigation.navigate('Appointments') }],
-        );
-        return;
-      }
-
       const response = await patientService.createAppointment(
-        {
-          clinic_id: Number(clinicId),
-          service_rate_id: service.id,
-          dentist_id: dentist!.id,
-          branch_id: slot.branchId,
-          starts_at: slot.startsAt,
-          reason: reason || undefined,
-          notes: notes.trim() || undefined,
-        },
+        { clinic_id: clinicId, service_rate_id: service.id, dentist_id: dentist.id, branch_id: slot.branchId, starts_at: slot.startsAt },
         idempotencyKey.current,
-        { service: service.name, dentist: dentist!.name },
+        { service: service.name, dentist: dentist.name },
       );
-      const queued = Boolean(response.data?.queued);
-      Alert.alert(
-        queued ? 'Saved on this phone' : 'Request sent',
-        queued
-          ? "Your connection dropped, so the request is saved and will be sent automatically. It isn't booked until the clinic confirms it, and the time may no longer be free."
-          : 'The clinic will review your request. You will be notified when it is confirmed.',
-        [{ text: 'View Appointments', onPress: () => navigation.navigate('Appointments') }],
-      );
+      setSubmitted({ queued: Boolean(response.data?.queued) });
     } catch (error) {
-      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-      Alert.alert('Not booked', serverMessage(error, 'Please try again.'));
-      if (status === 409 && date) {
+      setProblem(serverMessage(error, 'Your request was not sent. Please try again.'));
+      if (axios.isAxiosError(error) && error.response?.status === 409 && date) {
         // That time was just taken: start a new attempt with fresh times.
         idempotencyKey.current = newIdempotencyKey();
+        setStepIndex(SCHEDULE_STEP);
         loadSlots(date);
       }
     } finally {
@@ -214,332 +223,279 @@ const BookAppointmentScreen = ({ route, navigation }: { route: any; navigation: 
     }
   };
 
-  if (!clinicId) {
+  const startOver = (target: string) => {
+    idempotencyKey.current = newIdempotencyKey();
+    setSubmitted(null);
+    setStepIndex(0);
+    setClinicId(null);
+    setDentistId(null);
+    setServiceId(null);
+    if (target === 'Home') {
+      navigation.popToTop();
+    } else {
+      navigation.navigate(target);
+    }
+  };
+
+  const whenLabel = date ? formatDateKey(date, { month: 'long', day: 'numeric', year: 'numeric' }) : null;
+  const timeLabel = slot ? formatClockTime(slot.time) : null;
+
+  if (submitted) {
     return (
-      <View style={styles.centered}>
-        <Icon name="business-outline" size={48} color="#667eea" />
-        <Text style={styles.emptyTitle}>Choose a clinic first</Text>
-        <Text style={styles.emptyText}>Open a clinic and tap Book Appointment to see its services and open times.</Text>
-        <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('Clinics')}>
-          <Text style={styles.primaryButtonText}>Find a Clinic</Text>
-        </TouchableOpacity>
-      </View>
+      <PatientShell navigation={navigation} title="Booking Submitted" active="BookAppointment">
+        <ScrollView contentContainerStyle={styles.content}>
+          <Card style={styles.submitted}>
+            <View style={styles.clockCircle}>
+              <Icon name="time-outline" size={36} color="#c98a0b" />
+            </View>
+            <StatusBadge group="pending" />
+            <Text style={styles.submittedTitle} accessibilityLiveRegion="polite">
+              {submitted.queued ? 'Saved on This Phone' : 'Appointment Request Sent!'}
+            </Text>
+            <Text style={styles.submittedText}>{submitted.queued ? BOOKING_QUEUED_MESSAGE : BOOKING_SUBMITTED_MESSAGE}</Text>
+            <View style={styles.reviewBox}>
+              <Row label="Clinic" value={clinic?.name} />
+              <Row label="Dentist" value={dentist?.name} />
+              <Row label="Service" value={service?.name} />
+              <Row label="Requested Date" value={whenLabel} />
+              <Row label="Requested Time" value={timeLabel} />
+            </View>
+            <Notice>{BOOKING_APPROVAL_NOTICE}</Notice>
+            <View style={styles.footer}>
+              <OutlineButton label="Dashboard" onPress={() => startOver('Home')} style={styles.flex} />
+              <PrimaryButton label="View Appointments" onPress={() => startOver('Appointments')} style={styles.flex} />
+            </View>
+          </Card>
+        </ScrollView>
+      </PatientShell>
     );
   }
 
-  if (loadingClinic) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#667eea" />
-      </View>
-    );
-  }
+  const clinicDependent = (render: (details: ClinicDetails) => React.ReactNode) => {
+    if (clinicProblem) {
+      return <Message icon="cloud-offline-outline" title={clinicProblem} />;
+    }
+    return clinic ? render(clinic) : <ActivityIndicator style={styles.loader} color={guestColors.primary} />;
+  };
 
-  if (!clinic) {
-    return (
-      <View style={styles.centered}>
-        <Icon name="cloud-offline-outline" size={48} color="#a0aec0" />
-        <Text style={styles.emptyText}>{clinicError ?? 'This clinic could not be loaded.'}</Text>
-      </View>
-    );
-  }
-
-  const canSubmit = Boolean(slot) && !submitting;
+  const stepContent: Record<string, { complete: boolean; content: React.ReactNode }> = {
+    clinic: {
+      complete: Boolean(clinicId),
+      content:
+        clinics === null ? (
+          <ActivityIndicator style={styles.loader} color={guestColors.primary} />
+        ) : clinics.length === 0 ? (
+          <Message icon="business-outline" title="No clinics are accepting bookings yet." />
+        ) : (
+          clinics.map((item) => {
+            const selected = item.id === clinicId;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.option, selected && styles.optionSelected]}
+                onPress={() => chooseClinic(item.id)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+              >
+                <View style={[styles.optionTile, { backgroundColor: accentFor(item.id) }]}>
+                  <Icon name="business-outline" size={22} color="#ffffff" />
+                </View>
+                <View style={styles.flex}>
+                  <Text style={styles.optionTitle}>{item.name}</Text>
+                  <Text style={styles.optionMeta}>{item.city}</Text>
+                  <Stars rating={item.rating} size={13} />
+                </View>
+                {selected && <Icon name="checkmark" size={20} color={guestColors.primary} />}
+              </TouchableOpacity>
+            );
+          })
+        ),
+    },
+    dentist: {
+      complete: Boolean(dentist),
+      content: clinicDependent((details) =>
+        details.dentists.length === 0 ? (
+          <Message icon="people-outline" title="This clinic has no dentists accepting online bookings yet." />
+        ) : (
+          details.dentists.map((item) => {
+            const selected = item.id === dentistId;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.option, selected && styles.optionSelected, !item.isAvailable && styles.optionOff]}
+                onPress={() => setDentistId(item.id)}
+                disabled={!item.isAvailable}
+                accessibilityRole="radio"
+                accessibilityState={{ selected, disabled: !item.isAvailable }}
+              >
+                <View style={[styles.optionTile, { backgroundColor: accentFor(item.id) }]}>
+                  <Text style={styles.optionInitial}>{initialOf(item.name)}</Text>
+                </View>
+                <View style={styles.flex}>
+                  <Text style={styles.optionTitle}>{item.name}</Text>
+                  <Text style={styles.optionMeta}>{item.specialization ?? 'General Dentistry'}</Text>
+                </View>
+                <Text style={[styles.availability, !item.isAvailable && styles.availabilityOff]}>{item.isAvailable ? 'Available' : 'Unavailable'}</Text>
+                {selected && <Icon name="checkmark" size={20} color={guestColors.primary} />}
+              </TouchableOpacity>
+            );
+          })
+        ),
+      ),
+    },
+    service: {
+      complete: Boolean(service),
+      content: clinicDependent((details) =>
+        details.services.length === 0 ? (
+          <Message icon="medical-outline" title="This clinic has not published any services yet." />
+        ) : (
+          <View style={styles.serviceGrid}>
+            {details.services.map((item) => {
+              const selected = item.id === serviceId;
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.serviceCard, selected && styles.optionSelected]}
+                  onPress={() => setServiceId(item.id)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                >
+                  <View style={styles.serviceHeading}>
+                    <Text style={styles.serviceName}>{item.name}</Text>
+                    {selected && <Icon name="checkmark" size={16} color={guestColors.primary} />}
+                  </View>
+                  <Text style={styles.optionMeta}>{item.durationMinutes} min</Text>
+                  <Text style={styles.servicePrice}>{formatPrice(item.price, item.currency)}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ),
+      ),
+    },
+    schedule: {
+      complete: Boolean(slot),
+      content: (
+        <>
+          {openDates === null && !problem ? (
+            <ActivityIndicator style={styles.loader} color={guestColors.primary} />
+          ) : (
+            <CalendarPicker dates={calendar} open={openDates} selected={date} onSelect={chooseDate} />
+          )}
+          {openDates === null && problem ? <OutlineButton label="Try again" onPress={() => setDatesAttempt((n) => n + 1)} /> : null}
+          {date && (
+            <View style={styles.slotSection}>
+              <SectionLabel>AVAILABLE TIME SLOTS</SectionLabel>
+              {slots === null ? (
+                !problem && <ActivityIndicator color={guestColors.primary} />
+              ) : slots.length === 0 ? (
+                <Text style={styles.optionMeta}>No open times on this date. Please choose another.</Text>
+              ) : (
+                <TimeSlots slots={slots} selected={slot} onSelect={setSlot} />
+              )}
+            </View>
+          )}
+        </>
+      ),
+    },
+    confirm: {
+      complete: true,
+      content: (
+        <>
+          <View style={styles.reviewBox}>
+            <Row label="Clinic" value={clinic?.name} />
+            <Row label="Dentist" value={dentist?.name} />
+            <Row label="Service" value={service?.name} />
+            <Row label="Date" value={whenLabel} />
+            <Row label="Time" value={timeLabel} />
+            <Row label="Estimated Cost" value={service ? formatPrice(service.price, service.currency) : null} />
+          </View>
+          <Notice>{BOOKING_ARRIVAL_NOTICE}</Notice>
+        </>
+      ),
+    },
+  };
+  const { complete, content } = stepContent[step.id];
+  const isLast = stepIndex === BOOKING_STEPS.length - 1;
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>{reschedule ? 'Reschedule' : 'Book Appointment'}</Text>
-          <Text style={styles.headerSubtitle}>{clinic.name}</Text>
-        </View>
-
-        <View style={styles.formContainer}>
-          {reschedule ? (
-            <View style={styles.policyContainer}>
-              <Icon name="time-outline" size={20} color="#667eea" />
-              <Text style={styles.policyText}>Current time: {reschedule.currentLabel}</Text>
+    <PatientShell navigation={navigation} title="Book Appointment" active="BookAppointment">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Stepper current={stepIndex} />
+        <Card>
+          <Text style={styles.title} accessibilityRole="header">
+            {step.title}
+          </Text>
+          {problem ? (
+            <View style={styles.problem}>
+              <Notice tone="danger">{problem}</Notice>
             </View>
-          ) : (
-            <>
-              <Text style={styles.label}>Service</Text>
-              {clinic.services.length === 0 ? (
-                <Text style={styles.emptyText}>This clinic has not published services yet.</Text>
-              ) : (
-                clinic.services.map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: serviceId === item.id }}
-                    style={[styles.dentistCard, serviceId === item.id && styles.selectedDentistCard]}
-                    onPress={() => setServiceId(item.id)}
-                  >
-                    <View style={styles.dentistInfo}>
-                      <Text style={styles.dentistName}>{item.name}</Text>
-                      <Text style={styles.dentistSpecialty}>
-                        {formatPrice(item.price)} · {item.durationMinutes} min
-                      </Text>
-                    </View>
-                    {serviceId === item.id && <Icon name="checkmark-circle" size={24} color="#48bb78" />}
-                  </TouchableOpacity>
-                ))
-              )}
-
-              <Text style={styles.label}>Dentist</Text>
-              {clinic.dentists.length === 0 ? (
-                <Text style={styles.emptyText}>No dentists are accepting online bookings here yet.</Text>
-              ) : (
-                clinic.dentists.map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: dentistId === item.id }}
-                    style={[styles.dentistCard, dentistId === item.id && styles.selectedDentistCard]}
-                    onPress={() => setDentistId(item.id)}
-                  >
-                    <View style={styles.dentistAvatar}>
-                      <Text style={styles.dentistInitials}>{item.name.replace(/^Dr\.?\s*/i, '').charAt(0)}</Text>
-                    </View>
-                    <View style={styles.dentistInfo}>
-                      <Text style={styles.dentistName}>{item.name}</Text>
-                      <Text style={styles.dentistSpecialty}>{item.specialization ?? 'General Dentistry'}</Text>
-                    </View>
-                    {dentistId === item.id && <Icon name="checkmark-circle" size={24} color="#48bb78" />}
-                  </TouchableOpacity>
-                ))
-              )}
-            </>
-          )}
-
-          {serviceId && dentistId && (
-            <>
-              <Text style={styles.label}>Date</Text>
-              {!openDates && !availabilityError ? (
-                <ActivityIndicator color="#667eea" />
-              ) : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.timeSlots}>
-                  {calendar.map((day) => {
-                    const isOpen = openDates?.has(day) ?? false;
-                    const isSelected = day === date;
-                    return (
-                      <TouchableOpacity
-                        key={day}
-                        disabled={!isOpen}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected: isSelected, disabled: !isOpen }}
-                        accessibilityLabel={`${formatDateKey(day, { weekday: 'long', month: 'long', day: 'numeric' })}${isOpen ? '' : ', unavailable'}`}
-                        style={[styles.timeSlot, isSelected && styles.selectedTimeSlot, !isOpen && styles.disabledSlot]}
-                        onPress={() => chooseDate(day)}
-                      >
-                        <Text style={[styles.timeSlotText, isSelected && styles.selectedTimeSlotText, !isOpen && styles.disabledSlotText]}>
-                          {formatDateKey(day)}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              )}
-
-              {date && (
-                <>
-                  <Text style={styles.label}>Time (Philippine time)</Text>
-                  {!slots && !availabilityError ? (
-                    <ActivityIndicator color="#667eea" />
-                  ) : slots && slots.length === 0 ? (
-                    <Text style={styles.emptyText}>No open times on this date. Please choose another day.</Text>
-                  ) : (
-                    <View style={styles.reasonContainer}>
-                      {(slots ?? []).map((item) => (
-                        <TouchableOpacity
-                          key={item.startsAt}
-                          accessibilityRole="radio"
-                          accessibilityState={{ selected: slot?.startsAt === item.startsAt }}
-                          style={[styles.reasonOption, slot?.startsAt === item.startsAt && styles.selectedReasonOption]}
-                          onPress={() => setSlot(item)}
-                        >
-                          <Text style={[styles.reasonOptionText, slot?.startsAt === item.startsAt && styles.selectedReasonOptionText]}>
-                            {formatClockTime(item.time)}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                </>
-              )}
-
-              {availabilityError && (
-                <View style={styles.errorBox}>
-                  <Text style={styles.errorText}>{availabilityError}</Text>
-                  <TouchableOpacity onPress={() => (date ? loadSlots(date) : setDatesAttempt((n) => n + 1))}>
-                    <Text style={styles.retryText}>Try again</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </>
-          )}
-
-          {!reschedule && (
-            <>
-              <Text style={styles.label}>Reason for Visit (optional)</Text>
-              <View style={styles.reasonContainer}>
-                {REASONS.map((item) => (
-                  <TouchableOpacity
-                    key={item}
-                    style={[styles.reasonOption, reason === item && styles.selectedReasonOption]}
-                    onPress={() => setReason(reason === item ? '' : item)}
-                  >
-                    <Text style={[styles.reasonOptionText, reason === item && styles.selectedReasonOptionText]}>{item}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={styles.label}>Notes for the clinic (optional)</Text>
-              <TextInput
-                style={styles.notesInput}
-                placeholder="Anything the clinic should know before your visit"
-                placeholderTextColor="#a0aec0"
-                value={notes}
-                onChangeText={setNotes}
-                maxLength={2000}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </>
-          )}
-
-          <TouchableOpacity
-            style={[styles.submitButton, !canSubmit && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={!canSubmit}
-            accessibilityRole="button"
-          >
-            {submitting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Icon name="calendar-outline" size={24} color="#fff" />
-                <Text style={styles.submitButtonText}>{reschedule ? 'Request New Time' : 'Request Appointment'}</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          <View style={styles.policyContainer}>
-            <Icon name="information-circle-outline" size={20} color="#a0aec0" />
-            <Text style={styles.policyText}>
-              Your request is confirmed only when the clinic approves it. Online changes are possible until 24 hours
-              before your appointment; after that, please call the clinic.
-            </Text>
+          ) : null}
+          <View style={styles.options} accessibilityRole="radiogroup">
+            {content}
           </View>
-        </View>
+          <View style={styles.footer}>
+            {stepIndex > 0 && <OutlineButton label="Back" onPress={() => setStepIndex(stepIndex - 1)} style={styles.backButton} />}
+            <PrimaryButton
+              label={submitting ? 'Sending request…' : step.nextLabel}
+              onPress={() => (isLast ? confirm() : setStepIndex(stepIndex + 1))}
+              disabled={!complete}
+              busy={submitting}
+              style={styles.flex}
+            />
+          </View>
+        </Card>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </PatientShell>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#f8f9fa' },
-  emptyTitle: { fontSize: 20, fontWeight: 'bold', color: '#2d3748', marginTop: 12 },
-  emptyText: { fontSize: 15, color: '#718096', textAlign: 'center', marginVertical: 8, lineHeight: 21 },
-  primaryButton: { backgroundColor: '#667eea', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 12, marginTop: 12 },
-  primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  header: { backgroundColor: '#667eea', padding: 24, paddingBottom: 32 },
-  headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 4 },
-  headerSubtitle: { fontSize: 16, color: 'rgba(255,255,255,0.8)' },
-  formContainer: {
-    backgroundColor: '#fff',
-    margin: 16,
-    marginTop: -20,
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  label: { fontSize: 16, fontWeight: '600', color: '#2d3748', marginBottom: 12, marginTop: 16 },
-  dentistCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    minHeight: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 8,
-  },
-  selectedDentistCard: { borderColor: '#667eea', backgroundColor: '#ebf8ff' },
-  dentistAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#667eea',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  dentistInitials: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-  dentistInfo: { flex: 1 },
-  dentistName: { fontSize: 16, fontWeight: '600', color: '#2d3748' },
-  dentistSpecialty: { fontSize: 14, color: '#718096' },
-  timeSlots: { flexDirection: 'row', marginBottom: 8 },
-  timeSlot: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginRight: 8,
-    backgroundColor: '#fff',
-  },
-  selectedTimeSlot: { backgroundColor: '#667eea', borderColor: '#667eea' },
-  disabledSlot: { backgroundColor: '#f7fafc', borderColor: '#edf2f7' },
-  timeSlotText: { fontSize: 14, color: '#2d3748' },
-  selectedTimeSlotText: { color: '#fff' },
-  disabledSlotText: { color: '#cbd5e0', textDecorationLine: 'line-through' },
-  reasonContainer: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
-  reasonOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginRight: 8,
-    marginBottom: 8,
-    backgroundColor: '#fff',
-  },
-  selectedReasonOption: { backgroundColor: '#667eea', borderColor: '#667eea' },
-  reasonOptionText: { fontSize: 14, color: '#2d3748' },
-  selectedReasonOptionText: { color: '#fff' },
-  notesInput: {
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#2d3748',
-    minHeight: 100,
-    backgroundColor: '#f7fafc',
-  },
-  errorBox: { padding: 12, borderRadius: 12, backgroundColor: '#fff5f5', marginTop: 8 },
-  errorText: { color: '#c53030', fontSize: 14 },
-  retryText: { color: '#667eea', fontWeight: '600', marginTop: 6 },
-  submitButton: {
-    backgroundColor: '#667eea',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginTop: 24,
-    marginBottom: 16,
-  },
-  submitButtonDisabled: { opacity: 0.5 },
-  submitButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginLeft: 8 },
-  policyContainer: { flexDirection: 'row', alignItems: 'flex-start', padding: 16, backgroundColor: '#f7fafc', borderRadius: 12 },
-  policyText: { flex: 1, fontSize: 13, color: '#718096', marginLeft: 8, lineHeight: 18 },
+  flex: { flex: 1 },
+  content: { padding: spacing.marginMobile, paddingBottom: spacing.xl },
+  loader: { marginVertical: spacing.xl },
+
+  stepper: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md },
+  step: { flex: 1, alignItems: 'center', gap: spacing.xs },
+  stepCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#e7eaf0' },
+  stepCircleOn: { backgroundColor: guestColors.primary },
+  stepNumber: { fontSize: 13, fontWeight: '600', color: guestColors.textMuted },
+  stepNumberOn: { color: '#ffffff' },
+  stepLabel: { fontSize: 11, lineHeight: 15, fontWeight: '600', color: guestColors.textMuted },
+  stepLabelOn: { color: guestColors.primary },
+
+  title: { fontSize: 20, lineHeight: 28, fontWeight: '600', color: guestColors.text, marginBottom: spacing.md },
+  problem: { marginBottom: spacing.sm },
+  options: { gap: spacing.sm },
+  option: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: 12, borderWidth: 1, borderColor: guestColors.border, backgroundColor: guestColors.surface },
+  optionSelected: { borderColor: guestColors.primary, backgroundColor: guestColors.primarySoft },
+  optionOff: { opacity: 0.5 },
+  optionTile: { width: 46, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  optionInitial: { fontSize: 18, fontWeight: '700', color: '#ffffff' },
+  optionTitle: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: guestColors.text },
+  optionMeta: { fontSize: 13, lineHeight: 18, color: guestColors.textMuted },
+  availability: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: '#13784a', backgroundColor: '#ecfbf3', borderRadius: 999, overflow: 'hidden', paddingHorizontal: spacing.base, paddingVertical: 3 },
+  availabilityOff: { color: guestColors.textMuted, backgroundColor: guestColors.neutralSoft },
+
+  serviceGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.sm },
+  serviceCard: { width: '48.5%', padding: spacing.sm, gap: 2, borderRadius: 12, borderWidth: 1, borderColor: guestColors.border, backgroundColor: guestColors.surface },
+  serviceHeading: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs },
+  serviceName: { flex: 1, fontSize: 14, lineHeight: 19, fontWeight: '600', color: guestColors.primary },
+  servicePrice: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: guestColors.text, marginTop: spacing.xs },
+  slotSection: { marginTop: spacing.xs },
+
+  reviewBox: { alignSelf: 'stretch', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: 12, backgroundColor: guestColors.background },
+  reviewRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.sm },
+  reviewLabel: { ...type.bodyMd, color: guestColors.textMuted },
+  reviewValue: { flexShrink: 1, fontSize: 14, lineHeight: 20, fontWeight: '600', color: guestColors.text, textAlign: 'right' },
+
+  footer: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md, alignSelf: 'stretch' },
+  backButton: { minWidth: 80 },
+
+  submitted: { alignItems: 'center', gap: spacing.sm },
+  clockCircle: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#f3e2a6', backgroundColor: '#fdf8e8' },
+  submittedTitle: { fontSize: 22, lineHeight: 30, fontWeight: '700', color: guestColors.text, textAlign: 'center' },
+  submittedText: { ...type.bodyMd, color: guestColors.textMuted, textAlign: 'center' },
 });
 
 export default BookAppointmentScreen;

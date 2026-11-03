@@ -3,10 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import ClinicLayout, { useClinic } from '../../layouts/ClinicLayout';
 import Icon from '../../components/Icon';
-import { Badge, Checkbox, DataTable, Field, FormError, Modal, Section } from '../../components/portal/PortalUi';
+import { Badge, DataTable, Field, FormError, Modal, Section } from '../../components/portal/PortalUi';
 import SlotPickerModal from '../../components/portal/SlotPickerModal';
+import { EMPTY_RECORD, RecordModal } from '../../components/portal/RecordForm';
 import { QueryState } from '../../components/StatusMessage';
-import { getClinicHref } from '../../config/clinicNavigation';
+import { getClinicHref, getRecordTypeLabel } from '../../config/clinicNavigation';
 import {
   addMedicalHistory,
   amendRecord,
@@ -21,18 +22,6 @@ import {
   updateClinicPatient,
 } from '../../services/clinicPortalApi';
 import { formatDateTime, formatShortDate } from '../../utils/dateTime';
-
-const RECORD_TYPES = ['examination', 'treatment', 'consultation'];
-const EMPTY_RECORD = {
-  record_type: 'treatment',
-  chief_complaint: '',
-  findings: '',
-  procedures: '',
-  tooth_numbers: '',
-  notes: '',
-  care_instructions: '',
-  is_patient_visible: false,
-};
 
 function Demographics({ patient, patientId }) {
   const { clinicId, can } = useClinic();
@@ -224,6 +213,30 @@ function PatientAppointments({ patient }) {
   );
 }
 
+// Only present when the patient chose to share it; it is their own report, not a clinical record.
+function PatientReportedHealth({ reported }) {
+  const list = (items, format) => (items?.length ? items.map(format).join('; ') : '—');
+  return (
+    <>
+      <h3 className="portal-subheading">Reported by the patient</h3>
+      <dl className="portal-details">
+        <dt>Blood type</dt>
+        <dd>{reported.blood_type || '—'}</dd>
+        <dt>Allergies</dt>
+        <dd>{list(reported.allergies, (a) => `${a.name} (${a.severity})${a.reaction ? `: ${a.reaction}` : ''}`)}</dd>
+        <dt>Medications</dt>
+        <dd>{list(reported.medications, (m) => [m.name, m.dosage, m.purpose].filter(Boolean).join(', '))}</dd>
+        <dt>Conditions</dt>
+        <dd>{list(reported.conditions, (c) => c)}</dd>
+        <dt>Dental anxiety</dt>
+        <dd>{reported.anxiety?.level ? `Level ${reported.anxiety.level} of 5` : '—'}</dd>
+        <dt>Notes for dentist</dt>
+        <dd>{reported.anxiety?.notes || '—'}</dd>
+      </dl>
+    </>
+  );
+}
+
 function MedicalHistory({ patientId }) {
   const { clinicId, can } = useClinic();
   const queryClient = useQueryClient();
@@ -284,9 +297,10 @@ function MedicalHistory({ patientId }) {
         </form>
       ) : (
         <QueryState query={query} loadingLabel="Loading…">
-          {({ current, history }) =>
+          {({ current, history, patient_reported: reported }) =>
             current ? (
               <>
+                {reported && <PatientReportedHealth reported={reported} />}
                 <dl className="portal-details">
                   <dt>Allergies</dt>
                   <dd>{current.allergies || '—'}</dd>
@@ -306,55 +320,15 @@ function MedicalHistory({ patientId }) {
                 )}
               </>
             ) : (
-              <p className="portal-empty">Nothing recorded yet.</p>
+              <>
+                {reported && <PatientReportedHealth reported={reported} />}
+                <p className="portal-empty">Nothing recorded by the clinic yet.</p>
+              </>
             )
           }
         </QueryState>
       )}
     </Section>
-  );
-}
-
-function RecordForm({ initial, isAmendment, isSaving, error, onSave, onCancel }) {
-  const [form, setForm] = useState(initial);
-  const bind = (name) => ({ value: form[name] ?? '', onChange: (e) => setForm((f) => ({ ...f, [name]: e.target.value })) });
-
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSave(form);
-      }}
-    >
-      <div className="portal-form-grid">
-        <Field label="Type" as="select" options={RECORD_TYPES} {...bind('record_type')} />
-        <Field label="Tooth numbers" placeholder="e.g. 16, 47" {...bind('tooth_numbers')} />
-        <Field label="Chief complaint" as="textarea" className="is-wide" {...bind('chief_complaint')} />
-        <Field label="Findings" as="textarea" {...bind('findings')} />
-        <Field label="Procedures performed" as="textarea" {...bind('procedures')} />
-        <Field label="Internal notes" as="textarea" {...bind('notes')} hint="Never shown to the patient." />
-        <Field label="Care instructions" as="textarea" {...bind('care_instructions')} />
-        <div className="is-wide">
-          <Checkbox
-            label="Share procedures and care instructions with the patient"
-            checked={Boolean(form.is_patient_visible)}
-            onChange={(e) => setForm((f) => ({ ...f, is_patient_visible: e.target.checked }))}
-          />
-        </div>
-        {isAmendment && (
-          <Field label="Reason for correction" as="textarea" required className="is-wide" {...bind('amendment_reason')} />
-        )}
-      </div>
-      <FormError error={error} />
-      <div className="portal-form-actions">
-        <button type="button" className="btn btn-outline" onClick={onCancel}>
-          Cancel
-        </button>
-        <button type="submit" className="btn btn-primary" disabled={isSaving}>
-          {isSaving ? 'Saving…' : isAmendment ? 'Save correction' : 'Save record'}
-        </button>
-      </div>
-    </form>
   );
 }
 
@@ -402,7 +376,7 @@ function ClinicalRecords({ patientId }) {
                 <li key={record.id} className="portal-list-item">
                   <div className="portal-section-header">
                     <div>
-                      <strong>{record.record_type}</strong>{' '}
+                      <strong>{getRecordTypeLabel(record.record_type)}</strong>{' '}
                       <span className="portal-table-muted">
                         {formatShortDate(record.created_at)} · {record.dentist ?? record.author}
                       </span>{' '}
@@ -442,16 +416,15 @@ function ClinicalRecords({ patientId }) {
       </QueryState>
 
       {editing && (
-        <Modal title={editing === 'new' ? 'New clinical record' : 'Correct record'} onClose={() => setEditing(null)} wide>
-          <RecordForm
-            initial={editing === 'new' ? EMPTY_RECORD : { ...EMPTY_RECORD, ...editing, amendment_reason: '' }}
-            isAmendment={editing !== 'new'}
-            isSaving={save.isPending}
-            error={save.error}
-            onSave={(form) => save.mutate(form)}
-            onCancel={() => setEditing(null)}
-          />
-        </Modal>
+        <RecordModal
+          title={editing === 'new' ? 'New clinical record' : 'Correct record'}
+          onClose={() => setEditing(null)}
+          initial={editing === 'new' ? EMPTY_RECORD : { ...EMPTY_RECORD, ...editing, amendment_reason: '' }}
+          isAmendment={editing !== 'new'}
+          isSaving={save.isPending}
+          error={save.error}
+          onSave={(form) => save.mutate(form)}
+        />
       )}
     </Section>
   );

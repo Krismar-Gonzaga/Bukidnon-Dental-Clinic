@@ -65,6 +65,7 @@ export function toAppointment(api) {
     status: PATIENT_STATUS[api.status] ?? api.status,
     backendStatus: api.status,
     startsAt,
+    endsAt: api.ends_at ?? null,
     date,
     time,
     dateTime: startsAt ? formatDateTime(startsAt) : `${date} at ${time}`,
@@ -75,8 +76,9 @@ export function toAppointment(api) {
     requestedDateTime: api.requested_starts_at ? formatDateTime(api.requested_starts_at) : '',
     hasReview: Boolean(api.has_review),
     patient: api.patient
-      ? { id: api.patient.id, name: api.patient.name, email: api.patient.email, phone: api.patient.phone }
+      ? { id: api.patient.id, name: api.patient.name, email: api.patient.email, phone: api.patient.phone, age: api.patient.age ?? null }
       : null,
+    type: api.type ?? null,
     history: (api.status_history ?? []).map((entry) => ({
       from: entry.from,
       to: entry.to,
@@ -151,12 +153,14 @@ export function toDentistCard(api, { clinicName } = {}) {
     specialty: api.specialization ?? 'General Dentistry',
     clinicName: clinicName ?? api.clinics?.map((c) => c.name).join(', ') ?? null,
     clinics: api.clinics ?? [],
-    rating: null,
-    reviewCount: 0,
+    // Published reviews of this dentist's visits; null until there are any.
+    rating: typeof api.rating === 'number' ? api.rating : null,
+    reviewCount: api.review_count ?? 0,
     yearsExperience: api.years_experience ?? 0,
+    schedules: api.schedules ?? [],
     qualifications: api.qualifications ?? '',
     bio: api.bio ?? '',
-    available: api.is_active !== false,
+    available: api.is_available ?? api.is_active !== false,
     accent: accentFor(api.id),
   };
 }

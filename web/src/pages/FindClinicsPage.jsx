@@ -14,6 +14,7 @@ import {
 } from '../config/clinicDirectory';
 import { getLoginHref, getPublicClinicHref } from '../config/navigation';
 import { getBookClinicHref } from '../config/patientNavigation';
+import { useAuth } from '../auth/AuthContext';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { getCities, getSpecializations, searchClinics } from '../services/publicApi';
 
@@ -22,13 +23,13 @@ const orAll = (value) => (value === ALL_OPTION ? '' : value);
 /**
  * Clinic directory with server-side search, filters and pagination.
  * getBookHref(clinic) / getDetailsHref(clinic) override the card links
- * (the patient portal opens its own pages). ?search= and ?city= prefill
- * the filters (from the home page search panel).
+ * ?search= and ?city= prefill the filters (from the home page search panel).
  */
-function FindClinicsPage({
-  getBookHref = (clinic) => getLoginHref(getBookClinicHref(clinic.id)),
-  getDetailsHref = (clinic) => getPublicClinicHref(clinic.id),
-}) {
+function FindClinicsPage() {
+  const { user } = useAuth();
+  const getBookHref = (clinic) =>
+    user?.role === 'patient' ? getBookClinicHref(clinic.id) : getLoginHref(getBookClinicHref(clinic.id));
+  const getDetailsHref = (clinic) => getPublicClinicHref(clinic.id);
   const [searchParams] = useSearchParams();
   const [filters, setFilters] = useState({
     query: searchParams.get('search') ?? '',

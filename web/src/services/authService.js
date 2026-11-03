@@ -36,11 +36,15 @@ export async function logout() {
   }
 }
 
-/** The signed-in user, or null when there is no valid session. */
+/**
+ * The signed-in user, or null when there is no valid session. GET /session
+ * answers 200 with no data for guests, so a guest visit does not log a
+ * failed request in the browser console.
+ */
 export async function fetchCurrentUser() {
   try {
-    const { data } = await apiClient.get('/user', { skipSessionExpiry: true });
-    return data.data;
+    const { data } = await apiClient.get('/session', { skipSessionExpiry: true });
+    return data.data ?? null;
   } catch (error) {
     if (error.response?.status === 401) return null;
     throw error;
@@ -71,5 +75,11 @@ export async function changePassword({ currentPassword, newPassword }) {
     new_password_confirmation: newPassword,
   });
   await ensureCsrfCookie({ refresh: true });
+  return data.message;
+}
+
+/** Name and email of the signed-in account (PUT /profile). */
+export async function updateAccount({ name, email }) {
+  const { data } = await apiClient.put('/profile', { name, email });
   return data.message;
 }

@@ -13,8 +13,10 @@ use App\Models\Review;
 use App\Models\Service;
 use App\Models\ServiceRate;
 use App\Models\Specialization;
+use App\Support\DentistRatings;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /** Public directory: only approved, published clinics are ever returned. */
 class HomeController extends Controller
@@ -23,6 +25,7 @@ class HomeController extends Controller
     {
         $featuredClinics = Clinic::publiclyListed()
             ->with(['specializations'])
+            ->withCount(['reviews' => fn ($q) => $q->where('status', Review::STATUS_APPROVED)])
             ->orderBy('rating', 'desc')
             ->limit(4)
             ->get()
@@ -33,6 +36,7 @@ class HomeController extends Controller
                     'address' => $clinic->full_address,
                     'city' => $clinic->city,
                     'rating' => $clinic->rating_stars,
+                    'review_count' => $clinic->reviews_count,
                     'logo' => $clinic->image,
                     'latitude' => $clinic->latitude,
                     'longitude' => $clinic->longitude,
@@ -91,9 +95,20 @@ class HomeController extends Controller
                 'date' => $review->created_at->diffForHumans(),
             ]);
 
+        $reviewTotals = Review::query()->toBase()->where('status', Review::STATUS_APPROVED)
+            ->selectRaw('COUNT(*) AS total, SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END) AS positive')
+            ->first();
+        $listed = Clinic::publiclyListed()->toBase()
+            ->selectRaw('COUNT(*) AS total, COUNT(DISTINCT city) AS cities')
+            ->first();
+
         $stats = [
-            'verified_clinics' => Clinic::publiclyListed()->count(),
-            'total_reviews' => Review::where('status', Review::STATUS_APPROVED)->count(),
+            'verified_clinics' => (int) $listed->total,
+            'municipalities' => (int) $listed->cities,
+            'patients' => DB::table('clinic_patients')->whereIn('clinic_id', Clinic::publiclyListed()->select('id'))->distinct()->count('patient_id'),
+            'total_reviews' => (int) $reviewTotals->total,
+            // Share of published reviews rated 4 or 5; null until there are reviews.
+            'satisfaction_rate' => $reviewTotals->total ? (int) round($reviewTotals->positive / $reviewTotals->total * 100) : null,
             'total_specializations' => Specialization::where('is_active', true)->count(),
         ];
 
@@ -201,15 +216,20 @@ class HomeController extends Controller
             ->groupBy('rating')
             ->pluck('total', 'rating');
 
+        $dentists = $clinic->dentistProfiles()->with(['user', 'specialization'])->withCount('schedules')->get();
+        $dentistRatings = DentistRatings::for($dentists->pluck('id'));
+
         return $this->ok([
             ...(new ClinicSummaryResource($clinic))->resolve(),
             'branches' => BranchResource::collection($clinic->branches)->resolve(),
             'services' => ServiceRateResource::collection(
                 $clinic->serviceRates()->available()->with('service')->orderBy('service_name')->get()
             )->resolve(),
-            'dentists' => DentistResource::collection(
-                $clinic->dentistProfiles()->with(['user', 'specialization'])->get()
-            )->resolve(),
+            'dentists' => $dentists->map(fn ($dentist) => [
+                ...(new DentistResource($dentist))->resolve(),
+                ...DentistRatings::fields($dentistRatings, $dentist->id),
+                'is_available' => $dentist->schedules_count > 0,
+            ])->values(),
             'reviews' => ReviewResource::collection($reviews)->resolve(),
             'rating_breakdown' => collect(range(5, 1))->mapWithKeys(fn ($r) => [$r => (int) ($ratingBreakdown[$r] ?? 0)]),
         ]);

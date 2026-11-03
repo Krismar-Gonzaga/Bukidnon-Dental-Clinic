@@ -7,7 +7,7 @@ import Pagination from '../components/Pagination';
 import { ErrorState, LoadingState } from '../components/StatusMessage';
 import { ALL_OPTION } from '../config/clinicDirectory';
 import { DENTISTS_PER_PAGE } from '../config/dentistDirectory';
-import { getPublicClinicHref } from '../config/navigation';
+import { getPublicDentistHref } from '../config/navigation';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { getDentists, getSpecializations } from '../services/publicApi';
 
@@ -65,7 +65,7 @@ function DentistsPage() {
                   <DentistDirectoryCard
                     dentist={dentist}
                     accentIndex={(currentPage - 1) * DENTISTS_PER_PAGE + index}
-                    profileHref={dentist.clinics[0] ? getPublicClinicHref(dentist.clinics[0].id) : undefined}
+                    profileHref={getPublicDentistHref(dentist.id)}
                   />
                 </li>
               ))}

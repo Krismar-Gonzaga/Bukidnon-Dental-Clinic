@@ -70,10 +70,12 @@ Routing uses React Router (`src/App.js`, future flags in `config/router.js`). Al
 | `/`, `/clinics`, `/clinics/:clinicId`, `/dentists`, `/services`, `/about`, `/contact`, `/privacy`, `/terms` | Everyone | Public pages |
 | `/login`, `/register`, `/forgot-password`, `/reset-password` | Signed out | Account access |
 | `/patient/...` | Patients | dashboard, book (`?clinic=<id>`), appointments, appointments/:id, appointments/:id/reschedule, reviews (`?appointment=<id>`), notifications, clinics, clinics/:id, saved-clinics, clinic-locator, profile, profile/edit, profile/password |
-| `/clinic/apply` | Clinic owners | Clinic application and documents |
-| `/clinic/:clinicId/...` | Clinic members (menu items depend on permissions) | dashboard, appointments, patients, inventory, services, dentists, branches, staff, reviews, reports, settings, notifications, password |
-| `/admin/...` | System administrators | dashboard, applications, clinics, users, reviews, audit-logs, notifications, password |
+| `/clinic/apply`, `/clinic/apply/profile`, `/clinic/apply/password` | Clinic owners before approval | Clinic application and documents, My Profile, Change Password |
+| `/clinic/:clinicId/...` | Clinic members (menu items depend on permissions) | dashboard, appointments, patients, inventory, services, dentists, branches, staff, reviews, reports, settings, notifications, profile, password |
+| `/admin/...` | System administrators | dashboard, applications, clinics, users, reviews, audit-logs, notifications, profile, password |
 | `*` | Everyone | `NotFoundPage` |
+
+The portal top bar (`layouts/PortalLayout.jsx`) holds the notification bell and the avatar menu (`components/AccountMenu.jsx`: My Profile, Log Out); sidebars hold only section navigation. `auth/homeRoutes.js` `getProfileHref(user)` picks each role's My Profile page. Signed in, the public header shows the same avatar menu with a My Dashboard link.
 
 Guards (`auth/RequireAuth.jsx`) only redirect. The API decides what each user may see and do.
 

@@ -15,6 +15,8 @@ class PatientDashboardController extends Controller
         $user = $request->user();
         $patient = $user->patient ?? throw new AccessDeniedHttpException('Only patient accounts have a patient dashboard.');
         $mine = fn () => Appointment::where('patient_id', $patient->id);
+        // One query for every count by status: the database may be a slow round trip away.
+        $byStatus = $mine()->selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status');
 
         return $this->ok([
             'name' => $user->name,
@@ -24,8 +26,9 @@ class PatientDashboardController extends Controller
                 ->map(fn ($a) => (new AppointmentResource($a))->resolve()),
             'counts' => [
                 'upcoming' => $mine()->active()->where('starts_at', '>=', now())->count(),
-                'pending' => $mine()->whereIn('status', [Appointment::PENDING, Appointment::RESCHEDULE_REQUESTED])->count(),
-                'completed' => $mine()->where('status', Appointment::COMPLETED)->count(),
+                'total' => (int) $byStatus->sum(),
+                'pending' => (int) (($byStatus[Appointment::PENDING] ?? 0) + ($byStatus[Appointment::RESCHEDULE_REQUESTED] ?? 0)),
+                'completed' => (int) ($byStatus[Appointment::COMPLETED] ?? 0),
                 'awaiting_review' => $mine()->where('status', Appointment::COMPLETED)->whereDoesntHave('review')->count(),
                 'saved_clinics' => $patient->savedClinics()->count(),
                 'reviews_given' => $patient->reviews()->count(),

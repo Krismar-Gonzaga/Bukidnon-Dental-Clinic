@@ -15,14 +15,26 @@ beforeEach(() => {
   });
 });
 
-test('lists dentists from the API with their clinic and no invented ratings', async () => {
+test('lists dentists from the API with their clinic, profile link and no invented ratings', async () => {
   renderWithProviders(<DentistsPage />);
 
   expect(await screen.findByRole('heading', { name: 'Dr. Maria Santos' })).toBeInTheDocument();
   expect(screen.getByText('Valencia Smiles')).toBeInTheDocument();
   expect(screen.getByText('12 years exp.')).toBeInTheDocument();
   expect(screen.queryByRole('img', { name: /Rated/ })).not.toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'View Clinic' })).toHaveAttribute('href', '/clinics/7');
+  expect(screen.getByRole('link', { name: 'View profile of Dr. Maria Santos' })).toHaveAttribute('href', '/dentists/5');
+});
+
+test('shows a real rating and availability when the API has them', async () => {
+  getDentists.mockResolvedValue({
+    dentists: [toDentistCard({ id: 6, name: 'Dr. Ana Cruz', rating: 4.7, review_count: 54, is_available: false, clinics: [] })],
+    pageCount: 1,
+    total: 1,
+  });
+  renderWithProviders(<DentistsPage />);
+
+  expect(await screen.findByText('4.7 (54 reviews)')).toBeInTheDocument();
+  expect(screen.getByText('Unavailable')).toBeInTheDocument();
 });
 
 test('filters by specialization on the server', async () => {

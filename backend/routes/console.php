@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\AuditChain;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -7,6 +8,22 @@ use Illuminate\Support\Facades\Schedule;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('audit:seal', function (AuditChain $chain) {
+    $this->info('Sealed '.$chain->seal().' audit log entries.');
+})->purpose('Add new audit log entries to the tamper-evident hash chain');
+
+Artisan::command('audit:verify', function (AuditChain $chain) {
+    $report = $chain->verify();
+    $this->line("Checked {$report['checked']} sealed entries: {$report['status']}.");
+    foreach ($report['problems'] as $problem) {
+        $this->error("  #{$problem['id']} {$problem['message']}");
+    }
+
+    return $report['status'] === 'verified' ? 0 : 1;
+})->purpose('Re-check the audit log hash chain');
+
+Schedule::command('audit:seal')->everyFiveMinutes()->withoutOverlapping();
 
 // Remove API tokens that expired more than a day ago.
 Schedule::command('sanctum:prune-expired --hours=24')->daily();

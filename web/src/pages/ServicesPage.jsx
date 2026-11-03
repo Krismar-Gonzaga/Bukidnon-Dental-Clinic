@@ -25,6 +25,7 @@ function ServicesPage() {
   return (
     <DirectoryPageLayout
       activeHref="/services"
+      eyebrow="Services"
       title="Affordable Care for Everyone"
       description="We bridge the gap between high-quality dental care and transparency in pricing across Bukidnon."
       resultsLabel="Services"
@@ -46,7 +47,6 @@ function ServicesPage() {
                 <li key={service.id}>
                   <ServiceCard
                     service={service}
-                    actionLabel="Find Clinics"
                     actionHref={service.clinicCount > 0 ? `${FIND_CLINICS_HREF}?service=${encodeURIComponent(service.name)}` : undefined}
                   />
                 </li>

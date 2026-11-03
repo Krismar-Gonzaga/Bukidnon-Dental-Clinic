@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import PortalLayout from '../../layouts/PortalLayout';
+import ClinicApplicantLayout from '../../layouts/ClinicApplicantLayout';
 import { Badge, DataTable, Field, FormError, Section } from '../../components/portal/PortalUi';
 import { QueryState } from '../../components/StatusMessage';
-import { CLINIC_APPLY_HREF, CLINIC_PORTAL_HREF, getClinicHref } from '../../config/clinicNavigation';
-import { useAuth } from '../../auth/AuthContext';
+import { CLINIC_APPLY_HREF, getClinicHref } from '../../config/clinicNavigation';
 import {
   createApplication,
   deleteApplicationDocument,
@@ -189,16 +188,10 @@ function ApplicationForm({ application }) {
 }
 
 function ClinicApplicationPage() {
-  const { memberships } = useAuth();
   const query = useQuery({ queryKey: APPLICATIONS_KEY, queryFn: getMyApplications });
 
-  const navItems = [
-    { label: 'Clinic application', href: CLINIC_APPLY_HREF, icon: 'shieldCheck' },
-    ...(memberships.length > 0 ? [{ label: 'My clinics', href: CLINIC_PORTAL_HREF, icon: 'building' }] : []),
-  ];
-
   return (
-    <PortalLayout title="Clinic Application" navItems={navItems} activeHref={CLINIC_APPLY_HREF} roleLabel="Clinic Admin" navLabel="Clinic owner">
+    <ClinicApplicantLayout title="Clinic Application" activeHref={CLINIC_APPLY_HREF}>
       <QueryState query={query} loadingLabel="Loading your application…">
         {(applications) => {
           // Work on the latest application that is not approved; otherwise show the latest.
@@ -206,7 +199,7 @@ function ClinicApplicationPage() {
           return <ApplicationForm key={current?.id ?? 'new'} application={current} />;
         }}
       </QueryState>
-    </PortalLayout>
+    </ClinicApplicantLayout>
   );
 }
 

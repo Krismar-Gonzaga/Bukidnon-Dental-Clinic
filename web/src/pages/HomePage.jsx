@@ -1,5 +1,3 @@
-import SiteHeader from '../components/SiteHeader';
-import SiteFooter from '../components/SiteFooter';
 import HomeHero from '../components/home/HomeHero';
 import ClinicSearchPanel from '../components/home/ClinicSearchPanel';
 import FeaturedClinics from '../components/home/FeaturedClinics';
@@ -14,8 +12,6 @@ import './HomePage.css';
 function HomePage() {
   return (
     <div className="home">
-      <SiteHeader activeHref="/" />
-
       <main className="home-main">
         <HomeHero />
         <div className="home-search-wrap">
@@ -28,8 +24,6 @@ function HomePage() {
         <ClinicsMapSection />
         <Testimonials />
       </main>
-
-      <SiteFooter />
     </div>
   );
 }

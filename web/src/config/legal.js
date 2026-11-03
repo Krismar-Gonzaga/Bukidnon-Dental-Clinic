@@ -5,7 +5,7 @@
 // issuances, and their real processing, before launch.
 export const LEGAL_PAGES = {
   privacy: {
-    title: 'Privacy Notice',
+    title: 'Privacy Policy',
     intro: 'How Bukidnon Dental Portal collects, uses and protects your personal information.',
     updated: 'October 2026',
     sections: [
@@ -51,7 +51,7 @@ export const LEGAL_PAGES = {
     ],
   },
   terms: {
-    title: 'Terms of Use',
+    title: 'Terms of Service',
     intro: 'The rules for using Bukidnon Dental Portal.',
     updated: 'October 2026',
     sections: [
@@ -80,6 +80,32 @@ export const LEGAL_PAGES = {
         body: [
           'Clinics are listed after their documents are verified. Prices and services are published by each clinic and may change; confirm details with the clinic.',
         ],
+      },
+    ],
+  },
+  cookies: {
+    title: 'Cookie Policy',
+    intro: 'The small amount of data this website stores in your browser, and why.',
+    updated: 'November 2026',
+    sections: [
+      {
+        heading: 'Cookies we use',
+        body: [
+          'A session cookie keeps you signed in. It cannot be read by scripts on the page and ends when you sign out or your session expires.',
+          'A security cookie (XSRF-TOKEN) protects your account from forged requests made by other websites.',
+        ],
+      },
+      {
+        heading: 'Stored in your browser',
+        body: ['Small preferences, such as a collapsed sidebar or alerts you chose to hide, are kept in your browser only. They are not sent to us.'],
+      },
+      {
+        heading: 'What we do not use',
+        body: ['We do not use advertising or tracking cookies. If you open Google Maps from a clinic page, Google applies its own cookie policy.'],
+      },
+      {
+        heading: 'Your choices',
+        body: ['You can clear cookies in your browser settings at any time. Without the session and security cookies you cannot sign in, but you can still browse clinics.'],
       },
     ],
   },

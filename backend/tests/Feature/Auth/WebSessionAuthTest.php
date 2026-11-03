@@ -43,6 +43,29 @@ class WebSessionAuthTest extends TestCase
         $this->assertGuest('web');
     }
 
+    public function test_session_check_answers_200_for_guests_and_returns_the_signed_in_user(): void
+    {
+        // Guest: 200 with no data (no failed request in the browser console).
+        $this->withHeaders(self::WEB)->getJson('/api/session')
+            ->assertOk()
+            ->assertJsonMissingPath('data');
+
+        // Web session (cookie).
+        $user = User::factory()->role('patient')->create();
+        $this->actingAs($user, 'web')->withHeaders(self::WEB)->getJson('/api/session')
+            ->assertOk()
+            ->assertJsonPath('data.id', $user->id);
+        $this->app['auth']->forgetGuards();
+
+        // Bearer token (mobile style).
+        $this->asUser($user)->getJson('/api/session')->assertOk()->assertJsonPath('data.id', $user->id);
+        $this->app['auth']->forgetGuards();
+
+        // Suspended accounts count as signed out.
+        $user->forceFill(['status' => User::STATUS_SUSPENDED])->save();
+        $this->asUser($user)->getJson('/api/session')->assertOk()->assertJsonMissingPath('data');
+    }
+
     public function test_mobile_style_login_still_gets_a_token(): void
     {
         User::factory()->create(['email' => 'juan@example.com']);
@@ -54,14 +77,20 @@ class WebSessionAuthTest extends TestCase
 
     public function test_cors_allows_credentials_only_for_known_origins(): void
     {
+        // Independent of the developer's local CORS_ALLOWED_ORIGINS.
+        config(['cors.allowed_origins' => ['http://localhost:3000', 'http://127.0.0.1:3000']]);
+
         $this->withHeaders(['Origin' => 'http://localhost:3000', 'Access-Control-Request-Method' => 'POST'])
             ->options('/api/login')
             ->assertHeader('Access-Control-Allow-Origin', 'http://localhost:3000')
             ->assertHeader('Access-Control-Allow-Credentials', 'true');
 
-        $this->withHeaders(['Origin' => 'https://evil.example', 'Access-Control-Request-Method' => 'POST'])
-            ->options('/api/login')
-            ->assertHeaderMissing('Access-Control-Allow-Origin');
+        // An unknown origin is never echoed back, so browsers block it. (With a
+        // single configured origin the library always sends that origin.)
+        $response = $this->withHeaders(['Origin' => 'https://evil.example', 'Access-Control-Request-Method' => 'POST'])
+            ->options('/api/login');
+        $this->assertNotSame('https://evil.example', $response->headers->get('Access-Control-Allow-Origin'));
+        $this->assertNotSame('*', $response->headers->get('Access-Control-Allow-Origin'));
     }
 
     public function test_saved_clinics_and_public_dentists(): void

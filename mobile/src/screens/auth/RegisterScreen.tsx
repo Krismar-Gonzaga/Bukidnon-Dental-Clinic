@@ -68,11 +68,11 @@ const RegisterScreen = ({ navigation, route }: RegisterScreenProps) => {
   );
   const { register } = useAuth();
 
-  const emailRef = useRef<TextInput>(null);
-  const phoneRef = useRef<TextInput>(null);
-  const addressRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
-  const confirmPasswordRef = useRef<TextInput>(null);
+  const emailRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const phoneRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const addressRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const passwordRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const confirmPasswordRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
   // React Navigation keeps this screen mounted and just updates params when
   // ClinicRequirementsScreen navigates back here, so state has to be resynced

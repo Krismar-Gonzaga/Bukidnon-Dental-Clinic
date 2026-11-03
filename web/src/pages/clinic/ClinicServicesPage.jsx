@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import ClinicLayout, { useClinic } from '../../layouts/ClinicLayout';
+import ClinicLayout, { useClinic, useClinicAccess } from '../../layouts/ClinicLayout';
+import { ClinicProfileTabs } from '../../components/clinic/ClinicUi';
 import { Badge, Checkbox, DataTable, Field, FormError, Modal, Section } from '../../components/portal/PortalUi';
 import { QueryState } from '../../components/StatusMessage';
 import { createClinicService, getClinicServices, getServiceCategories, updateClinicService } from '../../services/clinicPortalApi';
@@ -92,8 +93,10 @@ function Services() {
 }
 
 function ClinicServicesPage() {
+  const { clinicId, can } = useClinicAccess();
   return (
-    <ClinicLayout section="services" title="Services & Prices" requires={['clinic.services.manage']}>
+    <ClinicLayout section="services" title="Clinic Profile" subtitle="Services & Pricing" requires={['clinic.services.manage']}>
+      <ClinicProfileTabs clinicId={clinicId} can={can} active="services" />
       <Services />
     </ClinicLayout>
   );

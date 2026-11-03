@@ -6,11 +6,14 @@ import StarRating from '../../components/StarRating';
 import Pagination from '../../components/Pagination';
 import { QueryState } from '../../components/StatusMessage';
 import { ADMIN_REVIEWS_HREF } from '../../config/adminNavigation';
+import { useSensitiveAction } from '../../components/admin/AdminSecurity';
 import { getModerationQueue, moderateReview } from '../../services/adminApi';
 
 // Moderation keeps the review and its reports; it only publishes or hides it.
-function AdminReviewsPage() {
+// Hiding or keeping a review needs the password re-entered (useSensitiveAction).
+function ModerationQueue() {
   const queryClient = useQueryClient();
+  const runSensitive = useSensitiveAction();
   const [showAll, setShowAll] = useState(false);
   const [page, setPage] = useState(1);
   const [moderating, setModerating] = useState(null);
@@ -20,7 +23,7 @@ function AdminReviewsPage() {
     queryFn: () => getModerationQueue({ all: showAll ? 1 : undefined, page }),
   });
   const decide = useMutation({
-    mutationFn: (status) => moderateReview(moderating.id, status, note.trim()),
+    mutationFn: (status) => runSensitive(() => moderateReview(moderating.id, status, note.trim())),
     onSuccess: () => {
       setModerating(null);
       setNote('');
@@ -29,7 +32,7 @@ function AdminReviewsPage() {
   });
 
   return (
-    <AdminLayout title="Review Moderation" activeHref={ADMIN_REVIEWS_HREF}>
+    <>
       <Section
         title={showAll ? 'All reviews' : 'Reported reviews'}
         actions={<Checkbox label="Show all reviews" checked={showAll} onChange={(e) => { setShowAll(e.target.checked); setPage(1); }} />}
@@ -50,7 +53,7 @@ function AdminReviewsPage() {
                           {review.open_reports > 0 && <> <Badge tone="warning">{review.open_reports} open report(s)</Badge></>}
                           <p className="portal-list-item-meta">{review.patient_name} · {review.date}</p>
                         </div>
-                        <button type="button" className="btn btn-outline btn-sm" onClick={() => setModerating(review)}>Moderate</button>
+                        <button type="button" className="btn btn-outline btn-sm" onClick={() => { decide.reset(); setModerating(review); }}>Moderate</button>
                       </div>
                       {review.comment && <p>{review.comment}</p>}
                       {review.reports?.length > 0 && (
@@ -80,6 +83,14 @@ function AdminReviewsPage() {
           </div>
         </Modal>
       )}
+    </>
+  );
+}
+
+function AdminReviewsPage() {
+  return (
+    <AdminLayout title="Review Moderation" activeHref={ADMIN_REVIEWS_HREF}>
+      <ModerationQueue />
     </AdminLayout>
   );
 }

@@ -7,6 +7,7 @@ use App\Http\Resources\AppointmentResource;
 use App\Models\Appointment;
 use App\Models\Clinic;
 use App\Services\AppointmentService;
+use App\Services\AuditLogger;
 use App\Support\BusinessTime;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -22,10 +23,12 @@ use Illuminate\Http\Request;
  */
 class AppointmentController extends Controller
 {
-    private const RELATIONS = ['clinic', 'branch', 'dentist.user', 'serviceRate'];
+    private const RELATIONS = ['clinic', 'branch', 'dentist.user', 'serviceRate', 'patient:id,user_id,birth_date'];
 
-    public function __construct(private readonly AppointmentService $appointments)
-    {
+    public function __construct(
+        private readonly AppointmentService $appointments,
+        private readonly AuditLogger $audit,
+    ) {
     }
 
     public function index(Request $request, Clinic $clinic)
@@ -59,13 +62,36 @@ class AppointmentController extends Controller
         }
         if (isset($data['search'])) {
             $term = '%'.mb_strtolower($data['search']).'%';
-            $query->where(fn ($q) => $q->whereRaw('LOWER(patient_name) LIKE ?', [$term])->orWhereRaw('LOWER(patient_email) LIKE ?', [$term]));
+            $query->where(fn ($q) => $q->whereRaw('LOWER(patient_name) LIKE ?', [$term])
+                ->orWhereRaw('LOWER(patient_email) LIKE ?', [$term])
+                ->orWhereHas('serviceRate', fn ($s) => $s->whereRaw('LOWER(service_name) LIKE ?', [$term])));
         }
 
         return $this->paginated(
             $query->paginate($this->perPage($request, 50)),
             fn ($a) => (new AppointmentResource($a))->clinicView()->resolve()
         );
+    }
+
+    /** Booked appointments per Philippine calendar day of a month (dashboard calendar). */
+    public function calendar(Request $request, Clinic $clinic)
+    {
+        $data = $request->validate(['month' => ['nullable', 'date_format:Y-m']]);
+        $month = isset($data['month']) ? BusinessTime::parse($data['month'].'-01') : BusinessTime::today()->startOfMonth();
+        $day = BusinessTime::daySql('starts_at');
+
+        $totals = $this->visible($request, $clinic)
+            ->whereNotIn('status', [Appointment::CANCELLED, Appointment::REJECTED])
+            ->whereBetween('starts_at', [BusinessTime::utc($month), BusinessTime::utc($month->endOfMonth())])
+            ->selectRaw("{$day} AS day, COUNT(*) AS total")
+            ->groupByRaw($day)
+            ->toBase()
+            ->pluck('total', 'day');
+
+        return $this->ok([
+            'month' => $month->format('Y-m'),
+            'days' => $totals->map(fn ($total, $date) => ['date' => $date, 'total' => (int) $total])->sortKeys()->values(),
+        ]);
     }
 
     public function show(Request $request, Clinic $clinic, int $appointmentId)
@@ -75,7 +101,10 @@ class AppointmentController extends Controller
         return $this->ok((new AppointmentResource($appointment))->clinicView()->resolve());
     }
 
-    /** Book for a patient registered with this clinic (e.g. phone or walk-in). */
+    /**
+     * Book for a patient registered with this clinic (e.g. by phone). With
+     * walk_in the patient is at the clinic, so the booking is confirmed at once.
+     */
     public function store(Request $request, Clinic $clinic)
     {
         $data = $request->validate([
@@ -86,10 +115,16 @@ class AppointmentController extends Controller
             'starts_at' => ['required', 'date'],
             'reason' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'walk_in' => ['sometimes', 'boolean'],
         ]);
 
         $patient = $clinic->patients()->findOrFail($data['patient_id']);
         $appointment = $this->appointments->book($clinic, $patient, $data, $request->user());
+
+        if ($data['walk_in'] ?? false) {
+            $this->audit->record('appointment.walk_in', $appointment, clinicId: $clinic->id);
+            $appointment = $this->appointments->transition($appointment, Appointment::CONFIRMED, $request->user());
+        }
 
         return $this->ok((new AppointmentResource($appointment->load(self::RELATIONS)))->clinicView()->resolve(), 'Appointment booked', 201);
     }

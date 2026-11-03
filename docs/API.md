@@ -55,17 +55,20 @@ Suspended accounts get 403 on login and on every authenticated request.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/home` | Homepage: featured clinics, specializations, counts |
+| GET | `/home` | Homepage: featured clinics, specializations, recent reviews, and counts (`verified_clinics`, `patients`, `municipalities`, `satisfaction_rate`; the rate is null until there are reviews) |
 | GET | `/clinics/search` | Directory search: `search`, `city`, `specialization` / `specialization_id`, `service` / `service_id`, `sort` (`rating`, `reviews`, `newest`, `name`, `price`), `page` |
 | GET | `/clinics/map` | Published clinics with coordinates, for the map |
 | GET | `/clinics/{id}` | Clinic profile: services, dentists, branches, hours, reviews |
 | GET | `/clinics/{id}/reviews` | Published reviews (paginated) |
 | GET | `/clinics/{id}/available-dates` | Dates with open slots: `service_rate_id`, `dentist_id`, `from`, `to` |
 | GET | `/clinics/{id}/availability` | Open start times on one date: `service_rate_id`, `dentist_id`, `date` |
-| GET | `/dentists` | Dentist directory |
+| GET | `/dentists` | Dentist directory, with `rating` and `review_count` (published reviews of their visits), `is_available` (has weekly hours) and `clinics` |
+| GET | `/dentists/{id}` | One dentist's public profile with `schedules`; 404 if they are not publicly listed |
+| POST | `/contact` | Contact form (`first_name`, `last_name`, `email`, `subject`, `message`), limited to 5 a minute. Emails the support address and audits the event without the content. 503 if the mail could not be sent |
 | GET | `/specializations`, `/services`, `/cities` | Filter options |
 | POST | `/register` | Patient or clinic-owner sign-up (`role`: `patient` or `clinic_admin`). Privileged roles cannot be self-assigned. |
 | POST | `/login`, `/forgot-password`, `/reset-password` | Account access. Forgot-password answers the same whether or not the email exists. |
+| GET | `/session` | Start-up session check: the signed-in user (same as `GET /user`), or 200 with no `data` for guests and suspended accounts |
 | GET | `/documents/{document}/download` | Streams a private document. Works only with the short-lived signed URL from a `.../link` endpoint. |
 
 Only clinics that are **approved and published** appear in public results or accept bookings.
@@ -91,7 +94,7 @@ Passwords must be at least 8 characters with at least one letter and one number.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/patient/dashboard` | Upcoming visit and counts |
+| GET | `/patient/dashboard` | Upcoming visits and counts (`total`, `upcoming`, `pending`, `completed`, `saved_clinics`, `reviews_given`) |
 | GET | `/patient/appointments` | Own appointments (`status`, comma-separated) |
 | POST | `/patient/appointments` | Request a booking (below) |
 | GET | `/patient/appointments/{id}` | One appointment |
@@ -101,7 +104,9 @@ Passwords must be at least 8 characters with at least one letter and one number.
 | GET | `/patient/reviews`, `/patient/reviews/eligible` | Own reviews; completed visits still waiting for one |
 | GET | `/patient/records`, `/patient/medical-history` | Records the clinic shared, own medical history (no internal clinic notes) |
 | GET/PUT/DELETE | `/patient/saved-clinics[/{clinicId}]` | Saved clinics |
-| GET/PUT | `/patient/profile` | Contact details, birth date, emergency contact |
+| GET/PUT | `/patient/profile` | Contact details, birth date, civil status, blood type, city, province, zip code, emergency contact and `consents` (`email_follow_up`, `share_medical_history`, `emergency_contact_consent`, `promotions`; all off until the patient turns them on). GET also returns `health` and `photo_version` |
+| PUT | `/patient/profile/health` | What the patient reports about their health: `conditions`, `procedures`, `vitals`, `allergies`, `medications`, `anxiety`. Sent sections replace the saved ones. Stored encrypted; the audit log records the sections changed, never the content |
+| GET/POST | `/patient/profile/photo` | Own photo (private, needs the session). POST `photo`: JPG, PNG or WebP up to 2 MB, 10 a minute |
 
 ### Booking
 
@@ -160,7 +165,7 @@ Access comes from the user's **active membership** in that clinic. Each role gra
 | appointments.view_all, appointments.manage | ✓ | | ✓ | |
 | appointments.view_assigned, appointments.progress | | ✓ | | |
 | patients.view | ✓ | ✓ | ✓ | |
-| patients.manage | | | ✓ | |
+| patients.manage | ✓ | | ✓ | |
 | records.view, records.write | | ✓ | | |
 | inventory.view, inventory.manage | ✓ | | | ✓ |
 | feedback.view, reports.view | ✓ | | | |
@@ -169,18 +174,18 @@ The clinic owner deliberately **cannot read clinical records**. Dentists see onl
 
 | Area | Endpoints |
 |---|---|
-| Profile | `GET /`, `PUT /`, `PUT /publish`, `GET /dashboard`, `GET /reports/appointments` |
+| Profile | `GET /`, `PUT /`, `PUT /publish`, `GET /dashboard`, `GET /dashboard/insights` (clinic admin dashboard figures, `reports.view`), `GET /reports/appointments`, `GET /reports/analytics?year=` (`reports.view`; aggregates only, revenue is an estimate) |
 | Branches & hours | `GET/POST /branches`, `PUT /branches/{branch}`, `PUT /branches/{branch}/hours`, `GET/POST /holidays`, `DELETE /holidays/{holiday}`, `GET/POST /schedule-blocks`, `DELETE /schedule-blocks/{id}` |
 | Services | `GET/POST /services`, `PUT /services/{serviceRate}` |
 | Dentists | `GET /dentists`, `PUT /dentists/{id}`, `PUT /dentists/{id}/schedules` |
 | Members | `GET/POST /members` (invite: `email`, `name`, `role`), `PUT /members/{membership}` |
-| Appointments | `GET/POST /appointments`, `GET /appointments/{id}`, `POST /appointments/{id}/{confirm, reject, cancel, reschedule, approve-reschedule, check-in, start, complete, no-show}` |
+| Appointments | `GET/POST /appointments` (`walk_in: true` confirms at once; rows include `type`: `online` or `walk_in`, and `patient.age`), `GET /appointments/calendar?month=YYYY-MM` (booked count per day), `GET /appointments/{id}`, `POST /appointments/{id}/{confirm, reject, cancel, reschedule, approve-reschedule, check-in, start, complete, no-show}` |
 | Patients | `GET/POST /patients`, `GET/PUT /patients/{id}` |
-| Clinical records | `GET/POST /patients/{id}/medical-history`, `GET/POST /patients/{id}/records`, `POST /patients/{id}/records/{recordId}/amend` |
-| Inventory | `GET/POST /inventory/items`, `GET/PUT /inventory/items/{id}`, `POST /inventory/items/{id}/movements`, `GET /inventory/alerts`, `GET/POST /inventory/categories`, `GET/POST /inventory/suppliers` |
+| Clinical records | `GET /records` (current records across the clinic; dentists: their patients only; filters `search`, `record_type`, `mine=1`), `GET/POST /patients/{id}/medical-history`, `GET/POST /patients/{id}/records`, `POST /patients/{id}/records/{recordId}/amend` |
+| Inventory | `GET/POST /inventory/items`, `GET/PUT /inventory/items/{id}`, `POST /inventory/items/{id}/movements`, `GET /inventory/movements` (stock history across items), `GET /inventory/alerts`, `GET/POST /inventory/categories`, `GET/POST /inventory/suppliers` |
 | Reviews | `GET /reviews`, `POST /reviews/{review}/report` |
 
-Clinical records and medical history are **append-only**: a correction is a new amendment that points at the original. Nothing is edited or deleted in place.
+Clinical records and medical history are **append-only**: a correction is a new amendment that points at the original. Nothing is edited or deleted in place. For dentists, `GET /dashboard` also returns `my_patients` (`total`, `new_this_month`, `new_today`: patients whose first visit with them falls in that period), and `appointments.same_day_last_week` for every role that sees appointments.
 
 Inventory stock changes only through **movements** (`receipt`, `usage`, `adjustment`, `disposal`). Usage takes the batch that expires first. Adjustments need a reason, and stock can't go negative.
 
@@ -188,17 +193,32 @@ Inventory stock changes only through **movements** (`receipt`, `usage`, `adjustm
 
 Requires `users.role = system_admin` (created with `php artisan app:create-system-admin`). It does **not** grant access to clinical records.
 
+**Password re-confirmation.** Routes marked † answer **423** `{ "code": "password_confirmation_required" }` until the administrator re-enters their password with `POST /admin/confirm-password` (`password`; 5 attempts a minute; failures are audited as `admin.password_confirm_failed`). A confirmation lasts 15 minutes and belongs to that sign-in only (the web session or the mobile token). The web and mobile apps ask for the password and retry automatically.
+
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/admin/dashboard` | Platform counts, recent admin activity |
-| GET | `/admin/clinic-applications[/{id}]` | Review queue |
-| POST | `/admin/clinic-applications/{id}/start-review`, `/approve`, `/reject` | Decide (`notes` required to reject) |
-| GET | `/admin/clinic-applications/{id}/documents/{documentId}/link` | Signed document URL |
+| GET | `/admin/dashboard` | Platform counts, registration queue (5 oldest), security counts for the last 24 h, audited events per day (14 days), recent activity |
+| GET | `/admin/system/health` | Live checks (database, cache, document storage, job queue) and production configuration warnings; never returns secrets |
+| POST | `/admin/confirm-password` | Re-enter the password (see above) |
+| GET | `/admin/clinic-applications[/{id}]` | Review queue (filters: `status`, `search` on clinic name or city, `view=attention`, submitted `from`/`to`, `per_page`). Rows add `reference` (REG-00012), `document_status` (`verified`, `under_review`, `pending`, `missing_info`, `returned`, `suspended`) and `priority` (`high` when documents are missing or it has waited 3+ days, `medium` after a day, `standard`; `null` once decided). The detail includes `history` from the audit log |
+| GET | `/admin/clinic-applications/summary` | Verification cards: pending, under review, submitted this/last week, needs attention, verified today, average decision hours (30 days), oldest open id, required documents |
+| GET | `/admin/clinic-applications/export` ‡ | CSV of the filtered registrations (same filters; `limit` up to 5,000) |
+| POST | `/admin/clinic-applications/{id}/start-review` | Mark as under review |
+| POST | `/admin/clinic-applications/{id}/approve` †, `/reject` † | Decide (`notes` required to reject; sent to the applicant) |
+| POST | `/admin/clinic-applications/{id}/notes` | Internal note (`note`), kept in the audit log, never shown to the applicant |
+| GET | `/admin/clinic-applications/{id}/documents/{documentId}/link` | Signed 5-minute document URL; `download=1` (part of the signature) saves instead of opening |
 | GET | `/admin/clinics` | All clinics |
-| POST | `/admin/clinics/{clinic}/suspend`, `/reactivate` | Hide or restore a clinic (`reason` required to suspend) |
-| GET | `/admin/users`, PUT `/admin/users/{user}` | Suspend (`reason` required) or reactivate accounts |
-| GET | `/admin/reviews`, POST `/admin/reviews/{review}/moderate` | `status`: `approved` or `rejected`, with a required `note` |
-| GET | `/admin/audit-logs` | Append-only audit trail (filters: `action`, `user_id`, `clinic_id`, `from`, `to`) |
+| POST | `/admin/clinics/{clinic}/suspend` †, `/reactivate` † | Hide or restore a clinic (`reason` required to suspend) |
+| GET | `/admin/users`, PUT `/admin/users/{user}` † | Change account type, suspend (`reason` required) or reactivate accounts |
+| GET | `/admin/reviews`, POST `/admin/reviews/{review}/moderate` † | `status`: `approved` or `rejected`, with a required `note` |
+| GET | `/admin/audit-logs` | Append-only audit trail, newest first (filters: `range` `24h`/`7d`/`30d`, or `from`/`to` dates; `category` `security`, `verification`, `clinics`, `accounts`, `records`, `appointments`, `reviews`, `audit`; `role` (account type, or `none` for not signed in); `action` prefix; `user_id`; `clinic_id`). Each entry has a readable `label`, `category`, `outcome` (`success`, `failed`, `blocked`), `user_name`/`user_role`, `subject_label`, `detail` and `sealed` |
+| GET | `/admin/audit-logs/summary` | Cards for the same filters: total events and the total of the window before it, failed and blocked sign-ins and their distinct IPs, critical actions, entries awaiting seal and the last integrity report |
+| POST | `/admin/audit-logs/integrity` | Seals new entries and re-checks the whole hash chain; returns `status` (`verified` or `failed`), `checked`, `pending` and `problems`. Audited |
+| GET | `/admin/audit-logs/export` ‡ | CSV of the filtered entries (newest first; `limit` up to 5,000) |
+
+‡ Exports contain personal data (emails, IP addresses): they need the password re-confirmed (†), are limited to 5 a minute and are themselves audited (`audit.exported`, `clinic_application.exported`). Cells that a spreadsheet would run as a formula are prefixed with an apostrophe.
+
+**Audit integrity.** `audit_logs` is append-only: the model refuses updates and deletes, and on PostgreSQL a trigger refuses them too, except setting `hash`/`prev_hash` once on an unsealed row. `audit:seal` (every 5 minutes, and before each check) seals entries older than 30 seconds in id order: each stores an HMAC-SHA-256, keyed from `APP_KEY`, of its columns and the previous entry's hash. `audit:verify` or the integrity endpoint re-computes the chain and reports edited entries, gaps (deleted entries), removed newest entries (checked against the head kept in the application cache) and unsealed entries inside the chain. Rotating `APP_KEY` breaks verification of entries sealed before the rotation.
 
 ## Scheduled jobs
 
@@ -209,3 +229,4 @@ Defined in `backend/routes/console.php`. They need `php artisan schedule:run` ev
 | `appointments:send-reminders` | every 15 min | Reminds patients `BOOKING_REMINDER_HOURS_BEFORE` (default 24) hours ahead, once per appointment |
 | `inventory:send-alerts` | daily 07:00 Manila | Low stock, near-expiry and expired batches, to members with `inventory.manage` |
 | `sanctum:prune-expired` | daily | Deletes expired tokens |
+| `audit:seal` | every 5 min | Adds new audit entries to the tamper-evident hash chain (`audit:verify` re-checks it) |

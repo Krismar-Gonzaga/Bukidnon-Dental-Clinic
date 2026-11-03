@@ -228,6 +228,24 @@ export function Modal({ title, onClose, children, wide = false }) {
   );
 }
 
+/** "Are you sure?" dialog for steps that cannot be undone. */
+export function ConfirmDialog({ title, message, confirmLabel, danger = false, isBusy = false, error, onConfirm, onCancel }) {
+  return (
+    <Modal title={title} onClose={onCancel}>
+      <p className="portal-confirm-message">{message}</p>
+      <FormError error={error} />
+      <div className="portal-form-actions">
+        <button type="button" className="btn btn-outline" onClick={onCancel} disabled={isBusy}>
+          Go back
+        </button>
+        <button type="button" className={`btn ${danger ? 'btn-danger' : 'btn-primary'}`} onClick={onConfirm} disabled={isBusy}>
+          {isBusy ? 'Saving…' : confirmLabel}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 export function StatTiles({ stats }) {
   return (
     <dl className="portal-stats">

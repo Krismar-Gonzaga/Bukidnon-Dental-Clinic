@@ -2,16 +2,15 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\Clinic;
-use App\Models\Service;
-use App\Models\ServiceRate;
+use App\Models\ClinicBranch;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // Create services
         $services = [
             ['name' => 'General Dentistry', 'icon_name' => 'medical-services', 'color' => '#003f87', 'is_popular' => true, 'sort_order' => 1],
             ['name' => 'Cosmetic Dentistry', 'icon_name' => 'brush', 'color' => '#006c4f', 'is_popular' => true, 'sort_order' => 2],
@@ -20,15 +19,21 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Root Canal', 'icon_name' => 'health-and-safety', 'color' => '#9c27b0', 'is_popular' => false, 'sort_order' => 5],
             ['name' => 'Dental Implants', 'icon_name' => 'bolt', 'color' => '#00bcd4', 'is_popular' => false, 'sort_order' => 6],
         ];
-        
-        foreach ($services as $service) {
-            Service::create(array_merge($service, [
-                'slug' => str()->slug($service['name']),
-                'description' => "Professional {$service['name']} services"
-            ]));
-        }
-        
-        // Create clinics
+
+        $now = now();
+        $serviceRows = array_map(fn (array $service) => array_merge($service, [
+            'slug' => str()->slug($service['name']),
+            'description' => "Professional {$service['name']} services",
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]), $services);
+
+        DB::table('services')->upsert(
+            $serviceRows,
+            ['slug'],
+            ['name', 'description', 'icon_name', 'color', 'is_popular', 'sort_order', 'updated_at']
+        );
+
         $clinics = [
             [
                 'name' => 'Bukidnon Dental Center',
@@ -61,28 +66,81 @@ class DatabaseSeeder extends Seeder
                 'is_verified' => true
             ],
         ];
-        
-        foreach ($clinics as $clinic) {
-            Clinic::create(array_merge($clinic, [
-                'slug' => str()->slug($clinic['name']),
-                'province' => 'Bukidnon',
-                'opening_time' => '08:00:00',
-                'closing_time' => '17:00:00',
-            ]));
+
+        // Sample clinics are approved and published so they appear in the
+        // public directory (Clinic::publiclyListed()).
+        $clinicRows = array_map(fn (array $clinic) => array_merge($clinic, [
+            'slug' => str()->slug($clinic['name']),
+            'province' => 'Bukidnon',
+            'opening_time' => '08:00:00',
+            'closing_time' => '17:00:00',
+            'status' => Clinic::STATUS_APPROVED,
+            'is_published' => true,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]), $clinics);
+
+        DB::table('clinics')->upsert(
+            $clinicRows,
+            ['slug'],
+            [
+                'name', 'address', 'city', 'province', 'contact_number', 'email',
+                'rating', 'is_featured', 'is_verified', 'opening_time', 'closing_time',
+                'status', 'is_published', 'updated_at',
+            ]
+        );
+
+        // Each sample clinic gets a main branch open Monday to Saturday, 8 AM to 5 PM.
+        foreach ($clinicRows as $row) {
+            $clinicId = DB::table('clinics')->where('slug', $row['slug'])->value('id');
+            $branch = ClinicBranch::where('clinic_id', $clinicId)->where('is_main', true)->first()
+                ?? new ClinicBranch;
+            $branch->fill(['name' => 'Main Branch', 'address' => $row['address'], 'city' => $row['city']]);
+            $branch->clinic_id = $clinicId;
+            $branch->is_main = true;
+            $branch->save();
+
+            foreach (range(1, 6) as $day) {
+                $branch->operatingHours()->updateOrCreate(
+                    ['day_of_week' => $day],
+                    ['opens_at' => '08:00', 'closes_at' => '17:00']
+                );
+            }
         }
-        
-        // Create service rates
-        $clinic1 = Clinic::first();
-        $generalService = Service::where('name', 'General Dentistry')->first();
-        
-        if ($clinic1 && $generalService) {
-            ServiceRate::create([
-                'clinic_id' => $clinic1->id,
-                'service_id' => $generalService->id,
+
+        $clinicId = DB::table('clinics')
+            ->where('slug', str()->slug('Bukidnon Dental Center'))
+            ->value('id');
+        $serviceId = DB::table('services')
+            ->where('slug', str()->slug('General Dentistry'))
+            ->value('id');
+
+        if ($clinicId && $serviceId) {
+            $rate = [
                 'service_name' => 'General Checkup',
                 'description' => 'Initial consultation and examination',
-                'price' => 500
-            ]);
+                'price' => 500,
+            ];
+            $existingRate = DB::table('service_rates')
+                ->where('clinic_id', $clinicId)
+                ->where('service_id', $serviceId)
+                ->where('service_name', $rate['service_name'])
+                ->exists();
+
+            if ($existingRate) {
+                DB::table('service_rates')
+                    ->where('clinic_id', $clinicId)
+                    ->where('service_id', $serviceId)
+                    ->where('service_name', $rate['service_name'])
+                    ->update(array_merge($rate, ['updated_at' => $now]));
+            } else {
+                DB::table('service_rates')->insert(array_merge($rate, [
+                    'clinic_id' => $clinicId,
+                    'service_id' => $serviceId,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]));
+            }
         }
     }
 }

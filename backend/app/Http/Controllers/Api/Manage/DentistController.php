@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\Manage;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DentistResource;
+use App\Models\Appointment;
 use App\Models\Clinic;
 use App\Models\Dentist;
 use App\Services\AuditLogger;
+use App\Support\BusinessTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -28,7 +30,19 @@ class DentistController extends Controller
             ->with(['user', 'specialization', 'schedules' => fn ($q) => $q->whereIn('branch_id', $clinic->branches()->select('id'))])
             ->get();
 
-        return $this->ok($dentists->map(fn ($d) => (new DentistResource($d))->staffView()->resolve()));
+        // Booked visits today per dentist, for the management cards.
+        $today = BusinessTime::today();
+        $todayCounts = $clinic->appointments()->toBase()
+            ->whereBetween('starts_at', [BusinessTime::utc($today), BusinessTime::utc($today->endOfDay())])
+            ->whereNotIn('status', [Appointment::CANCELLED, Appointment::REJECTED])
+            ->selectRaw('dentist_id, COUNT(*) AS total')
+            ->groupBy('dentist_id')
+            ->pluck('total', 'dentist_id');
+
+        return $this->ok($dentists->map(fn ($d) => [
+            ...(new DentistResource($d))->staffView()->resolve(),
+            'appointments_today' => (int) ($todayCounts[$d->id] ?? 0),
+        ]));
     }
 
     public function update(Request $request, Clinic $clinic, int $dentistId)

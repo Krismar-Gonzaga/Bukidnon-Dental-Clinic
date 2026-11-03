@@ -44,13 +44,14 @@ function OptionGroup({ layout, children }) {
   );
 }
 
-// ?clinic=<id> (from Find Clinics or a clinic page) preselects a clinic.
+// ?clinic=<id> (from Find Clinics or a clinic page) preselects a clinic, and
+// ?dentist=<id> (from a dentist's profile) that clinic's dentist.
 function BookAppointmentPage() {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [stepIndex, setStepIndex] = useState(0);
   const [clinicId, setClinicId] = useState(searchParams.get('clinic'));
-  const [dentistId, setDentistId] = useState(null);
+  const [dentistId, setDentistId] = useState(searchParams.get('dentist'));
   const [serviceId, setServiceId] = useState(null);
   // One key per booking attempt: a retried submit cannot book twice.
   const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey);

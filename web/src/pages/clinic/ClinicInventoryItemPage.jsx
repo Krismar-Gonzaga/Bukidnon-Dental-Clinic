@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import ClinicLayout, { useClinic } from '../../layouts/ClinicLayout';
 import Icon from '../../components/Icon';
 import { Badge, DataTable, Field, FormError, Section } from '../../components/portal/PortalUi';
@@ -21,6 +21,9 @@ function MovementForm({ item }) {
   const queryClient = useQueryClient();
   const suppliers = useQuery({ queryKey: ['clinic', clinicId, 'inventory', 'suppliers'], queryFn: () => getSuppliers(clinicId) });
   const [form, setForm] = useState({ type: 'receipt', quantity: '', reason: '', batch_id: '', batch_number: '', expires_on: '', supplier_id: '' });
+  // ?receive=1 (dashboard alert "Reorder Now") jumps straight to receiving stock.
+  const [searchParams] = useSearchParams();
+  const startReceiving = searchParams.get('receive') === '1';
   const needsBatch = form.type === 'adjustment' || form.type === 'disposal';
 
   const save = useMutation({
@@ -54,6 +57,7 @@ function MovementForm({ item }) {
             type="number"
             required
             min={form.type === 'adjustment' ? undefined : 1}
+            autoFocus={startReceiving}
             {...bind('quantity')}
           />
           {needsBatch && (

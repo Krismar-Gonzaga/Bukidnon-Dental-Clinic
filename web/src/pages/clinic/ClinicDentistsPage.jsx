@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import ClinicLayout, { useClinic } from '../../layouts/ClinicLayout';
-import { Badge, Checkbox, Field, FormError, Modal, Section } from '../../components/portal/PortalUi';
+import ClinicLayout, { useClinic, useClinicAccess } from '../../layouts/ClinicLayout';
+import Icon from '../../components/Icon';
+import { FilterSelect, InitialsTile, Pill, SearchInput } from '../../components/clinic/ClinicUi';
+import { Checkbox, ConfirmDialog, Field, FormError, Modal } from '../../components/portal/PortalUi';
 import WeeklyHoursEditor from '../../components/portal/WeeklyHoursEditor';
 import { QueryState } from '../../components/StatusMessage';
-import { getClinicHref } from '../../config/clinicNavigation';
 import {
   getBranches,
   getClinicDentists,
@@ -12,7 +13,9 @@ import {
   updateDentist,
   updateDentistSchedules,
 } from '../../services/clinicPortalApi';
-import { WEEKDAY_SHORT } from '../../utils/dateTime';
+import { businessTodayKey, dateFromKey, formatClockTime, WEEKDAY_SHORT } from '../../utils/dateTime';
+import { InviteModal } from './ClinicStaffPage';
+import './ClinicDentistsPage.css';
 
 function ProfileModal({ dentist, onClose }) {
   const { clinicId } = useClinic();
@@ -126,69 +129,232 @@ function ScheduleModal({ dentist, branches, onClose }) {
   );
 }
 
-const summarize = (schedules, branches) =>
+const hoursToday = (schedules = []) => {
+  const day = dateFromKey(businessTodayKey()).getDay();
+  const today = schedules.filter((entry) => entry.day_of_week === day);
+  if (today.length === 0) return schedules.length === 0 ? 'No schedule yet' : 'Off today';
+  const start = today.map((entry) => entry.starts_at).sort()[0];
+  const end = today.map((entry) => entry.ends_at).sort().at(-1);
+  return `${formatClockTime(start)} – ${formatClockTime(end)}`;
+};
+
+const scheduleLines = (schedules, branches) =>
   branches
     .map((branch) => {
-      const days = schedules.filter((s) => s.branch_id === branch.id).sort((a, b) => a.day_of_week - b.day_of_week);
+      const days = schedules.filter((entry) => entry.branch_id === branch.id).sort((a, b) => a.day_of_week - b.day_of_week);
       if (days.length === 0) return null;
-      return `${branch.name}: ${days.map((d) => `${WEEKDAY_SHORT[d.day_of_week]} ${d.starts_at}–${d.ends_at}`).join(', ')}`;
+      return `${branch.name}: ${days.map((d) => `${WEEKDAY_SHORT[d.day_of_week]} ${formatClockTime(d.starts_at)}–${formatClockTime(d.ends_at)}`).join(', ')}`;
     })
-    .filter(Boolean)
-    .join(' · ') || 'No schedule — not bookable';
+    .filter(Boolean);
 
-function Dentists() {
+function ViewModal({ dentist, branches, canSchedule, onEditSchedule, onClose }) {
+  const lines = scheduleLines(dentist.schedules ?? [], branches);
+  return (
+    <Modal title={dentist.name} onClose={onClose}>
+      <dl className="portal-details">
+        <dt>Email</dt>
+        <dd>{dentist.email ?? '—'}</dd>
+        <dt>Specialization</dt>
+        <dd>{dentist.specialization ?? 'General Dentist'}</dd>
+        <dt>PRC license</dt>
+        <dd>{dentist.license_number || '—'}</dd>
+        <dt>Experience</dt>
+        <dd>{dentist.years_experience} years</dd>
+        <dt>Qualifications</dt>
+        <dd>{dentist.qualifications || '—'}</dd>
+        <dt>Public bio</dt>
+        <dd>{dentist.bio || '—'}</dd>
+        <dt>Weekly hours</dt>
+        <dd>{lines.length > 0 ? lines.map((line) => <div key={line}>{line}</div>) : 'No schedule: patients cannot book this dentist yet.'}</dd>
+      </dl>
+      <div className="portal-form-actions">
+        {canSchedule && (
+          <button type="button" className="btn btn-outline" disabled={branches.length === 0} onClick={onEditSchedule}>
+            Edit schedule
+          </button>
+        )}
+        <button type="button" className="btn btn-primary" onClick={onClose}>
+          Done
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function DentistCard({ dentist, canEdit, onView, onEdit, onToggle }) {
+  return (
+    <li className="clinic-dentist-card">
+      <InitialsTile name={dentist.name} id={dentist.id} />
+      <div className="clinic-dentist-body">
+        <div className="clinic-dentist-head">
+          <div>
+            <h2 className="clinic-dentist-name">{dentist.name}</h2>
+            <p className="clinic-cell-sub clinic-dentist-specialty">{dentist.specialization ?? 'General Dentist'}</p>
+          </div>
+          <Pill tone={dentist.is_active ? 'success' : 'neutral'}>{dentist.is_active ? 'Active' : 'Inactive'}</Pill>
+        </div>
+        <p className="clinic-dentist-meta">
+          <span>
+            <Icon name="calendarBlank" size={16} />
+            {dentist.appointments_today ?? 0} today
+          </span>
+          <span>
+            <Icon name="clock" size={16} />
+            {hoursToday(dentist.schedules)}
+          </span>
+        </p>
+        <div className="clinic-dentist-actions">
+          <button type="button" className="clinic-mini-button is-primary clinic-dentist-view" onClick={onView} aria-label={`View profile of ${dentist.name}`}>
+            View Profile
+          </button>
+          {canEdit && (
+            <>
+              <button type="button" className="clinic-dentist-edit" onClick={onEdit} aria-label={`Edit ${dentist.name}`}>
+                <Icon name="pencil" size={18} />
+              </button>
+              <button
+                type="button"
+                className={`clinic-mini-button ${dentist.is_active ? 'is-danger' : 'is-positive'}`}
+                onClick={onToggle}
+                aria-label={`${dentist.is_active ? 'Deactivate' : 'Activate'} ${dentist.name}`}
+              >
+                {dentist.is_active ? 'Deactivate' : 'Activate'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function Dentists({ query, search, setSearch }) {
   const { clinicId, can } = useClinic();
+  const queryClient = useQueryClient();
   const [modal, setModal] = useState(null);
-  const dentists = useQuery({ queryKey: ['clinic', clinicId, 'dentists'], queryFn: () => getClinicDentists(clinicId) });
+  const [specialty, setSpecialty] = useState('');
+  const [status, setStatus] = useState('');
+  const [toggling, setToggling] = useState(null);
   const branches = useQuery({ queryKey: ['clinic', clinicId, 'branches'], queryFn: () => getBranches(clinicId) });
+  const toggle = useMutation({
+    mutationFn: () => updateDentist(clinicId, toggling.id, { is_active: !toggling.is_active }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clinic', clinicId] });
+      setToggling(null);
+    },
+  });
+  const list = query.data ?? [];
+  const specialties = [...new Set(list.map((d) => d.specialization ?? 'General Dentist'))].sort();
+  const term = search.trim().toLowerCase();
+  const visible = list.filter(
+    (d) =>
+      (!term || `${d.name} ${d.email ?? ''} ${d.specialization ?? ''}`.toLowerCase().includes(term)) &&
+      (!specialty || (d.specialization ?? 'General Dentist') === specialty) &&
+      (!status || (status === 'active') === d.is_active)
+  );
 
   return (
-    <Section
-      title="Dentists"
-      subtitle="Dentists join through Staff (role: Dentist). Set their profile and weekly hours here."
-      actions={can('clinic.staff.manage') && <a href={getClinicHref(clinicId, 'staff')} className="btn btn-outline btn-sm">Add a dentist</a>}
-    >
-      <QueryState query={dentists} loadingLabel="Loading dentists…">
-        {(list) =>
-          list.length === 0 ? (
-            <p className="portal-empty">No dentists yet.</p>
+    <>
+      <div className="clinic-toolbar">
+        <SearchInput label="Search dentists" placeholder="Search dentists..." value={search} onChange={setSearch} />
+        <FilterSelect label="Specialization" value={specialty} onChange={setSpecialty} options={[{ value: '', label: 'All specializations' }, ...specialties.map((value) => ({ value, label: value }))]} />
+        <FilterSelect
+          label="Status"
+          value={status}
+          onChange={setStatus}
+          options={[
+            { value: '', label: 'All' },
+            { value: 'active', label: 'Active' },
+            { value: 'inactive', label: 'Inactive' },
+          ]}
+        />
+      </div>
+      <QueryState query={query} loadingLabel="Loading dentists…">
+        {() =>
+          visible.length === 0 ? (
+            <p className="portal-empty">{list.length === 0 ? 'No dentists yet. Use Add Dentist to invite one.' : 'No dentists match these filters.'}</p>
           ) : (
-            <ul className="portal-list">
-              {list.map((dentist) => (
-                <li key={dentist.id} className="portal-list-item">
-                  <div className="portal-section-header">
-                    <div>
-                      <strong>{dentist.name}</strong> <Badge tone={dentist.is_active ? 'success' : 'neutral'}>{dentist.is_active ? 'Accepting bookings' : 'Inactive'}</Badge>
-                      <p className="portal-list-item-meta">
-                        {dentist.specialization ?? 'General'} · {dentist.years_experience} yrs{dentist.license_number && ` · PRC ${dentist.license_number}`}
-                      </p>
-                      <p className="portal-list-item-meta">{summarize(dentist.schedules ?? [], branches.data ?? [])}</p>
-                    </div>
-                    <div className="portal-actions">
-                      {can('clinic.dentists.manage') && (
-                        <button type="button" className="btn btn-outline btn-sm" onClick={() => setModal({ type: 'profile', dentist })}>Edit profile</button>
-                      )}
-                      {can('clinic.schedules.manage') && (
-                        <button type="button" className="btn btn-outline btn-sm" disabled={!branches.data} onClick={() => setModal({ type: 'schedule', dentist })}>Edit schedule</button>
-                      )}
-                    </div>
-                  </div>
-                </li>
+            <ul className="clinic-dentist-grid">
+              {visible.map((dentist) => (
+                <DentistCard
+                  key={dentist.id}
+                  dentist={dentist}
+                  canEdit={can('clinic.dentists.manage')}
+                  onView={() => setModal({ type: 'view', dentist })}
+                  onEdit={() => setModal({ type: 'profile', dentist })}
+                  onToggle={() => {
+                    toggle.reset();
+                    setToggling(dentist);
+                  }}
+                />
               ))}
             </ul>
           )
         }
       </QueryState>
+      {modal?.type === 'view' && (
+        <ViewModal
+          dentist={modal.dentist}
+          branches={branches.data ?? []}
+          canSchedule={can('clinic.schedules.manage')}
+          onEditSchedule={() => setModal({ type: 'schedule', dentist: modal.dentist })}
+          onClose={() => setModal(null)}
+        />
+      )}
       {modal?.type === 'profile' && <ProfileModal dentist={modal.dentist} onClose={() => setModal(null)} />}
       {modal?.type === 'schedule' && <ScheduleModal dentist={modal.dentist} branches={branches.data ?? []} onClose={() => setModal(null)} />}
-    </Section>
+      {toggling && (
+        <ConfirmDialog
+          title={`${toggling.is_active ? 'Deactivate' : 'Activate'} ${toggling.name}?`}
+          message={
+            toggling.is_active
+              ? 'Patients can no longer book this dentist. Existing appointments stay on the schedule.'
+              : 'Patients can book this dentist again during their weekly hours.'
+          }
+          confirmLabel={toggling.is_active ? 'Deactivate' : 'Activate'}
+          danger={toggling.is_active}
+          isBusy={toggle.isPending}
+          error={toggle.error}
+          onConfirm={() => toggle.mutate()}
+          onCancel={() => setToggling(null)}
+        />
+      )}
+    </>
   );
 }
 
 function ClinicDentistsPage() {
+  const { clinicId, can } = useClinicAccess();
+  const [search, setSearch] = useState('');
+  const [inviting, setInviting] = useState(null);
+  const allowed = can('clinic.dentists.manage', 'clinic.schedules.manage');
+  const query = useQuery({ queryKey: ['clinic', clinicId, 'dentists'], queryFn: () => getClinicDentists(clinicId), enabled: allowed });
+  const total = query.data?.length;
+
   return (
-    <ClinicLayout section="dentists" title="Dentists & Schedules" requires={['clinic.dentists.manage', 'clinic.schedules.manage']}>
-      <Dentists />
+    <ClinicLayout
+      section="dentists"
+      title="Dentist Management"
+      subtitle={total == null ? 'Loading dentists…' : `${total} ${total === 1 ? 'dentist' : 'dentists'} registered`}
+      requires={['clinic.dentists.manage', 'clinic.schedules.manage']}
+      hideSearch
+      headerActions={
+        can('clinic.staff.manage') && (
+          <>
+            <button type="button" className="btn btn-outline clinic-header-button" onClick={() => setInviting('Invite dentist by email')}>
+              <Icon name="mail" size={18} />
+              Invite by Email
+            </button>
+            <button type="button" className="btn btn-primary clinic-header-button" onClick={() => setInviting('Add dentist')}>
+              <Icon name="userPlus" size={18} />
+              Add Dentist
+            </button>
+          </>
+        )
+      }
+    >
+      <Dentists query={query} search={search} setSearch={setSearch} />
+      {inviting && <InviteModal title={inviting} defaultRole="dentist" onClose={() => setInviting(null)} />}
     </ClinicLayout>
   );
 }

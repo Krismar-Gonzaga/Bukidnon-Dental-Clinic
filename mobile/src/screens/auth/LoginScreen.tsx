@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../../context/AuthContext';
+import { DEMO_ACCOUNTS } from '../../config/demoAccounts';
 
 type LoginScreenProps = {
   navigation: { navigate: (screen: string) => void; goBack?: () => void; canGoBack?: () => boolean };
@@ -30,7 +31,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
 
-  const passwordRef = useRef<TextInput>(null);
+  const passwordRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -185,6 +186,33 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
                   </>
                 )}
               </TouchableOpacity>
+
+              {/* Development-only demo accounts (config/demoAccounts.ts) */}
+              {DEMO_ACCOUNTS.length > 0 && (
+                <View style={styles.demoBox}>
+                  <View style={styles.demoHeader}>
+                    <Text style={styles.demoTitle}>Auto fill a demo account</Text>
+                    <Text style={styles.demoTag}>Development only</Text>
+                  </View>
+                  <View style={styles.demoList}>
+                    {DEMO_ACCOUNTS.map((account) => (
+                      <TouchableOpacity
+                        key={account.email}
+                        style={styles.demoChip}
+                        onPress={() => {
+                          setEmail(account.email);
+                          setPassword(account.password);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Auto fill the ${account.label} demo account`}
+                      >
+                        <Text style={styles.demoChipText}>{account.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <Text style={styles.demoHint}>Then tap Sign In.</Text>
+                </View>
+              )}
             </View>
 
             {/* Footer */}
@@ -202,6 +230,14 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
 };
 
 const styles = StyleSheet.create({
+  demoBox: { marginTop: 20, padding: 14, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: '#c2c6d4', backgroundColor: '#f1f4f9' },
+  demoHeader: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  demoTitle: { fontSize: 14, fontWeight: '600', color: '#181c20' },
+  demoTag: { fontSize: 11, fontWeight: '600', color: '#a16207', backgroundColor: '#fdf8e8', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, overflow: 'hidden' },
+  demoList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  demoChip: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: '#c2c6d4', backgroundColor: '#ffffff' },
+  demoChipText: { fontSize: 13, fontWeight: '600', color: '#003f87' },
+  demoHint: { fontSize: 12, color: '#424752', marginTop: 10 },
   backButton: {
     alignSelf: 'flex-start',
     marginLeft: 12,

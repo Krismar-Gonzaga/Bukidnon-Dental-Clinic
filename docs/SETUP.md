@@ -13,7 +13,7 @@ All three apps use the same Laravel API, and the API is the only part that talks
 | Node.js | 22.11+ (mobile requires it; web works on 18+) | Web, mobile |
 | PostgreSQL | Supabase project, or local PostgreSQL 15+ | API database |
 | Android Studio / Xcode | Current | Mobile emulator (optional) |
-| Expo Go | Matching Expo SDK 57 | Mobile on a phone (optional) |
+| Expo Go | Matching Expo SDK 58 | Mobile on a phone (optional) |
 
 On Windows, run npm as `npm.cmd` and npx as `npx.cmd` if PowerShell blocks the `.ps1` shims.
 
@@ -88,28 +88,44 @@ npm ci
 npx expo start
 ```
 
-The app needs to know where the API is. The address depends on where the app runs:
+In development the app finds the API by itself: it uses the computer that serves the app (Metro), port 8000. The phone already reaches that computer to load the app, so nothing needs to be configured. Two things are still required:
 
-| Running on | API address | How |
-|---|---|---|
-| Android emulator | `http://10.0.2.2:8000/api` | Default. `10.0.2.2` is the host computer. |
-| iOS simulator | `http://127.0.0.1:8000/api` | Default. |
-| Physical phone (Expo Go or a build) | `http://<computer LAN IP>:8000/api` | Set `expo.extra.apiUrl` in `mobile/app.json`, then start the API with `php artisan serve --host=0.0.0.0 --port=8000`. Phone and computer must be on the same Wi-Fi. |
+1. Let the API accept the phone. In `backend/.env` set:
 
-`expo.extra.apiUrl` in `app.json` overrides the defaults on **every** platform. Clear it (or set it to the right address) when you switch between an emulator and a phone. It currently holds a LAN address from one developer's network.
+   ```dotenv
+   SERVER_HOST=0.0.0.0
+   SERVER_PORT=8000
+   ```
 
-On Windows, allow PHP through the firewall on private networks, or the phone cannot reach port 8000.
+   Then plain `php artisan serve` listens on all network interfaces. Without it, the API listens on 127.0.0.1 (this computer only) and the phone shows "Can't reach the server" / `Network Error`. Restart `php artisan serve` after changing `.env`: it keeps the address it started with.
+2. Allow port 8000 through Windows Firewall. Run once in an **administrator** PowerShell (allows only devices on your local network):
+
+   ```powershell
+   New-NetFirewallRule -DisplayName "Laravel dev API (8000)" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow -Profile Private,Public -RemoteAddress LocalSubnet
+   ```
+
+| Running on | API address used |
+|---|---|
+| Phone or emulator in development | `http://<computer running Metro>:8000/api` (detected) |
+| Expo tunnel mode, or no Metro host | `http://127.0.0.1:8000/api`: use `adb reverse tcp:8000 tcp:8000` with a USB-connected Android device |
+| Release builds | `expo.extra.apiUrl` in `mobile/app.json` (an `https://` URL); required |
+
+Set `expo.extra.apiUrl` only to override the detected address; when set it applies on every platform.
+
+The app checks connectivity with Laravel's `GET /up` health route, which does not touch the database.
 
 ```bash
 npx tsc --noEmit -p .
 npx jest --ci
 ```
 
-The mobile app is the **patient** app. Clinic owners, staff, dentists and system administrators who sign in on mobile see a notice that sends them to the web portal.
+Patients get the patient app. Members of an approved clinic (owners, dentists, receptionists, inventory staff) get the clinic portal with the same sections as the web portal, shown according to their role. System administrators get the admin portal (dashboard, registration queue, verification, users, review moderation, audit logs, settings). Clinic owners whose application is still pending see a notice that sends them to the web portal.
 
 ## Email
 
 With `MAIL_MAILER=log`, nothing is delivered. Messages (including password-reset links) appear in `backend/storage/logs/laravel.log`. To send real email, set the `MAIL_*` SMTP values for a provider and test delivery before relying on it. See [DEPLOYMENT.md](DEPLOYMENT.md#email).
+
+Contact form messages go to `MAIL_CONTACT_ADDRESS`, or to `MAIL_FROM_ADDRESS` when it is not set. Set a monitored mailbox before launch: with `MAIL_MAILER=log`, the form says the message was sent but it only reaches the log.
 
 ## Troubleshooting
 
@@ -117,6 +133,7 @@ With `MAIL_MAILER=log`, nothing is delivered. Messages (including password-reset
 |---|---|
 | Web login returns **419** | CSRF cookie not set. Web and API host names don't match (`localhost` vs `127.0.0.1`), or `SANCTUM_STATEFUL_DOMAINS` doesn't list the web origin. |
 | Browser shows a **CORS** error | The web origin is missing from `CORS_ALLOWED_ORIGINS`. Restart `php artisan serve` after editing `.env`. |
-| Mobile shows "You're offline" on a phone | `extra.apiUrl` isn't set to the computer's LAN IP, the API isn't bound to `0.0.0.0`, or the firewall blocks port 8000. |
+| Mobile shows "You're offline" on a phone | The API was started without `--host=0.0.0.0`, Windows Firewall blocks port 8000, phone and computer are on different networks, or `extra.apiUrl` points at an old address. Test from the phone's browser: `http://<computer IP>:8000/up` should open. |
 | Requests take 1–3 seconds | Normal against a remote Supabase pooler from a local machine. |
+| `php artisan migrate` fails with `SQLSTATE[25P02] current transaction is aborted` | Postgres aborted the migration's transaction part-way (seen intermittently through the Supabase pooler). Each migration is rolled back as a unit, so run `php artisan migrate` again; it continues from the first pending one. Running migrations through session mode (`DB_PORT=5432 php artisan migrate` in Git Bash) avoids the transaction pooler on port 6543. |
 | `could not find driver` | Enable `pdo_pgsql` in `php.ini`. |

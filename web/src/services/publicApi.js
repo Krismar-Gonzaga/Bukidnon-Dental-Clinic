@@ -19,7 +19,7 @@ export async function getHome() {
       name: c.name,
       location: c.address,
       rating: Number(c.rating ?? 0),
-      reviewCount: null,
+      reviewCount: c.review_count ?? null,
       tags: c.specializations ?? [],
       imageSrc: c.logo ?? null,
     })),
@@ -88,6 +88,11 @@ export async function getDentists({ query, specializationId, city, page = 1, per
   });
   return { dentists: items.map((d) => toDentistCard(d)), pageCount: meta.last_page ?? 1, total: meta.total ?? items.length };
 }
+
+export const getDentist = async (dentistId) => toDentistCard(await getData(`/dentists/${dentistId}`));
+
+/** Public contact form. `website` is the hidden field that catches bots. */
+export const sendContactMessage = async (body) => (await apiClient.post('/contact', body)).data;
 
 export async function getServiceCatalog() {
   return (await getData('/services')).map((s) => ({

@@ -3,10 +3,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import ClinicLayout, { useClinic } from '../../layouts/ClinicLayout';
 import Icon from '../../components/Icon';
-import { Badge, Field, FormError, Modal, Section } from '../../components/portal/PortalUi';
+import { Badge, ConfirmDialog, Field, FormError, Modal, Section } from '../../components/portal/PortalUi';
 import SlotPickerModal from '../../components/portal/SlotPickerModal';
 import { QueryState } from '../../components/StatusMessage';
-import { getClinicHref, getClinicStatusLabel } from '../../config/clinicNavigation';
+import { getClinicHref, getClinicStatusLabel, isDentistMember } from '../../config/clinicNavigation';
 import { appointmentAction, getClinicAppointment } from '../../services/clinicPortalApi';
 import { formatDateTime } from '../../utils/dateTime';
 
@@ -40,12 +40,23 @@ const ACTIONS = {
   ],
 };
 
+// What each one-click step asks before it runs (the patient is notified of most).
+const CONFIRMATIONS = {
+  confirm: (name) => `Confirm this appointment? ${name} will be notified.`,
+  'approve-reschedule': (name) => `Move the appointment to the requested time? ${name} will be notified.`,
+  'check-in': (name) => `Check in ${name} for this visit?`,
+  start: (name) => `Start the visit with ${name}?`,
+  complete: () => 'Mark this visit as completed? This cannot be undone.',
+  'no-show': (name) => `Mark ${name} as a no-show? This cannot be undone.`,
+};
+
 function AppointmentDetail({ appointmentId }) {
-  const { clinicId, can } = useClinic();
+  const { clinicId, membership, can } = useClinic();
+  const backHref = getClinicHref(clinicId, isDentistMember(membership) ? 'schedule' : 'appointments');
   const queryClient = useQueryClient();
   const queryKey = ['clinic', clinicId, 'appointment', appointmentId];
   const query = useQuery({ queryKey, queryFn: () => getClinicAppointment(clinicId, appointmentId) });
-  const [pending, setPending] = useState(null); // action needing a reason or a slot
+  const [pending, setPending] = useState(null); // action needing a reason, a slot or a confirmation
   const [reason, setReason] = useState('');
 
   const run = useMutation({
@@ -59,8 +70,7 @@ function AppointmentDetail({ appointmentId }) {
 
   const start = (item) => {
     run.reset();
-    if (item.reason || item.slot) setPending(item);
-    else run.mutate({ action: item.action });
+    setPending(item);
   };
 
   return (
@@ -69,9 +79,9 @@ function AppointmentDetail({ appointmentId }) {
         const actions = (ACTIONS[a.backendStatus] ?? []).filter((item) => can(...item.needs));
         return (
           <div className="portal-stack">
-            <a href={getClinicHref(clinicId, 'appointments')} className="patient-back-link">
+            <a href={backHref} className="patient-back-link">
               <Icon name="chevronLeft" size={16} />
-              Back to appointments
+              {isDentistMember(membership) ? 'Back to schedule' : 'Back to appointments'}
             </a>
 
             <Section
@@ -175,6 +185,19 @@ function AppointmentDetail({ appointmentId }) {
                   </div>
                 </form>
               </Modal>
+            )}
+
+            {pending && !pending.reason && !pending.slot && (
+              <ConfirmDialog
+                title={pending.label}
+                message={(CONFIRMATIONS[pending.action] ?? (() => 'Continue?'))(a.patient?.name ?? 'The patient')}
+                confirmLabel={pending.label}
+                danger={pending.action === 'no-show'}
+                isBusy={run.isPending}
+                error={run.error}
+                onConfirm={() => run.mutate({ action: pending.action })}
+                onCancel={() => setPending(null)}
+              />
             )}
 
             {pending?.slot && (

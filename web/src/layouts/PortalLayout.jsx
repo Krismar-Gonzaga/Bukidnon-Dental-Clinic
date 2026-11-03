@@ -1,19 +1,26 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
+import AccountMenu from '../components/AccountMenu';
+import NotificationBell from '../components/NotificationBell';
 import { BRAND_NAME } from '../config/app';
-import { LOGIN_HREF } from '../config/navigation';
 import { useAuth } from '../auth/AuthContext';
-import { useUnreadNotifications } from '../hooks/useUnreadNotifications';
+import { getProfileHref } from '../auth/homeRoutes';
+import { LOGIN_HREF } from '../config/navigation';
 import './PatientLayout.css';
 
 const getInitial = (name = '') => name.trim().charAt(0).toUpperCase() || '?';
 
 /**
  * Signed-in portal frame shared by the patient, clinic and admin areas:
- * sidebar (account summary, navigation, log out) and a top bar with the page
- * title and notification bell. Styles come from the patient Figma design.
+ * sidebar (account summary and navigation) and a top bar with the page
+ * title, the notification bell (dropdown of recent notifications), and the
+ * avatar menu (My Profile, Log Out). On phones and small tablets the sidebar
+ * becomes a slide-in menu opened from the top bar.
+ * Styles come from the patient Figma design.
  *
  * sidebarExtra: content under the account summary (e.g. clinic switcher).
+ * profileHref: the avatar menu's My Profile link (defaults by role).
  */
 function PortalLayout({
   title,
@@ -21,14 +28,25 @@ function PortalLayout({
   activeHref,
   roleLabel,
   notificationsHref,
+  profileHref,
   navLabel = 'Portal',
   sidebarExtra,
   children,
 }) {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const unreadCount = useUnreadNotifications();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const name = user?.name ?? '';
+  const isNotificationsPage = Boolean(notificationsHref) && activeHref === notificationsHref;
+
+  useEffect(() => {
+    if (!isMenuOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setIsMenuOpen(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [isMenuOpen]);
 
   const handleLogout = async () => {
     await signOut();
@@ -37,7 +55,8 @@ function PortalLayout({
 
   return (
     <div className="patient-layout">
-      <aside className="patient-sidebar">
+      {isMenuOpen && <div className="patient-sidebar-scrim" onClick={() => setIsMenuOpen(false)} aria-hidden="true" />}
+      <aside id="portal-sidebar" className={`patient-sidebar${isMenuOpen ? ' is-open' : ''}`}>
         <div className="patient-sidebar-top">
           <a href="/" className="patient-sidebar-brand">
             {BRAND_NAME}
@@ -64,6 +83,7 @@ function PortalLayout({
                     href={href}
                     className={`patient-nav-link${isActive ? ' is-active' : ''}`}
                     aria-current={isActive ? 'page' : undefined}
+                    onClick={() => setIsMenuOpen(false)}
                   >
                     <Icon name={icon} size={20} />
                     {label}
@@ -74,7 +94,7 @@ function PortalLayout({
           </ul>
         </nav>
 
-        <div className="patient-sidebar-bottom">
+        <div className="patient-sidebar-footer">
           <button type="button" className="patient-logout" onClick={handleLogout}>
             <Icon name="logOut" size={20} />
             Log Out
@@ -84,21 +104,22 @@ function PortalLayout({
 
       <div className="patient-main">
         <header className="patient-topbar">
-          <h1 className="patient-topbar-title">{title}</h1>
+          <div className="patient-topbar-start">
+            <button
+              type="button"
+              className="patient-menu-button"
+              aria-label="Open menu"
+              aria-expanded={isMenuOpen}
+              aria-controls="portal-sidebar"
+              onClick={() => setIsMenuOpen(true)}
+            >
+              <Icon name="menu" size={22} />
+            </button>
+            <h1 className="patient-topbar-title">{title}</h1>
+          </div>
           <div className="patient-topbar-actions">
-            {notificationsHref && (
-              <a
-                href={notificationsHref}
-                className="patient-topbar-bell"
-                aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
-              >
-                <Icon name="bell" size={22} />
-                {unreadCount > 0 && <span className="patient-topbar-bell-dot" aria-hidden="true" />}
-              </a>
-            )}
-            <span className="patient-avatar" aria-hidden="true">
-              {getInitial(name)}
-            </span>
+            {notificationsHref && <NotificationBell allHref={notificationsHref} isCurrentPage={isNotificationsPage} />}
+            <AccountMenu profileHref={profileHref ?? getProfileHref(user)} roleLabel={roleLabel} />
           </div>
         </header>
 

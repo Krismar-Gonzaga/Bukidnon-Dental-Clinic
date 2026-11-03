@@ -69,7 +69,10 @@ class AppointmentResource extends JsonResource
                 'name' => $this->patient_name,
                 'email' => $this->patient_email,
                 'phone' => $this->patient_phone,
+                'age' => $this->relationLoaded('patient') ? $this->patient?->birth_date?->age : null,
             ]),
+            // Online: the patient booked it themselves. Walk-in: the clinic booked it for them.
+            'type' => $this->when($this->forClinic && $this->relationLoaded('patient'), fn () => $this->created_by !== null && $this->created_by !== $this->patient?->user_id ? 'walk_in' : 'online'),
             'has_review' => $this->whenLoaded('review', fn () => $this->review !== null),
             'status_history' => $this->whenLoaded('statusHistory', fn () => $this->statusHistory->map(fn ($h) => [
                 'from' => $h->from_status,

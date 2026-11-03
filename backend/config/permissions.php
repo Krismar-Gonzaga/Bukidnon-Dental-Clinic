@@ -33,6 +33,7 @@ return [
             'appointments.view_all',
             'appointments.manage',
             'patients.view',
+            'patients.manage',
             'inventory.view',
             'inventory.manage',
             'feedback.view',

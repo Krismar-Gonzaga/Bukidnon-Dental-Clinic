@@ -1,17 +1,43 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import ClinicLayout, { useClinic } from '../../layouts/ClinicLayout';
-import { Badge, Checkbox, Field, FormError, Section } from '../../components/portal/PortalUi';
+import ClinicLayout, { useClinic, useClinicAccess } from '../../layouts/ClinicLayout';
+import Icon from '../../components/Icon';
+import { ClinicProfileTabs } from '../../components/clinic/ClinicUi';
+import { Badge, Checkbox, Field, FormError, Modal, Section } from '../../components/portal/PortalUi';
 import { QueryState } from '../../components/StatusMessage';
+import { getClinicHref } from '../../config/clinicNavigation';
 import { getPublicClinicHref } from '../../config/navigation';
 import {
+  getBranches,
   getClinicOverview,
   getSpecializationOptions,
   setClinicPublished,
   updateClinicProfile,
 } from '../../services/clinicPortalApi';
+import { formatClockTime, WEEKDAY_NAMES } from '../../utils/dateTime';
+import { embedUrl, searchUrl } from '../../utils/maps';
+import './ClinicSettingsPage.css';
 
-function ProfileForm({ clinic }) {
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+/** "Monday – Friday 8:00 AM – 5:00 PM": consecutive days with the same hours merged. */
+export function groupHours(hours = []) {
+  const byDay = Object.fromEntries(hours.map((h) => [h.day_of_week, h]));
+  const groups = [];
+  WEEK_ORDER.forEach((day) => {
+    const entry = byDay[day];
+    const text = entry ? `${formatClockTime(entry.opens_at)} – ${formatClockTime(entry.closes_at)}` : null;
+    const last = groups[groups.length - 1];
+    if (last && last.text === text) last.to = day;
+    else groups.push({ from: day, to: day, text });
+  });
+  return groups.map(({ from, to, text }) => ({
+    days: from === to ? WEEKDAY_NAMES[from] : `${WEEKDAY_NAMES[from]} – ${WEEKDAY_NAMES[to]}`,
+    text,
+  }));
+}
+
+function ProfileModal({ clinic, onClose }) {
   const { clinicId } = useClinic();
   const queryClient = useQueryClient();
   const specializations = useQuery({ queryKey: ['specializations'], queryFn: getSpecializationOptions, staleTime: 10 * 60 * 1000 });
@@ -34,7 +60,10 @@ function ProfileForm({ clinic }) {
         latitude: form.latitude === '' ? null : Number(form.latitude),
         longitude: form.longitude === '' ? null : Number(form.longitude),
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clinic', clinicId] }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['clinic', clinicId] });
+      onClose();
+    },
   });
   const bind = (name) => ({ value: form[name] ?? '', onChange: (e) => setForm((f) => ({ ...f, [name]: e.target.value })) });
   const toggleSpecialization = (id) =>
@@ -44,8 +73,13 @@ function ProfileForm({ clinic }) {
     }));
 
   return (
-    <Section title="Clinic profile" subtitle="Shown on your public clinic page.">
-      <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+    <Modal title="Edit clinic profile" onClose={onClose} wide>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate();
+        }}
+      >
         <div className="portal-form-grid">
           <Field label="Clinic name" required className="is-wide" {...bind('name')} />
           <Field label="Description" as="textarea" className="is-wide" {...bind('description')} />
@@ -66,12 +100,16 @@ function ProfileForm({ clinic }) {
           </fieldset>
         </div>
         <FormError error={save.error} />
-        {save.isSuccess && <p className="portal-success portal-spaced-top" role="status">Profile saved.</p>}
         <div className="portal-form-actions">
-          <button type="submit" className="btn btn-primary" disabled={save.isPending}>Save profile</button>
+          <button type="button" className="btn btn-outline" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={save.isPending}>
+            {save.isPending ? 'Saving…' : 'Save profile'}
+          </button>
         </div>
       </form>
-    </Section>
+    </Modal>
   );
 }
 
@@ -117,26 +155,142 @@ function Publishing({ clinic }) {
   );
 }
 
-function Settings() {
-  const { clinicId } = useClinic();
-  const query = useQuery({ queryKey: ['clinic', clinicId, 'overview'], queryFn: () => getClinicOverview(clinicId) });
+function ContactTile({ icon, label, children }) {
+  return (
+    <div className="clinic-contact-tile">
+      <Icon name={icon} size={20} />
+      <div>
+        <p className="clinic-contact-label">{label}</p>
+        <p className="clinic-contact-value">{children}</p>
+      </div>
+    </div>
+  );
+}
+
+function ProfileView({ clinic }) {
+  const { clinicId, can } = useClinic();
+  const branches = useQuery({ queryKey: ['clinic', clinicId, 'branches'], queryFn: () => getBranches(clinicId) });
+  const main = (branches.data ?? []).find((b) => b.is_main) ?? branches.data?.[0];
+  const place = { name: clinic.name, address: `${clinic.address}, ${clinic.city}, ${clinic.province}`, latitude: clinic.latitude, longitude: clinic.longitude };
+  const mapSrc = embedUrl(place);
+  const specialties = (clinic.specializations ?? []).map((s) => s.name);
+  const cityProvince = [clinic.city, clinic.province].filter(Boolean).join(', ');
 
   return (
-    <QueryState query={query} loadingLabel="Loading clinic…">
-      {(clinic) => (
-        <div className="portal-stack">
-          <Publishing clinic={clinic} />
-          <ProfileForm clinic={clinic} />
+    <div className="clinic-profile">
+      <section className="clinic-profile-hero" aria-labelledby="clinic-profile-name">
+        <div className="clinic-profile-banner" />
+        <div className="clinic-profile-hero-body">
+          <span className="clinic-profile-logo" aria-hidden="true">
+            {clinic.name.trim().charAt(0).toUpperCase()}
+          </span>
+          <h2 id="clinic-profile-name" className="clinic-profile-name">
+            {clinic.name}
+          </h2>
+          <p className="clinic-profile-meta">{[...specialties, cityProvince].filter(Boolean).join(' · ')}</p>
         </div>
-      )}
-    </QueryState>
+      </section>
+
+      <section className="clinic-card-soft">
+        <h2 className="clinic-card-soft-title">Clinic Description</h2>
+        <p className="clinic-profile-text">{clinic.description || 'No description yet. Use Edit Profile to add one.'}</p>
+      </section>
+
+      <section className="clinic-card-soft">
+        <h2 className="clinic-card-soft-title">Contact Information</h2>
+        <div className="clinic-contact-grid">
+          <ContactTile icon="phone" label="Phone">
+            {clinic.contact_number || '—'}
+          </ContactTile>
+          <ContactTile icon="mail" label="Email">
+            {clinic.email || '—'}
+          </ContactTile>
+          <ContactTile icon="mapPin" label="Address">
+            {clinic.address || '—'}
+          </ContactTile>
+          <ContactTile icon="building" label="City">
+            {cityProvince || '—'}
+          </ContactTile>
+        </div>
+      </section>
+
+      <section className="clinic-card-soft">
+        <div className="clinic-card-soft-head">
+          <div>
+            <h2 className="clinic-card-soft-title">Operating Hours</h2>
+            {main && <p className="clinic-card-soft-sub">{main.name}</p>}
+          </div>
+          {can('clinic.schedules.manage') && (
+            <a href={getClinicHref(clinicId, 'branches')} className="clinic-overview-link">
+              Edit hours
+            </a>
+          )}
+        </div>
+        {branches.isPending ? (
+          <p className="clinic-card-soft-sub">Loading hours…</p>
+        ) : branches.isError ? (
+          <p className="clinic-card-soft-sub">The hours could not be loaded.</p>
+        ) : !main ? (
+          <p className="clinic-card-soft-sub">No branch yet.</p>
+        ) : (
+          <dl className="clinic-hours">
+            {groupHours(main.operating_hours).map((row) => (
+              <div key={row.days}>
+                <dt>{row.days}</dt>
+                <dd className={row.text ? 'is-open' : ''}>{row.text ?? 'Closed'}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+      </section>
+
+      <section className="clinic-card-soft">
+        <h2 className="clinic-card-soft-title">Location</h2>
+        <p className="clinic-card-soft-sub">{place.address}</p>
+        {mapSrc ? (
+          <iframe className="clinic-profile-map" title={`Map of ${clinic.name}`} src={mapSrc} loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+        ) : (
+          <a href={searchUrl(place)} target="_blank" rel="noreferrer" className="clinic-profile-map is-placeholder">
+            <Icon name="map" size={44} />
+            <span className="clinic-profile-map-title">Open in Google Maps</span>
+            <span className="clinic-profile-map-sub">{cityProvince}</span>
+          </a>
+        )}
+      </section>
+
+      <Publishing clinic={clinic} />
+    </div>
   );
 }
 
 function ClinicSettingsPage() {
+  const { clinicId, can } = useClinicAccess();
+  const [isEditing, setIsEditing] = useState(false);
+  const query = useQuery({ queryKey: ['clinic', clinicId, 'overview'], queryFn: () => getClinicOverview(clinicId), enabled: can('clinic.profile.manage') });
+
   return (
-    <ClinicLayout section="settings" title="Clinic Profile" requires={['clinic.profile.manage']}>
-      <Settings />
+    <ClinicLayout
+      section="settings"
+      title="Clinic Profile"
+      subtitle="Manage your clinic information"
+      requires={['clinic.profile.manage']}
+      hideSearch
+      headerActions={
+        <button type="button" className="btn btn-outline clinic-header-button" disabled={!query.data} onClick={() => setIsEditing(true)}>
+          <Icon name="pencil" size={18} />
+          Edit Profile
+        </button>
+      }
+    >
+      <ClinicProfileTabs clinicId={clinicId} can={can} active="settings" />
+      <QueryState query={query} loadingLabel="Loading clinic…">
+        {(clinic) => (
+          <>
+            <ProfileView clinic={clinic} />
+            {isEditing && <ProfileModal clinic={clinic} onClose={() => setIsEditing(false)} />}
+          </>
+        )}
+      </QueryState>
     </ClinicLayout>
   );
 }

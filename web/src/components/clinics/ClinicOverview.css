@@ -1,5 +1,5 @@
 /* Two columns, ratio estimated from the Figma clinic details page. */
-.clinic-overview {
+.public-clinic-overview {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: var(--space-5);
@@ -129,6 +129,7 @@
   align-items: center;
   gap: var(--space-1);
   margin-top: var(--space-1);
+  margin-right: var(--space-4);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
 }
@@ -144,7 +145,7 @@
 }
 
 @media (max-width: 900px) {
-  .clinic-overview {
+  .public-clinic-overview {
     grid-template-columns: minmax(0, 1fr);
   }
 }

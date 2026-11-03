@@ -8,7 +8,7 @@ import AppointmentStatusBadge from '../components/patient/AppointmentStatusBadge
 import StarRatingInput from '../components/patient/StarRatingInput';
 import SuccessCard from '../components/patient/SuccessCard';
 import { QueryState } from '../components/StatusMessage';
-import { PATIENT_HISTORY_HREF, PATIENT_REVIEWS_HREF } from '../config/patientNavigation';
+import { PATIENT_REVIEWS_HREF } from '../config/patientNavigation';
 import {
   REVIEW_INTRO,
   REVIEW_PLACEHOLDER,
@@ -54,10 +54,6 @@ function FeedbackPage() {
   return (
     <PatientLayout title="Feedback & Ratings" activeHref={PATIENT_REVIEWS_HREF}>
       <div className="feedback-page">
-        <a href={PATIENT_HISTORY_HREF} className="patient-back-link">
-          <Icon name="chevronLeft" size={16} />
-          Back to History
-        </a>
         {review.isSuccess ? (
           <SuccessCard
             ref={headingRef}
