@@ -155,7 +155,7 @@ const ClinicRequirementsScreen = ({ navigation, route }: ClinicRequirementsScree
                     [
                         {
                             text: 'OK',
-                            onPress: () => navigation.navigate('Home'),
+                            onPress: () => navigation.goBack(),
                         },
                     ]
                 );

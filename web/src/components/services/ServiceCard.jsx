@@ -1,7 +1,8 @@
 import './ServiceCard.css';
 
-// Service listing card. Booking is visual only until appointments exist.
-function ServiceCard({ service }) {
+// Service listing card. actionHref links "Book This Service" (to booking or
+// to clinics offering it); without it the button is hidden.
+function ServiceCard({ service, actionHref, actionLabel = 'Book This Service' }) {
   const { id, name, category, priceLabel, durationLabel, description } = service;
   const titleId = `${id}-name`;
 
@@ -23,9 +24,11 @@ function ServiceCard({ service }) {
 
       <p className="service-card-description">{description}</p>
 
-      <button type="button" className="btn btn-primary service-card-action">
-        Book This Service
-      </button>
+      {actionHref && (
+        <a href={actionHref} className="btn btn-primary service-card-action">
+          {actionLabel}
+        </a>
+      )}
     </article>
   );
 }

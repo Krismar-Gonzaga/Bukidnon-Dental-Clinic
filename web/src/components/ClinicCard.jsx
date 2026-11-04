@@ -1,33 +1,30 @@
 import Icon from './Icon';
 import './ClinicCard.css';
 
-// Actions are visual only until routing/booking are implemented.
-function ClinicCard({ clinic }) {
+// Featured clinic card. bookHref / detailsHref link the actions. Clinics
+// without a photo show a colored placeholder.
+function ClinicCard({ clinic, bookHref, detailsHref }) {
   const { name, location, rating, reviewCount, tags, imageSrc } = clinic;
   const titleId = `${clinic.id}-name`;
 
   return (
-    <article className="clinic-card" aria-labelledby={titleId}>
-      {imageSrc ? (
-        <img className="clinic-card-image" src={imageSrc} alt={name} />
-      ) : (
-        // TEMPORARY placeholder until real clinic photos are available
-        <div
-          className="clinic-card-image clinic-card-image-placeholder"
-          role="img"
-          aria-label="Placeholder for clinic photo"
-        >
-          <Icon name="building" size={36} />
-        </div>
-      )}
+    <article className="public-clinic-card" aria-labelledby={titleId}>
+      <div className="clinic-card-media">
+        {imageSrc ? (
+          <img className="clinic-card-image" src={imageSrc} alt={name} />
+        ) : (
+          <div className="clinic-card-image clinic-card-image-placeholder" role="img" aria-label="Clinic photo not available yet">
+            <Icon name="building" size={48} />
+          </div>
+        )}
+        <p className="clinic-card-rating">
+          <span className="clinic-card-rating-value">{rating.toFixed(1)}</span>
+          {reviewCount != null && <span>({reviewCount} reviews)</span>}
+          <Icon name="star" size={16} className="clinic-card-star" />
+        </p>
+      </div>
 
       <div className="clinic-card-body">
-        <p className="clinic-card-rating">
-          <Icon name="star" size={16} className="clinic-card-star" />
-          <span className="clinic-card-rating-value">{rating.toFixed(1)}</span>
-          <span className="clinic-card-reviews">({reviewCount} reviews)</span>
-        </p>
-
         <h3 id={titleId} className="clinic-card-name">
           {name}
         </h3>
@@ -37,7 +34,7 @@ function ClinicCard({ clinic }) {
           {location}
         </p>
 
-        <ul className="clinic-card-tags" aria-label="Services">
+        <ul className="clinic-card-tags" aria-label="Specializations">
           {tags.map((tag) => (
             <li key={tag} className="clinic-card-tag">
               {tag}
@@ -46,12 +43,12 @@ function ClinicCard({ clinic }) {
         </ul>
 
         <div className="clinic-card-actions">
-          <button type="button" className="btn btn-primary btn-sm">
+          <a href={bookHref} className="btn btn-primary clinic-card-book">
             Book Appointment
-          </button>
-          <button type="button" className="btn btn-outline btn-sm">
+          </a>
+          <a href={detailsHref} className="btn btn-outline clinic-card-details">
             View Details
-          </button>
+          </a>
         </div>
       </div>
     </article>

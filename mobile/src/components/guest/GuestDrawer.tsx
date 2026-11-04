@@ -14,19 +14,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { palette, radius, spacing, type } from '../../theme/tokens';
 
-export type GuestMenuKey = 'home' | 'clinics' | 'services' | 'rates' | 'about';
+export type GuestMenuKey = 'home' | 'clinics' | 'dentists' | 'services' | 'about' | 'contact';
 
 const MENU_ITEMS: Array<{ key: GuestMenuKey; label: string; icon: string }> = [
   { key: 'home', label: 'Home', icon: 'home-outline' },
   { key: 'clinics', label: 'Find Clinics', icon: 'search-outline' },
+  { key: 'dentists', label: 'Dentists', icon: 'people-outline' },
   { key: 'services', label: 'Services', icon: 'medical-outline' },
-  { key: 'rates', label: 'Service Rates', icon: 'pricetag-outline' },
-  { key: 'about', label: 'Why BukidnonDental', icon: 'information-circle-outline' },
+  { key: 'about', label: 'About', icon: 'information-circle-outline' },
+  { key: 'contact', label: 'Contact', icon: 'mail-outline' },
 ];
 
 type GuestDrawerProps = {
   visible: boolean;
-  activeItem: GuestMenuKey;
+  activeItem: GuestMenuKey | null;
   onClose: () => void;
   onSelect: (key: GuestMenuKey) => void;
   onLogin: () => void;

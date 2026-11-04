@@ -1,7 +1,7 @@
 /* Same column as the appointment details page. */
 .reschedule-page {
   max-width: 672px;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .reschedule-card {
@@ -64,4 +64,13 @@
   .reschedule-card {
     padding: var(--space-5) var(--space-4);
   }
+}
+
+.reschedule-error {
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background-color: var(--color-danger-soft);
+  color: var(--color-danger-text);
+  font-size: var(--font-size-sm);
 }

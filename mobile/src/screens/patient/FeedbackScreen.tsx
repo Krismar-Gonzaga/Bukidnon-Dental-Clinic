@@ -1,315 +1,174 @@
-// src/screens/FeedbackScreen.js
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+// Feedback & Ratings. Reviews are allowed once per completed appointment; the server
+// enforces it, and a review written offline is sent once the phone reconnects.
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import PatientShell from '../../components/patient/PatientShell';
+import { Notice, StatusBadge, SuccessCard } from '../../components/patient/PatientUi';
+import { Card, guestColors, Message, PrimaryButton } from '../../components/guest/GuestUi';
+import { RATING_LABELS } from '../../content/patientContent';
 import { patientService } from '../../services/api';
+import { Appointment, appointmentDate } from '../../services/patientPortal';
+import { spacing, type } from '../../theme/tokens';
 
 const FeedbackScreen = ({ route, navigation }: { route: any; navigation: any }) => {
-  const { appointmentId } = route.params || {};
+  const [eligible, setEligible] = useState<Appointment[] | null>(null);
+  const [appointmentId, setAppointmentId] = useState<number | string | undefined>(route.params?.appointmentId);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [done, setDone] = useState<{ queued: boolean } | null>(null);
 
-  const handleSubmit = async () => {
-    if (rating === 0) {
-      Alert.alert('Error', 'Please select a rating');
-      return;
-    }
-
-    if (!comment.trim()) {
-      Alert.alert('Error', 'Please write a review');
-      return;
-    }
-
-    setLoading(true);
+  const load = useCallback(async () => {
     try {
-      const response = await patientService.submitFeedback({
-        appointment_id: appointmentId,
-        rating,
-        comment,
-      });
-      Alert.alert(
-        'Thank You!',
-        response.data?.queued
-          ? "You're offline, so your feedback is saved and will be sent once you're back online."
-          : 'Your feedback has been submitted successfully.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      const response = await patientService.getReviewableAppointments();
+      setEligible(response.data?.data ?? []);
     } catch {
-      Alert.alert('Error', 'Failed to submit feedback. Please try again.');
+      setEligible([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const submit = async () => {
+    if (!appointmentId || rating === 0) {
+      return;
+    }
+    setSaving(true);
+    setProblem(null);
+    try {
+      const response = await patientService.submitFeedback({ appointment_id: appointmentId, rating, comment: comment.trim() || undefined });
+      setDone({ queued: Boolean(response.data?.queued) });
+    } catch (error: any) {
+      // e.g. "You already reviewed this appointment."
+      setProblem(error?.response?.data?.message ?? error?.message ?? 'Your review was not submitted. Please try again.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const renderStars = () => {
-    return (
-      <View style={styles.starsContainer}>
-        {[1, 2, 3, 4, 5].map((star) => (
-          <TouchableOpacity
-            key={star}
-            onPress={() => setRating(star)}
-            style={styles.starButton}
-          >
-            <Icon
-              name={star <= rating ? 'star' : 'star-outline'}
-              size={40}
-              color={star <= rating ? '#f6ad55' : '#e2e8f0'}
-            />
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
-
-  const getRatingLabel = () => {
-    const labels: Record<number, string> = {
-      1: 'Poor',
-      2: 'Fair',
-      3: 'Good',
-      4: 'Very Good',
-      5: 'Excellent',
-    };
-    return labels[rating] || 'Tap a star to rate';
+  const another = () => {
+    setDone(null);
+    setAppointmentId(undefined);
+    setRating(0);
+    setComment('');
+    setEligible(null);
+    load();
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Rate Your Experience</Text>
-          <Text style={styles.headerSubtitle}>
-            Help us improve by sharing your feedback
-          </Text>
-        </View>
+    <PatientShell navigation={navigation} title="Feedback & Ratings">
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          {done ? (
+            <SuccessCard
+              title="Review Submitted!"
+              message={
+                done.queued
+                  ? "You're offline, so your review is saved and will be sent once you're back online."
+                  : 'Thank you for your feedback! Your review helps other patients make informed decisions.'
+              }
+              actionLabel="Leave Another Review"
+              onAction={another}
+            />
+          ) : (
+            <>
+              <Text style={styles.intro}>You can only review completed appointments.</Text>
+              <Card>
+                <Text style={styles.cardTitle} accessibilityRole="header">
+                  Select Appointment to Review
+                </Text>
+                {eligible === null ? (
+                  <ActivityIndicator style={styles.loader} color={guestColors.primary} />
+                ) : eligible.length === 0 ? (
+                  <Message icon="checkmark-done-outline" title="Nothing to review" body="Completed visits that have no review yet appear here." />
+                ) : (
+                  <View style={styles.visits}>
+                    {eligible.map((visit) => {
+                      const selected = String(visit.id) === String(appointmentId);
+                      return (
+                        <TouchableOpacity
+                          key={visit.id}
+                          style={[styles.visit, selected && styles.visitSelected]}
+                          onPress={() => setAppointmentId(visit.id)}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected }}
+                        >
+                          <View style={styles.visitIcon}>
+                            <Icon name="checkmark-circle-outline" size={20} color="#22a35a" />
+                          </View>
+                          <View style={styles.flex}>
+                            <Text style={styles.visitTitle}>{visit.service?.name ?? 'Appointment'}</Text>
+                            <Text style={styles.visitMeta}>{[visit.clinic?.name, appointmentDate(visit)].filter(Boolean).join(' · ')}</Text>
+                          </View>
+                          <StatusBadge group="completed" />
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
 
-        <View style={styles.formContainer}>
-          <Text style={styles.ratingLabel}>How would you rate your experience?</Text>
-          
-          {renderStars()}
-          
-          <Text style={styles.ratingFeedback}>{getRatingLabel()}</Text>
+                <View style={styles.divider} />
 
-          <Text style={styles.commentLabel}>Write a Review</Text>
-          <TextInput
-            style={styles.commentInput}
-            placeholder="Share your experience with the clinic..."
-            placeholderTextColor="#a0aec0"
-            value={comment}
-            onChangeText={setComment}
-            multiline
-            numberOfLines={6}
-            textAlignVertical="top"
-          />
+                <Text style={styles.cardTitle}>Your Rating</Text>
+                <View style={styles.stars}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity key={star} onPress={() => setRating(star)} accessibilityRole="button" accessibilityLabel={`${star} of 5 stars`} accessibilityState={{ selected: star <= rating }}>
+                      <Icon name={star <= rating ? 'star' : 'star-outline'} size={38} color={star <= rating ? '#f5843c' : '#dde3ee'} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={styles.ratingLabel}>{RATING_LABELS[rating] || ' '}</Text>
 
-          <View style={styles.quickComments}>
-            <Text style={styles.quickCommentsLabel}>Quick comments:</Text>
-            <View style={styles.quickCommentsContainer}>
-              {[
-                'Friendly staff',
-                'Clean facility',
-                'Professional service',
-                'Great experience',
-                'Will recommend',
-              ].map((quick) => (
-                <TouchableOpacity
-                  key={quick}
-                  style={[
-                    styles.quickCommentChip,
-                    comment.includes(quick) && styles.selectedQuickCommentChip,
-                  ]}
-                  onPress={() => {
-                    if (comment.includes(quick)) {
-                      setComment(comment.replace(quick, '').trim());
-                    } else {
-                      setComment(comment ? `${comment} ${quick}` : quick);
-                    }
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.quickCommentText,
-                      comment.includes(quick) && styles.selectedQuickCommentText,
-                    ]}
-                  >
-                    {quick}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Icon name="send-outline" size={24} color="#fff" />
-                <Text style={styles.submitButtonText}>Submit Feedback</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.skipButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.skipButtonText}>Skip for now</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+                <Text style={styles.label}>YOUR REVIEW</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Share your experience with this clinic..."
+                  placeholderTextColor={guestColors.textMuted}
+                  value={comment}
+                  onChangeText={setComment}
+                  maxLength={2000}
+                  multiline
+                  textAlignVertical="top"
+                  accessibilityLabel="Your review"
+                />
+                {problem && (
+                  <View style={styles.problem}>
+                    <Notice tone="danger">{problem}</Notice>
+                  </View>
+                )}
+                <PrimaryButton label={saving ? 'Submitting…' : 'Submit Review'} onPress={submit} disabled={!appointmentId || rating === 0} busy={saving} style={styles.submit} />
+              </Card>
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </PatientShell>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  header: {
-    backgroundColor: '#667eea',
-    padding: 24,
-    paddingBottom: 32,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  formContainer: {
-    backgroundColor: '#fff',
-    margin: 16,
-    marginTop: -20,
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  ratingLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2d3748',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  starButton: {
-    padding: 4,
-  },
-  ratingFeedback: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#667eea',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  commentLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2d3748',
-    marginBottom: 12,
-  },
-  commentInput: {
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#2d3748',
-    minHeight: 150,
-    backgroundColor: '#f7fafc',
-  },
-  quickComments: {
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  quickCommentsLabel: {
-    fontSize: 14,
-    color: '#718096',
-    marginBottom: 8,
-  },
-  quickCommentsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  quickCommentChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginRight: 8,
-    marginBottom: 8,
-    backgroundColor: '#fff',
-  },
-  selectedQuickCommentChip: {
-    backgroundColor: '#667eea',
-    borderColor: '#667eea',
-  },
-  quickCommentText: {
-    fontSize: 13,
-    color: '#4a5568',
-  },
-  selectedQuickCommentText: {
-    color: '#fff',
-  },
-  submitButton: {
-    backgroundColor: '#667eea',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  submitButtonDisabled: {
-    opacity: 0.7,
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  skipButton: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  skipButtonText: {
-    color: '#a0aec0',
-    fontSize: 16,
-  },
+  flex: { flex: 1 },
+  loader: { marginVertical: spacing.lg },
+  content: { padding: spacing.marginMobile, paddingBottom: spacing.xl },
+  intro: { ...type.bodyMd, color: guestColors.textMuted, marginBottom: spacing.sm },
+  cardTitle: { fontSize: 18, lineHeight: 24, fontWeight: '600', color: guestColors.text, marginBottom: spacing.sm },
+  visits: { gap: spacing.sm },
+  visit: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: 12, borderWidth: 1, borderColor: guestColors.border },
+  visitSelected: { borderColor: guestColors.primary, backgroundColor: guestColors.primarySoft },
+  visitIcon: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#e8f7ee' },
+  visitTitle: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: guestColors.text },
+  visitMeta: { fontSize: 12, lineHeight: 17, color: guestColors.textMuted },
+  divider: { height: 1, backgroundColor: guestColors.border, marginVertical: spacing.md },
+  stars: { flexDirection: 'row', gap: spacing.xs },
+  ratingLabel: { ...type.bodyMd, color: guestColors.text, marginTop: spacing.xs, marginBottom: spacing.sm },
+  label: { fontSize: 12, lineHeight: 18, fontWeight: '600', letterSpacing: 0.6, color: guestColors.text, marginBottom: spacing.base },
+  input: { ...type.bodyMd, minHeight: 110, padding: spacing.sm, color: guestColors.text, borderWidth: 1, borderColor: guestColors.border, borderRadius: 10, backgroundColor: guestColors.surface },
+  problem: { marginTop: spacing.sm },
+  submit: { marginTop: spacing.md },
 });
 
 export default FeedbackScreen;

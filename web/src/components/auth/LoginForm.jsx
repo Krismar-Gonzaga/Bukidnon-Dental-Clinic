@@ -1,33 +1,62 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Icon from '../Icon';
 import AuthField from './AuthField';
-import { FORGOT_PASSWORD_HREF, SIGN_IN_ROLES } from '../../config/auth';
+import { FORGOT_PASSWORD_HREF } from '../../config/auth';
 import { REGISTER_HREF } from '../../config/navigation';
+import { DEMO_ACCOUNTS } from '../../config/demoAccounts';
+import { login } from '../../services/authService';
+import { getErrorMessage } from '../../services/apiErrors';
+import { useAuth } from '../../auth/AuthContext';
+import { getHomeHref, safeNextPath } from '../../auth/homeRoutes';
 import './auth.css';
 import './LoginForm.css';
 
-// Login form UI only. Authentication is not integrated yet: submitting never
-// sends or stores credentials, it only shows a notice for the chosen role.
+// Signs in through the Laravel API (session cookie). One Sign In button for
+// every account type: the account's role (from the API) decides where it
+// lands (see auth/homeRoutes.js). ?next=/path returns the user there
+// afterwards (same-site paths only; portal guards still apply).
 function LoginForm() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { setUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [notice, setNotice] = useState('');
-  // Set by the clicked role button just before the form submits.
-  const pendingRoleRef = useRef(SIGN_IN_ROLES[0]);
+  // Shown after the API answers 423: this account needs an authenticator code.
+  const [needsCode, setNeedsCode] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [notice, setNotice] = useState({ text: '', isError: false });
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (event) => {
+  const autoFill = (account) => {
+    setEmail(account.email);
+    setPassword(account.password);
+    setNotice({ text: `Filled in the ${account.label} demo account. Press Sign In.`, isError: false });
+  };
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    setNotice(
-      `${pendingRoleRef.current.label} sign-in is not connected yet. You have not been signed in.`
-    );
+    setSubmitting(true);
+    setNotice({ text: '', isError: false });
+
+    try {
+      const user = await login({ email, password, twoFactorCode: needsCode ? twoFactorCode.trim() : undefined });
+      setUser(user);
+      navigate(safeNextPath(searchParams.get('next')) ?? getHomeHref(user), { replace: true });
+    } catch (error) {
+      if (error.response?.status === 423) {
+        setNeedsCode(true);
+        setNotice({ text: 'Enter the 6-digit code from your authenticator app, or a recovery code.', isError: false });
+      } else {
+        setNotice({ text: getErrorMessage(error), isError: true });
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <form
-      className="auth-card"
-      aria-labelledby="login-title"
-      onSubmit={handleSubmit}
-    >
+    <form className="auth-card" aria-labelledby="login-title" aria-busy={submitting} onSubmit={handleSubmit}>
       <span className="auth-badge" aria-hidden="true">
         <Icon name="lock" size={28} />
       </span>
@@ -61,28 +90,51 @@ function LoginForm() {
         required
       />
 
+      {needsCode && (
+        <AuthField
+          id="login-two-factor"
+          label="Authentication Code"
+          icon="shieldCheck"
+          type="text"
+          placeholder="123456"
+          autoComplete="one-time-code"
+          value={twoFactorCode}
+          onChange={(event) => setTwoFactorCode(event.target.value)}
+          required
+        />
+      )}
+
       <a href={FORGOT_PASSWORD_HREF} className="login-form-forgot">
         Forgot password?
       </a>
 
-      <div className="login-form-actions">
-        {SIGN_IN_ROLES.map((role) => (
-          <button
-            key={role.id}
-            type="submit"
-            className={`btn login-role login-role--${role.variant}`}
-            onClick={() => {
-              pendingRoleRef.current = role;
-            }}
-          >
-            {role.icon && <Icon name={role.icon} size={17} />}
-            Sign In as {role.label}
-          </button>
-        ))}
-      </div>
+      <button type="submit" className="btn btn-primary login-submit" disabled={submitting}>
+        {submitting ? 'Signing in…' : 'Sign In'}
+      </button>
 
-      <p className="auth-notice" role="status">
-        {notice}
+      {DEMO_ACCOUNTS.length > 0 && (
+        <section className="login-demo" aria-labelledby="login-demo-title">
+          <p id="login-demo-title" className="login-demo-title">
+            Auto fill a demo account <span className="login-demo-tag">Development only</span>
+          </p>
+          <div className="login-demo-list">
+            {DEMO_ACCOUNTS.map((account) => (
+              <button
+                key={account.email}
+                type="button"
+                className="login-demo-chip"
+                onClick={() => autoFill(account)}
+                aria-label={`Auto fill the ${account.label} demo account`}
+              >
+                {account.label}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <p className={`auth-notice${notice.isError ? ' auth-notice--error' : ''}`} role="status">
+        {notice.text}
       </p>
 
       <p className="auth-footer">

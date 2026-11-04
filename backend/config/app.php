@@ -54,6 +54,17 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    // The web app's address, used for links in emails (e.g. password reset).
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
+
+    /*
+    | Password for the LOCAL demo accounts (DemoUsersSeeder,
+    | DemoClinicDataSeeder). The web and mobile apps' development-only
+    | "auto fill" buttons use the same default. The seeders refuse to run
+    | outside APP_ENV=local, so this never applies to a real deployment.
+    */
+    'demo_password' => env('DEMO_USER_PASSWORD', 'DemoPass2026'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

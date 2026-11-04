@@ -1,0 +1,395 @@
+/* Grouped sidebar and top bar (clinic admin design). Only applies inside
+   .clinic-shell.is-grouped: the dentist portal keeps its own frame. */
+
+.clinic-shell.is-grouped {
+  --clinic-sidebar-width: 240px;
+  --clinic-topbar-height: 80px;
+  /* Shared with the admin data components (table footer). */
+  --admin-card-border: #e5e8ee;
+  --admin-card-radius: 16px;
+}
+
+.is-grouped .clinic-sidebar {
+  padding: 0;
+  background-color: #ffffff;
+  transition: width 0.15s ease;
+}
+
+.is-collapsed .clinic-sidebar {
+  width: 76px;
+}
+
+.is-grouped .clinic-sidebar-logo {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--clinic-topbar-height);
+  margin: 0;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--clinic-surface-high);
+}
+
+.is-collapsed .clinic-sidebar-logo {
+  justify-content: center;
+  padding: 0;
+}
+
+.is-grouped .clinic-sidebar-name {
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+}
+
+.clinic-sidebar-toggle,
+.clinic-sidebar-logout {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--clinic-on-surface-variant);
+  cursor: pointer;
+}
+
+.clinic-sidebar-toggle:hover,
+.clinic-sidebar-logout:hover,
+.clinic-sidebar-toggle:focus-visible,
+.clinic-sidebar-logout:focus-visible {
+  background-color: var(--clinic-surface-high);
+  color: var(--clinic-primary);
+}
+
+.is-grouped .portal-clinic-switcher {
+  margin: var(--space-3) 0 0;
+}
+
+.is-grouped .clinic-sidebar-nav {
+  padding: var(--space-4) 0;
+}
+
+.clinic-nav-group + .clinic-nav-group {
+  margin-top: var(--space-5);
+}
+
+.clinic-nav-heading {
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-5);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9aa0ad;
+}
+
+.is-collapsed .clinic-nav-heading,
+.is-collapsed .clinic-nav-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.is-collapsed .clinic-nav-group + .clinic-nav-group {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--clinic-surface-high);
+}
+
+.is-grouped .clinic-nav-link {
+  position: relative;
+  margin: 0 var(--space-2);
+  padding: 12px var(--space-4);
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--clinic-on-surface-variant);
+}
+
+.clinic-nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 10px;
+  background-color: #e5252a;
+  color: #ffffff;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-bold);
+}
+
+.is-collapsed .clinic-nav-badge {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+}
+
+.clinic-menu-button,
+.clinic-drawer-close,
+.clinic-drawer-backdrop {
+  display: none;
+}
+
+.is-grouped .clinic-nav-link.is-active {
+  background: linear-gradient(135deg, var(--clinic-primary), var(--clinic-primary-container));
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(0, 63, 135, 0.25);
+}
+
+.is-collapsed .clinic-nav-link {
+  justify-content: center;
+  padding: 12px 0;
+}
+
+.is-grouped .clinic-sidebar-footer {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--clinic-surface-high);
+}
+
+.is-grouped .clinic-sidebar-user {
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.is-collapsed .clinic-sidebar-footer {
+  padding: var(--space-3) 0;
+}
+
+.is-collapsed .clinic-sidebar-user {
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.is-grouped .clinic-sidebar-user-text {
+  flex: 1;
+}
+
+.is-grouped .clinic-sidebar-user-role {
+  overflow: hidden;
+  letter-spacing: 0;
+  text-transform: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Top bar ---------- */
+.is-grouped .clinic-topbar {
+  padding: var(--space-2) var(--space-6);
+  background-color: #ffffff;
+  box-shadow: none;
+}
+
+.is-grouped .clinic-topbar-title {
+  margin: 0;
+  font-size: 1.375rem;
+  line-height: 1.3;
+  color: var(--clinic-on-surface);
+}
+
+.clinic-topbar-subtitle {
+  margin: 2px 0 0;
+  font-size: 0.9375rem;
+  color: var(--clinic-on-surface-variant);
+}
+
+.clinic-topbar-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.clinic-topbar-page-actions:empty {
+  display: none;
+}
+
+.clinic-topbar-page-actions:not(:empty) + .clinic-topbar-actions {
+  margin-left: 0;
+}
+
+.clinic-walkin-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 12px var(--space-5);
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.clinic-topbar-user {
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--clinic-surface-high);
+  text-align: right;
+}
+
+.clinic-topbar-user-name {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--clinic-on-surface);
+  white-space: nowrap;
+}
+
+.clinic-topbar-user-role {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--clinic-on-surface-variant);
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .clinic-topbar-user {
+    display: none;
+  }
+}
+
+/* Under 900px the sidebar is a drawer opened from the top bar's menu button.
+   ClinicShell.css stacks the frame at this width, which the dentist portal keeps. */
+@media (max-width: 900px) {
+  .clinic-shell.is-grouped {
+    flex-direction: row;
+  }
+
+  .is-grouped .clinic-sidebar,
+  .is-collapsed .clinic-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 60;
+    width: min(280px, 85vw);
+    height: auto;
+    border-right: 1px solid var(--clinic-surface-high);
+    border-bottom: 0;
+    visibility: hidden;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease, visibility 0.2s;
+  }
+
+  .is-drawer-open .clinic-sidebar {
+    visibility: visible;
+    transform: none;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  }
+
+  .clinic-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 59;
+    display: block;
+    border: 0;
+    background-color: rgba(24, 28, 32, 0.45);
+    cursor: pointer;
+  }
+
+  .clinic-sidebar-toggle {
+    display: none;
+  }
+
+  .clinic-drawer-close,
+  .clinic-menu-button {
+    display: inline-flex;
+    flex-shrink: 0;
+    padding: var(--space-2);
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: var(--clinic-on-surface);
+    cursor: pointer;
+  }
+
+  .is-grouped .clinic-sidebar-nav {
+    display: block;
+    padding: var(--space-4) 0;
+  }
+
+  .is-grouped .clinic-sidebar-nav ul {
+    display: grid;
+    overflow: visible;
+  }
+
+  .is-grouped .clinic-nav-link {
+    margin: 0 var(--space-2);
+    white-space: normal;
+  }
+
+  .is-grouped .clinic-sidebar-footer {
+    display: grid;
+  }
+
+  .is-grouped .clinic-topbar {
+    position: sticky;
+    top: 0;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .is-grouped .clinic-topbar-heading {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .is-grouped .clinic-topbar-title {
+    overflow: hidden;
+    font-size: 1.125rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .clinic-topbar-subtitle {
+    overflow: hidden;
+    font-size: 0.75rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .clinic-topbar-page-actions {
+    order: 3;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .clinic-topbar-page-actions .btn,
+  .clinic-topbar-page-actions .clinic-action-button {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 8px var(--space-3);
+    font-size: 0.875rem;
+  }
+
+  .clinic-topbar-page-actions:not(:empty) + .clinic-topbar-actions {
+    margin-left: auto;
+  }
+
+  .clinic-walkin-button {
+    padding: 8px var(--space-3);
+    font-size: 0.875rem;
+  }
+
+  .clinic-header-actions.clinic-header-only {
+    display: none;
+  }
+
+  .clinic-topbar-page-actions:has(> .clinic-header-only:only-child) {
+    display: none;
+  }
+}
+
+/* A long role line ellipsizes instead of pushing the sign-out button out. */
+.is-grouped .clinic-sidebar-footer {
+  grid-template-columns: minmax(0, 1fr);
+}

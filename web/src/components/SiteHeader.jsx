@@ -1,18 +1,23 @@
 import { useEffect, useState } from 'react';
 import Icon from './Icon';
-import { BRAND_NAME } from '../config/app';
+import AccountMenu from './AccountMenu';
+import { useBrandName } from '../services/platformStore';
 import {
   LOGIN_HREF,
   MAIN_NAV_ITEMS,
   REGISTER_HREF,
 } from '../config/navigation';
+import { useAuth } from '../auth/AuthContext';
+import { getHomeHref, getProfileHref } from '../auth/homeRoutes';
 import './SiteHeader.css';
 
-// Login and Register link to the account pages. When `account` ({ name, href })
-// is given, a "My Account" link replaces them for a signed-in user.
+// Login and Register link to the account pages. For a signed-in user the
+// avatar menu (Dashboard, My Profile, Log Out) replaces them.
 // Below the desktop breakpoint, nav and actions collapse into a menu panel.
-function SiteHeader({ activeHref = '/', account }) {
+function SiteHeader({ activeHref = '/' }) {
+  const brand = useBrandName();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!isMenuOpen) return undefined;
@@ -30,7 +35,7 @@ function SiteHeader({ activeHref = '/', account }) {
     <header className="site-header">
       <div className="site-header-inner">
         <a href="/" className="site-header-brand">
-          {BRAND_NAME}
+          {brand}
         </a>
 
         <button
@@ -69,13 +74,13 @@ function SiteHeader({ activeHref = '/', account }) {
           </nav>
 
           <div className="site-header-actions">
-            {account ? (
-              <a href={account.href} className="site-header-account" onClick={closeMenu}>
-                <span className="site-header-account-avatar" aria-hidden="true">
-                  {account.name.trim().charAt(0).toUpperCase()}
-                </span>
-                My Account
-              </a>
+            {user ? (
+              <AccountMenu
+                links={[{ label: 'My Dashboard', href: getHomeHref(user), icon: 'layoutGrid' }]}
+                profileHref={getProfileHref(user)}
+                triggerLabel="My Account"
+                onNavigate={closeMenu}
+              />
             ) : (
               <>
                 <a href={LOGIN_HREF} className="btn btn-outline" onClick={closeMenu}>

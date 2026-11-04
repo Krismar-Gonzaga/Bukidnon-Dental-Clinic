@@ -1,45 +1,35 @@
-// Guest clinic directory. Search and filters run against the on-device copy of the
-// directory, so results are instant and identical online or offline.
+// Guest clinic directory, laid out like the website's. Search and filters run against the
+// on-device copy of the directory, so results are instant and identical online or offline.
+// The one exception is "clinics offering a service", which only the server can answer.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSync } from '../../context/SyncContext';
-import OfflineBanner from '../../components/common/OfflineBanner';
-import ClinicImage from '../../components/guest/ClinicImage';
+import GuestClinicCard from '../../components/guest/GuestClinicCard';
+import GuestShell, { GuestFooter } from '../../components/guest/GuestShell';
+import { directoryAccent, guestColors, Message, PageIntro, SearchField, SelectField } from '../../components/guest/GuestUi';
 import SelectSheet from '../../components/guest/SelectSheet';
 import {
   ClinicSort,
   ClinicSummary,
   countClinics,
+  fetchClinicIdsOfferingService,
   getCities,
   getSpecializations,
   queryClinics,
   Specialization,
 } from '../../services/offline/publicRepository';
-import { palette, radius, shadow, spacing, type } from '../../theme/tokens';
-import { getOpenStatus } from '../../utils/format';
+import { spacing, type } from '../../theme/tokens';
 
 type RouteParams = {
   search?: string;
   city?: string | null;
   specializationId?: number | null;
+  service?: string | null;
 };
 
 const SORT_OPTIONS: Array<{ label: string; value: ClinicSort }> = [
-  { label: 'Top rated', value: 'rating' },
+  { label: 'Highest Rated', value: 'rating' },
   { label: 'Name (A–Z)', value: 'name' },
   { label: 'Newest', value: 'newest' },
 ];
@@ -56,8 +46,12 @@ const GuestClinicsScreen = ({ navigation, route }: { navigation: any; route: any
   const [search, setSearch] = useState(params.search ?? '');
   const [city, setCity] = useState<string | null>(params.city ?? null);
   const [specializationId, setSpecializationId] = useState<number | null>(params.specializationId ?? null);
+  const [service, setService] = useState<string | null>(params.service ?? null);
+  // Null while unknown: failed means the service filter could not be applied.
+  const [serviceClinicIds, setServiceClinicIds] = useState<number[] | null>(null);
+  const [serviceFailed, setServiceFailed] = useState(false);
   const [sort, setSort] = useState<ClinicSort>('rating');
-  const [picker, setPicker] = useState<'city' | 'sort' | null>(null);
+  const [picker, setPicker] = useState<'city' | 'specialization' | 'sort' | null>(null);
 
   const [clinics, setClinics] = useState<ClinicSummary[]>([]);
   const [totalSaved, setTotalSaved] = useState(0);
@@ -66,25 +60,47 @@ const GuestClinicsScreen = ({ navigation, route }: { navigation: any; route: any
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Picks up new filters when the home screen navigates here again.
+  // Picks up new filters when another screen navigates here again.
   useEffect(() => {
     setSearchInput(params.search ?? '');
     setSearch(params.search ?? '');
     setCity(params.city ?? null);
     setSpecializationId(params.specializationId ?? null);
-  }, [params.search, params.city, params.specializationId]);
+    setService(params.service ?? null);
+  }, [params.search, params.city, params.specializationId, params.service]);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  const loadService = useCallback(() => {
+    setServiceClinicIds(null);
+    setServiceFailed(false);
+    if (!service) {
+      return () => undefined;
+    }
+    let cancelled = false;
+    fetchClinicIdsOfferingService(service)
+      .then((ids) => {
+        if (!cancelled) {
+          setServiceClinicIds(ids);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setServiceFailed(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [service]);
+
+  useEffect(() => loadService(), [loadService]);
+
   const loadFilters = useCallback(async () => {
-    const [specializationList, cityList, total] = await Promise.all([
-      getSpecializations(),
-      getCities(),
-      countClinics(),
-    ]);
+    const [specializationList, cityList, total] = await Promise.all([getSpecializations(), getCities(), countClinics()]);
     setSpecializations(specializationList);
     setCities(cityList);
     setTotalSaved(total);
@@ -132,203 +148,145 @@ const GuestClinicsScreen = ({ navigation, route }: { navigation: any; route: any
     setSearch('');
     setCity(null);
     setSpecializationId(null);
+    setService(null);
   };
 
-  const hasFilters = Boolean(search.trim() || city || specializationId);
-  const sortLabel = SORT_OPTIONS.find((option) => option.value === sort)?.label ?? 'Top rated';
+  const shown = useMemo(() => {
+    if (!service) {
+      return clinics;
+    }
+    return serviceClinicIds ? clinics.filter((clinic) => serviceClinicIds.includes(clinic.id)) : [];
+  }, [clinics, service, serviceClinicIds]);
+
+  const sortLabel = SORT_OPTIONS.find((option) => option.value === sort)?.label ?? 'Highest Rated';
+  const specializationName = specializations.find((spec) => spec.id === specializationId)?.name ?? 'All';
 
   const cityOptions = useMemo(
-    () => [
-      { label: 'All locations', value: null as string | null },
-      ...cities.map((name) => ({ label: name, value: name as string | null })),
-    ],
+    () => [{ label: 'All', value: null as string | null }, ...cities.map((name) => ({ label: name, value: name as string | null }))],
     [cities],
   );
-
-  const renderClinic = ({ item }: { item: ClinicSummary }) => {
-    const status = getOpenStatus(item.openingTime, item.closingTime);
-    const primarySpecialization = item.specializations[0]?.name;
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        activeOpacity={0.92}
-        onPress={() => navigation.navigate('GuestClinicDetails', { id: item.id })}
-      >
-        <View>
-          <ClinicImage uri={item.image} name={item.name} style={styles.cardImage} />
-          <View style={styles.ratingBadge}>
-            <Icon name="star" size={14} color={palette.onSecondaryContainer} />
-            <Text style={styles.ratingBadgeText}>{item.rating.toFixed(1)}</Text>
-          </View>
-        </View>
-        <View style={styles.cardBody}>
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <View style={styles.locationRow}>
-            <Icon name="location-outline" size={18} color={palette.onSurfaceVariant} />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {item.fullAddress || item.city}
-            </Text>
-          </View>
-          <View style={styles.cardFooter}>
-            <View style={styles.tags}>
-              {primarySpecialization ? (
-                <View style={styles.tag}>
-                  <Text style={styles.tagText} numberOfLines={1}>
-                    {primarySpecialization}
-                  </Text>
-                </View>
-              ) : null}
-              {status ? (
-                <View style={[styles.tag, !status.isOpen && styles.tagClosed]}>
-                  <Text style={[styles.tagText, !status.isOpen && styles.tagClosedText]}>
-                    {status.isOpen ? 'Open' : 'Closed'}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-            <View style={styles.detailsButton}>
-              <Text style={styles.detailsButtonText}>View Details</Text>
-            </View>
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const specializationOptions = useMemo(
+    () => [{ label: 'All', value: null as number | null }, ...specializations.map((spec) => ({ label: spec.name, value: spec.id as number | null }))],
+    [specializations],
+  );
 
   const renderEmpty = () => {
-    if (!loaded || (isSyncing && totalSaved === 0)) {
-      return <ActivityIndicator style={styles.loader} size="large" color={palette.primary} />;
+    if (!loaded || (isSyncing && totalSaved === 0) || (service && !serviceClinicIds && !serviceFailed)) {
+      return <ActivityIndicator style={styles.loader} size="large" color={guestColors.primary} />;
+    }
+    if (serviceFailed) {
+      return (
+        <Message
+          icon="cloud-offline-outline"
+          title={`Could not check who offers ${service}`}
+          body="This needs an internet connection."
+          actionLabel="Try again"
+          onAction={loadService}
+        />
+      );
     }
     if (totalSaved === 0) {
       return (
-        <View style={styles.empty}>
-          <Icon name="cloud-offline-outline" size={40} color={palette.outline} />
-          <Text style={styles.emptyTitle}>No clinics saved yet</Text>
-          <Text style={styles.emptyBody}>
-            Connect to the internet once to download the clinic directory for offline use.
-          </Text>
-          <TouchableOpacity style={styles.emptyButton} onPress={onRefresh}>
-            <Text style={styles.emptyButtonText}>Try again</Text>
-          </TouchableOpacity>
-        </View>
+        <Message
+          icon="cloud-offline-outline"
+          title="No clinics saved yet"
+          body="Connect to the internet once to download the clinic directory for offline use."
+          actionLabel="Try again"
+          onAction={onRefresh}
+        />
       );
     }
     return (
-      <View style={styles.empty}>
-        <Icon name="search-outline" size={40} color={palette.outline} />
-        <Text style={styles.emptyTitle}>No clinics match your search</Text>
-        <Text style={styles.emptyBody}>Try another name, location, or specialization.</Text>
-        <TouchableOpacity style={styles.emptyButton} onPress={clearFilters}>
-          <Text style={styles.emptyButtonText}>Clear filters</Text>
-        </TouchableOpacity>
-      </View>
+      <Message
+        icon="search-outline"
+        title="No clinics match your search"
+        body="Try another name, location, or specialization."
+        actionLabel="Clear filters"
+        onAction={clearFilters}
+      />
     );
   };
 
   const header = (
     <View>
-      <View style={styles.searchBox}>
-        <Icon name="search" size={20} color={palette.outline} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search clinics, areas, specialties..."
-          placeholderTextColor={palette.onSurfaceVariant}
+      <PageIntro title="Clinic Directory" description="Discover and compare verified dental clinics across Bukidnon." />
+      <View style={styles.filters}>
+        <Text style={styles.filterLabel}>SEARCH CLINIC</Text>
+        <SearchField
+          placeholder="Search by clinic name..."
           value={searchInput}
           onChangeText={setSearchInput}
-          returnKeyType="search"
           onSubmitEditing={() => setSearch(searchInput)}
+          accessibilityLabel="Search clinic"
         />
-        {searchInput.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchInput('')} hitSlop={10} accessibilityLabel="Clear search">
-            <Icon name="close-circle" size={20} color={palette.outline} />
-          </TouchableOpacity>
-        )}
+        <View style={styles.filterRow}>
+          <View style={styles.filterColumn}>
+            <Text style={styles.filterLabel}>LOCATION</Text>
+            <SelectField
+              icon="location-outline"
+              value={city ?? 'All'}
+              onPress={() => setPicker('city')}
+              accessibilityLabel={`Location: ${city ?? 'All'}`}
+            />
+          </View>
+          <View style={styles.filterColumn}>
+            <Text style={styles.filterLabel}>SPECIALIZATION</Text>
+            <SelectField
+              icon="medical-outline"
+              value={specializationName}
+              onPress={() => setPicker('specialization')}
+              accessibilityLabel={`Specialization: ${specializationName}`}
+            />
+          </View>
+        </View>
+        <Text style={styles.filterLabel}>SORT BY</Text>
+        <SelectField icon="options-outline" value={sortLabel} onPress={() => setPicker('sort')} accessibilityLabel={`Sort by: ${sortLabel}`} />
       </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chips}
-        style={styles.chipsScroll}
-      >
-        {[{ id: null as number | null, name: 'All Clinics' }, ...specializations].map((spec) => {
-          const active = specializationId === spec.id;
-          return (
-            <TouchableOpacity
-              key={String(spec.id)}
-              style={[styles.chip, active && styles.chipActive]}
-              onPress={() => setSpecializationId(spec.id)}
-              accessibilityState={{ selected: active }}
-            >
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>{spec.name}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      <View style={styles.filterRow}>
-        <TouchableOpacity style={styles.filterButton} onPress={() => setPicker('city')}>
-          <Icon name="location-outline" size={16} color={palette.primary} />
-          <Text style={styles.filterButtonText} numberOfLines={1}>
-            {city ?? 'All locations'}
-          </Text>
-          <Icon name="chevron-down" size={14} color={palette.primary} />
-        </TouchableOpacity>
-        <Text style={styles.resultCount}>
-          {clinics.length} clinic{clinics.length === 1 ? '' : 's'}
+      <View style={styles.results}>
+        {service ? (
+          <TouchableOpacity
+            style={styles.serviceChip}
+            onPress={() => setService(null)}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove filter: offers ${service}`}
+          >
+            <Text style={styles.serviceChipText} numberOfLines={1}>
+              Offers {service}
+            </Text>
+            <Icon name="close" size={14} color={guestColors.primary} />
+          </TouchableOpacity>
+        ) : null}
+        <Text style={styles.resultCount} accessibilityLiveRegion="polite">
+          {shown.length} {shown.length === 1 ? 'clinic' : 'clinics'} found
         </Text>
       </View>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="dark-content" backgroundColor={palette.surfaceContainerLowest} />
-      <View style={styles.topBar}>
-        <View style={styles.topBarLeft}>
-          <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()} accessibilityLabel="Back">
-            <Icon name="arrow-back" size={24} color={palette.primary} />
-          </TouchableOpacity>
-          <Text style={styles.topBarTitle}>Find Clinics</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={() => setPicker('sort')}
-          accessibilityLabel={`Sort: ${sortLabel}`}
-        >
-          <Icon name="swap-vertical-outline" size={24} color={palette.primary} />
-        </TouchableOpacity>
-      </View>
-      <OfflineBanner />
-
+    <GuestShell navigation={navigation} active="clinics" patientTitle="Find Clinics">
       <FlatList
-        data={clinics}
+        data={shown}
         keyExtractor={(item) => String(item.id)}
-        renderItem={renderClinic}
+        renderItem={({ item, index }) => (
+          <View style={styles.item}>
+            <GuestClinicCard clinic={item} navigation={navigation} color={directoryAccent(index)} />
+          </View>
+        )}
         ListHeaderComponent={header}
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={styles.listContent}
+        ListFooterComponent={
+          <View style={styles.footer}>
+            <GuestFooter navigation={navigation} active="clinics" />
+          </View>
+        }
         ItemSeparatorComponent={Separator}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[palette.primary]}
-            tintColor={palette.primary}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[guestColors.primary]} tintColor={guestColors.primary} />
         }
       />
-
-      {hasFilters && clinics.length > 0 && (
-        <TouchableOpacity style={styles.clearFab} onPress={clearFilters} activeOpacity={0.85}>
-          <Icon name="close" size={16} color={palette.onPrimary} />
-          <Text style={styles.clearFabText}>Clear filters</Text>
-        </TouchableOpacity>
-      )}
 
       <SelectSheet
         visible={picker === 'city'}
@@ -339,158 +297,54 @@ const GuestClinicsScreen = ({ navigation, route }: { navigation: any; route: any
         onClose={() => setPicker(null)}
       />
       <SelectSheet
+        visible={picker === 'specialization'}
+        title="Specialization"
+        options={specializationOptions}
+        selected={specializationId}
+        onSelect={setSpecializationId}
+        onClose={() => setPicker(null)}
+      />
+      <SelectSheet
         visible={picker === 'sort'}
-        title="Sort clinics by"
+        title="Sort By"
         options={SORT_OPTIONS}
         selected={sort}
         onSelect={setSort}
         onClose={() => setPicker(null)}
       />
-    </SafeAreaView>
+    </GuestShell>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: palette.background },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.marginMobile,
-    paddingVertical: spacing.base,
-    backgroundColor: palette.surfaceContainerLowest,
+  filters: {
+    padding: spacing.marginMobile,
+    gap: spacing.base,
+    backgroundColor: guestColors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: palette.outlineVariant,
-    ...shadow.sm,
-    zIndex: 2,
+    borderBottomColor: guestColors.border,
   },
-  topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.base },
-  topBarTitle: { ...type.headlineMd, fontSize: 22, fontWeight: '700', color: palette.primary },
-  iconButton: { padding: spacing.base, borderRadius: radius.full },
-
-  listContent: { paddingHorizontal: spacing.marginMobile, paddingTop: spacing.lg, paddingBottom: 96 },
-  separator: { height: spacing.lg },
-
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    minHeight: 52,
-    backgroundColor: palette.surfaceContainerLowest,
-    borderWidth: 1,
-    borderColor: palette.outlineVariant,
-    borderRadius: radius.xl,
-  },
-  searchInput: { ...type.bodyMd, flex: 1, color: palette.onSurface, paddingVertical: spacing.sm },
-
-  chipsScroll: { marginHorizontal: -spacing.marginMobile, marginTop: spacing.lg },
-  chips: { paddingHorizontal: spacing.marginMobile, gap: spacing.base },
-  chip: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.full,
-    backgroundColor: palette.surfaceContainerHigh,
-  },
-  chipActive: { backgroundColor: palette.primary },
-  chipText: { ...type.labelMd, color: palette.onSurfaceVariant },
-  chipTextActive: { color: palette.onPrimary },
-
-  filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  filterButton: {
+  filterRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  filterColumn: { flex: 1, gap: spacing.base },
+  filterLabel: { fontSize: 12, lineHeight: 18, fontWeight: '600', letterSpacing: 0.6, color: guestColors.text, marginTop: spacing.xs },
+  results: { padding: spacing.marginMobile, paddingTop: spacing.lg, gap: spacing.sm },
+  resultCount: { ...type.bodyMd, color: guestColors.text },
+  serviceChip: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.base,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: palette.primaryFixedDim,
-    backgroundColor: palette.surfaceContainerLowest,
-    maxWidth: '65%',
-  },
-  filterButtonText: { ...type.labelMd, color: palette.primary, flexShrink: 1 },
-  resultCount: { ...type.bodyMd, color: palette.onSurfaceVariant },
-
-  card: {
-    backgroundColor: palette.surfaceContainerLowest,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: palette.outlineVariant,
-    overflow: 'hidden',
-    ...shadow.md,
-  },
-  cardImage: { width: '100%', height: 192 },
-  ratingBadge: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
+    maxWidth: '100%',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    borderRadius: radius.lg,
-    backgroundColor: 'rgba(103,252,198,0.92)',
+    borderRadius: 999,
+    backgroundColor: guestColors.primarySoft,
   },
-  ratingBadgeText: { ...type.labelMd, color: palette.onSecondaryContainer },
-  cardBody: { padding: spacing.md },
-  cardTitle: { ...type.titleLg, color: palette.onSurface, marginBottom: spacing.xs },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md },
-  locationText: { ...type.bodyMd, color: palette.onSurfaceVariant, flex: 1 },
-  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.base },
-  tags: { flexDirection: 'row', gap: spacing.xs, flexShrink: 1, flexWrap: 'wrap' },
-  tag: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 6,
-    backgroundColor: palette.tertiaryFixed,
-  },
-  tagText: { ...type.labelMd, fontSize: 10, textTransform: 'uppercase', color: palette.onTertiaryFixedVariant },
-  tagClosed: { backgroundColor: palette.errorContainer },
-  tagClosedText: { color: palette.onErrorContainer },
-  detailsButton: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.lg,
-    backgroundColor: palette.primary,
-  },
-  detailsButtonText: { ...type.labelMd, color: palette.onPrimary },
-
+  serviceChipText: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: guestColors.primary, flexShrink: 1 },
+  item: { paddingHorizontal: spacing.marginMobile },
+  separator: { height: spacing.md },
   loader: { marginTop: 48 },
-  empty: { alignItems: 'center', gap: spacing.sm, paddingVertical: 48, paddingHorizontal: spacing.lg },
-  emptyTitle: { ...type.titleLg, fontSize: 18, color: palette.onSurface, textAlign: 'center' },
-  emptyBody: { ...type.bodyMd, color: palette.onSurfaceVariant, textAlign: 'center' },
-  emptyButton: {
-    marginTop: spacing.xs,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: palette.primary,
-  },
-  emptyButtonText: { ...type.labelMd, color: palette.primary },
-
-  clearFab: {
-    position: 'absolute',
-    bottom: spacing.lg,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.full,
-    backgroundColor: palette.inverseSurface,
-    ...shadow.md,
-  },
-  clearFabText: { ...type.labelMd, color: palette.onPrimary },
+  footer: { marginTop: spacing.xl },
 });
 
 export default GuestClinicsScreen;

@@ -4,7 +4,9 @@ Documentation for the `web/` React app (Create React App, JavaScript/JSX).
 
 | Document | Read it when |
 |---|---|
-| [CONVENTIONS.md](CONVENTIONS.md) | Adding or changing frontend code: naming, folders, styling, and mock-data rules. |
-| [BACKEND_INTEGRATION.md](BACKEND_INTEGRATION.md) | Connecting a screen to the Laravel API: what data each screen expects, which endpoint should replace each mock, and the known gaps. |
+| [CONVENTIONS.md](CONVENTIONS.md) | Adding or changing frontend code: naming, folders, styling. |
+| [BACKEND_INTEGRATION.md](BACKEND_INTEGRATION.md) | Working with API data: the service layer, authentication, data rules, and what is still static. |
 
-These docs describe the code as of 2026-10-15 (Patient View merged into `main` in PR #2). When the code changes, update them in the same change.
+System-wide docs (setup, API reference, database, security, deployment) are in [`docs/`](../../docs) at the repository root.
+
+When the code changes, update these docs in the same change.

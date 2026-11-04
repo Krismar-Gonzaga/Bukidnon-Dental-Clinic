@@ -1,0 +1,1558 @@
+/* Dentist portal, on the clinic admin look. */
+.dentist-page-back {
+  margin-bottom: var(--space-4);
+}
+
+/* Dashboard hero */
+.dentist-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  border-radius: 20px;
+  background: linear-gradient(120deg, #003f87, #0056b3);
+  color: #ffffff;
+}
+
+.dentist-hero-greeting {
+  margin: 0;
+  font-size: 0.875rem;
+  opacity: 0.85;
+}
+
+.dentist-hero-name {
+  margin: 2px 0;
+  color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-bold);
+}
+
+.dentist-hero-text {
+  margin: 0;
+  font-size: 0.875rem;
+  opacity: 0.95;
+}
+
+.dentist-hero-text strong {
+  font-weight: var(--font-weight-bold);
+}
+
+.dentist-hero-text .is-alert {
+  color: #ffd54f;
+}
+
+.dentist-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.dentist-hero-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 16px;
+  border-radius: 10px;
+  background-color: #ffffff;
+  color: #003f87;
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.dentist-hero-button.is-soft {
+  background-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.dentist-quick {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+/* Forms in a card: room between one field and the next, as in the design. */
+.dentist-narrow .portal-field,
+.dentist-narrower .portal-field,
+.dentist-split .clinic-admin-card .portal-field {
+  margin-bottom: var(--space-4);
+}
+
+.dentist-form-row .portal-field {
+  margin-bottom: var(--space-4);
+}
+
+/* Today's queue */
+.dentist-queue {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dentist-queue-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid #e5e8ee;
+  border-radius: 12px;
+  background-color: #f7f8fc;
+  color: inherit;
+  text-decoration: none;
+}
+
+.dentist-queue-row.is-ongoing {
+  border-color: #b7ebc6;
+  background-color: #edfbf1;
+}
+
+.dentist-queue-row.is-pending {
+  border-color: #f3e3a1;
+  background-color: #fffbe8;
+}
+
+.dentist-queue-number {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #dfe7fb;
+  color: #003f87;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.dentist-queue-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.dentist-row-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.dentist-row-sub {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.dentist-queue-when {
+  display: grid;
+  flex: none;
+  justify-items: end;
+  gap: 2px;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.dentist-go {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background-color: #dfe7fb;
+  color: #003f87;
+}
+
+/* Side cards of the dashboard */
+.dentist-request {
+  padding: var(--space-3);
+  border: 1px solid #f3e3a1;
+  border-radius: 12px;
+  background-color: #fffbe8;
+}
+
+.dentist-request-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.dentist-request-status {
+  color: #a16207;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.dentist-request .btn {
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.dentist-side-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dentist-side-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.dentist-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #3b82f6;
+}
+
+.dentist-dot.is-high {
+  background-color: #ef4444;
+}
+
+.dentist-mini-notice {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: 10px;
+  background-color: var(--color-primary-soft);
+}
+
+.dentist-mini-notice svg {
+  flex: none;
+  color: #003f87;
+}
+
+/* Week chart */
+.dentist-chart {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+  height: 180px;
+  padding-top: var(--space-3);
+  border-bottom: 1px solid #e5e8ee;
+}
+
+.dentist-chart-column {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  height: 100%;
+}
+
+.dentist-chart-value {
+  margin-bottom: 4px;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.dentist-chart-bar {
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background-color: #003f87;
+}
+
+.dentist-chart-labels {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+/* Appointments */
+.dentist-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.dentist-text-filter {
+  width: min(100%, 240px);
+  padding: 10px 12px;
+  border: 1px solid #d5dae3;
+  border-radius: 10px;
+  background-color: #ffffff;
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.dentist-count {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.dentist-view-switch {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10px;
+  background-color: #eef0f4;
+}
+
+.dentist-view-switch button {
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.dentist-view-switch button.is-active {
+  background-color: #ffffff;
+  color: #003f87;
+  box-shadow: 0 1px 3px rgba(24, 28, 32, 0.12);
+}
+
+.dentist-day-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.dentist-day-head::after {
+  content: '';
+  order: 1;
+  flex: 1;
+  height: 1px;
+  background-color: #e5e8ee;
+}
+
+.dentist-day-count {
+  order: 2;
+  color: #9aa2b1;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-regular, 400);
+  text-transform: none;
+}
+
+.dentist-appointment {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid #eef0f4;
+  border-radius: 12px;
+  background-color: #ffffff;
+}
+
+.dentist-appointment-open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.dentist-hour {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background-color: #eef1f8;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.1;
+}
+
+.dentist-hour small {
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-regular, 400);
+}
+
+.dentist-name-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dentist-note-line {
+  margin: 2px 0 0;
+  color: #9aa2b1;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.dentist-confirm {
+  flex: none;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 8px;
+  background-color: #dfe7fb;
+  color: #003f87;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.dentist-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.dentist-week-day {
+  min-height: 160px;
+  padding: var(--space-3);
+  border: 1px solid #e5e8ee;
+  border-radius: 10px;
+}
+
+.dentist-week-day.is-today {
+  border-color: #003f87;
+  background-color: var(--color-primary-soft);
+}
+
+.dentist-week-title {
+  margin: 0 0 var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.dentist-week-chip {
+  display: block;
+  margin-bottom: var(--space-1);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background-color: #003f87;
+  color: #ffffff;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.dentist-week-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* Two-column detail pages */
+.dentist-split {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.dentist-split.is-chart {
+  grid-template-columns: minmax(0, 2.5fr) minmax(0, 1fr);
+}
+
+.dentist-split > div > .clinic-admin-card:first-child,
+.dentist-stack > .clinic-admin-card:first-child {
+  margin-top: 0;
+}
+
+.dentist-stack {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.dentist-stack > *,
+.dentist-stack > .clinic-admin-card + .clinic-admin-card {
+  margin: 0;
+}
+
+.dentist-narrow {
+  max-width: 760px;
+}
+
+.dentist-narrower {
+  max-width: 680px;
+}
+
+.dentist-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.dentist-info {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: 10px;
+  background-color: #f6f7fb;
+}
+
+.dentist-info svg {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.dentist-info-label {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+}
+
+.dentist-info-value {
+  margin: 2px 0 0;
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-medium, 500);
+  overflow-wrap: anywhere;
+}
+
+.dentist-alert {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid #fbcfd0;
+  border-radius: 12px;
+  background-color: #fef1f1;
+  color: #b91c1c;
+  font-size: 0.8125rem;
+}
+
+.dentist-alert p {
+  margin: 0;
+}
+
+.dentist-alert strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 0.9375rem;
+}
+
+.dentist-actions-stack {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.dentist-actions-stack .btn {
+  justify-content: center;
+  width: 100%;
+}
+
+.dentist-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.dentist-snapshot-line {
+  margin: var(--space-1) 0 0;
+  font-size: 0.8125rem;
+}
+
+.dentist-snapshot-line.is-danger {
+  color: #b91c1c;
+}
+
+.dentist-snapshot-line.is-warning {
+  color: #c2410c;
+}
+
+/* Patient cards */
+.dentist-patient-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.dentist-patient-card {
+  display: block;
+  padding: var(--space-4);
+  border: 1px solid #eef0f4;
+  border-radius: 16px;
+  background-color: #ffffff;
+  color: inherit;
+  text-decoration: none;
+}
+
+.dentist-patient-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.dentist-patient-head > svg {
+  margin-left: auto;
+  color: #9aa2b1;
+}
+
+.dentist-meta-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.dentist-patient-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid #eef0f4;
+}
+
+.dentist-patient-visits {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+/* Patient profile */
+.dentist-profile-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.dentist-profile-main {
+  flex: 1;
+  min-width: 220px;
+}
+
+.dentist-profile-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-bold);
+}
+
+.dentist-profile-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.dentist-profile-figures {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.dentist-figure {
+  min-width: 64px;
+  padding: var(--space-3);
+  border-radius: 10px;
+  background-color: #f6f7fb;
+  text-align: center;
+}
+
+.dentist-figure strong {
+  display: block;
+  color: #003f87;
+  font-size: 1rem;
+}
+
+.dentist-figure span {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+}
+
+.dentist-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.dentist-columns > *,
+.dentist-columns > .clinic-admin-card + .clinic-admin-card {
+  margin: 0;
+}
+
+.dentist-detail-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 170px) minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid #eef0f4;
+  font-size: 0.8125rem;
+}
+
+.dentist-detail-row:last-child {
+  border-bottom: 0;
+}
+
+.dentist-detail-row dt {
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium, 500);
+}
+
+.dentist-detail-row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.dentist-details {
+  margin: 0;
+}
+
+.dentist-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  margin-bottom: var(--space-2);
+  padding: 10px var(--space-3);
+  border: 0;
+  border-radius: 8px;
+  background-color: #f6f7fb;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dentist-check.is-done {
+  background-color: #edfbf1;
+  color: #15803d;
+}
+
+.dentist-entry {
+  padding: var(--space-4);
+  border: 1px solid #e5e8ee;
+  border-radius: 12px;
+  background-color: #f7f8fc;
+}
+
+.dentist-entry + .dentist-entry {
+  margin-top: var(--space-3);
+}
+
+.dentist-entry-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.dentist-entry p {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.dentist-entry p strong {
+  color: #3a4250;
+}
+
+/* Dental chart */
+.dentist-chart-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.dental-jaw-title {
+  margin: var(--space-3) 0;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dental-jaw {
+  display: grid;
+  grid-template-columns: repeat(16, minmax(0, 40px));
+  justify-content: center;
+  gap: 8px;
+}
+
+.dental-tooth {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 4px 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.dental-tooth.is-selected {
+  border-color: #003f87;
+}
+
+/* The gap between a patient's right and left. */
+.dental-tooth.is-midline {
+  position: relative;
+}
+
+.dental-tooth.is-midline::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -7px;
+  bottom: 0;
+  width: 1px;
+  background-color: #1a1c20;
+}
+
+.dental-tooth-face {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  max-width: 36px;
+  aspect-ratio: 9 / 10;
+  border: 2px solid;
+  border-radius: 8px;
+}
+
+.dental-swatch.is-healthy,
+.dental-tooth-face.is-healthy {
+  border-color: #86e0b4;
+  background-color: #d7f8e6;
+}
+
+.dental-swatch.is-caries,
+.dental-tooth-face.is-caries {
+  border-color: #f9a8a8;
+  background-color: #fee2e2;
+}
+
+.dental-swatch.is-filled,
+.dental-tooth-face.is-filled {
+  border-color: #93bbfb;
+  background-color: #dbe8fe;
+}
+
+.dental-swatch.is-crown,
+.dental-tooth-face.is-crown {
+  border-color: #c4b5fd;
+  background-color: #ede9fe;
+}
+
+.dental-swatch.is-missing,
+.dental-tooth-face.is-missing {
+  border-color: #c9ced8;
+  background-color: #f1f3f6;
+}
+
+.dental-swatch.is-planned,
+.dental-tooth-face.is-planned {
+  border-color: #fdba74;
+  background-color: #ffedd5;
+}
+
+.dental-mark {
+  color: #1a1c20;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.dental-sides {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-2);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid #e5e8ee;
+  color: #9aa2b1;
+  font-size: 0.625rem;
+}
+
+.dental-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid #e5e8ee;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.dental-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dental-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid;
+  border-radius: 4px;
+}
+
+.dental-swatch.is-round {
+  border-radius: 50%;
+}
+
+.dental-summary-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 8px 0;
+  border-bottom: 1px solid #eef0f4;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.dental-summary-row:last-child {
+  border-bottom: 0;
+}
+
+.dental-summary-row strong {
+  margin-left: auto;
+  color: #1a1c20;
+}
+
+.dental-prompt {
+  padding: var(--space-5) var(--space-3);
+  text-align: center;
+}
+
+.dental-prompt svg {
+  color: #b7bdc9;
+}
+
+/* Lists of notes, records and prescriptions */
+.dentist-list-card {
+  max-width: 900px;
+  margin-bottom: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid #eef0f4;
+  border-radius: 14px;
+  background-color: #ffffff;
+}
+
+.dentist-list-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.dentist-list-head-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.dentist-list-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background-color: #eef1f8;
+  color: #003f87;
+}
+
+.dentist-tag {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid #e5e8ee;
+  border-radius: 6px;
+  background-color: #f7f8fc;
+  color: #3a4250;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.dentist-list-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.dentist-list-fields.is-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dentist-list-fields p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.dentist-list-fields strong {
+  color: #3a4250;
+}
+
+.dentist-list-wide {
+  grid-column: 1 / -1;
+}
+
+.dentist-list-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid #eef0f4;
+  font-size: 0.8125rem;
+}
+
+.dentist-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #0056b3;
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.dentist-link.is-plain {
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium, 500);
+}
+
+.dentist-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.dentist-form-row.is-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Certificates */
+.dentist-cert-types {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.dentist-cert-type {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid #e5e8ee;
+  border-radius: 12px;
+  background-color: #ffffff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dentist-cert-type.is-active {
+  border-color: #003f87;
+  background-color: var(--color-primary-soft);
+}
+
+.dentist-cert-type svg {
+  color: #3a4250;
+}
+
+.dentist-cert-type.is-active svg,
+.dentist-cert-type.is-active .dentist-cert-title {
+  color: #003f87;
+}
+
+.dentist-cert-title {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.dentist-cert-note {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+}
+
+.dentist-cert-preview {
+  text-align: center;
+}
+
+.dentist-cert-clinic {
+  margin: 0;
+  color: #003f87;
+  font-size: 1rem;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+}
+
+.dentist-cert-badge {
+  display: inline-block;
+  margin: var(--space-2) 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background-color: #003f87;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+}
+
+.dentist-cert-body {
+  margin: var(--space-3) 0;
+  padding: var(--space-3) 0;
+  border-top: 1px solid #e5e8ee;
+  border-bottom: 1px solid #e5e8ee;
+  font-size: 0.8125rem;
+  text-align: left;
+}
+
+.dentist-cert-sign {
+  width: 96px;
+  margin: var(--space-6) auto var(--space-1);
+  border-top: 1px solid #1a1c20;
+}
+
+/* Imaging */
+.dentist-file-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.dentist-file-grid.is-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dentist-file {
+  overflow: hidden;
+  border: 1px solid #eef0f4;
+  border-radius: 14px;
+  background-color: #ffffff;
+}
+
+.dentist-file-thumb {
+  display: grid;
+  place-items: center;
+  height: 140px;
+  background-color: #ecf0fb;
+  color: #003f87;
+}
+
+.dentist-file-body {
+  padding: var(--space-3) var(--space-4);
+}
+
+.dentist-file-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.dentist-file-size {
+  flex: none;
+  padding: 2px 6px;
+  border: 1px solid #e5e8ee;
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  font-size: 0.625rem;
+}
+
+.dentist-file-foot {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid #eef0f4;
+  font-size: 0.8125rem;
+}
+
+.dentist-file-preview {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  margin-bottom: var(--space-3);
+  overflow: hidden;
+  border-radius: 12px;
+  background-color: #ecf0fb;
+  color: #003f87;
+}
+
+.dentist-file-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 60vh;
+}
+
+/* Follow-ups */
+.dentist-followup-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.dentist-followup-tile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid #eef0f4;
+  border-radius: 16px;
+  background-color: #ffffff;
+}
+
+.dentist-followup-tile .clinic-tile-icon {
+  flex: none;
+  margin: 0;
+}
+
+.dentist-followup-value {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-bold);
+  line-height: 1.1;
+}
+
+.dentist-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #eef0f4;
+  border-radius: 16px;
+  background-color: #ffffff;
+}
+
+.dentist-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.dentist-table th {
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.dentist-table td {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid #eef0f4;
+}
+
+.dentist-table tbody tr {
+  cursor: pointer;
+}
+
+.dentist-table tbody tr:nth-child(even) {
+  background-color: #fafbfd;
+}
+
+.dentist-table-patient {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* My schedule */
+.dentist-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.dentist-day {
+  width: 48px;
+  height: 48px;
+  border: 1px solid #e5e8ee;
+  border-radius: 10px;
+  background-color: #ffffff;
+  color: #9aa2b1;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.dentist-day.is-on {
+  border-color: #003f87;
+  background-color: #003f87;
+  color: #ffffff;
+}
+
+button.dentist-day {
+  cursor: pointer;
+}
+
+.dentist-schedule-week {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dentist-schedule-row {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 0.8125rem;
+}
+
+.dentist-schedule-date {
+  font-weight: var(--font-weight-semibold);
+}
+
+.dentist-schedule-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.dentist-schedule-chip {
+  padding: 4px 10px;
+  border: 1px solid #cfdcf6;
+  border-radius: 6px;
+  background-color: #eef3fd;
+  color: #003f87;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.dentist-muted {
+  color: #9aa2b1;
+  font-size: 0.75rem;
+}
+
+.dentist-branch-hours {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+}
+
+.dentist-branch-hours li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.dentist-branch-hours span {
+  color: var(--color-text-muted);
+}
+
+.dentist-change {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid #f3e3a1;
+  border-radius: 10px;
+  background-color: #fffbe8;
+}
+
+.dentist-change.is-declined {
+  border-color: #fbcfd0;
+  background-color: #fef1f1;
+}
+
+.dentist-change-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.dentist-change-text {
+  margin: var(--space-1) 0;
+  font-size: 0.875rem;
+}
+
+.dentist-change .dentist-link {
+  margin-top: var(--space-2);
+  font-size: 0.8125rem;
+}
+
+/* My profile */
+.dentist-credential {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid #e5e8ee;
+  border-radius: 12px;
+  background-color: #f7f8fc;
+}
+
+.dentist-credential-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.dentist-info-note {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid #cfdcf6;
+  border-radius: 10px;
+  background-color: #eef3fd;
+  color: #1d4ed8;
+  font-size: 0.8125rem;
+}
+
+.dentist-info-note svg {
+  flex: none;
+}
+
+.dentist-time-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+@media (max-width: 1100px) {
+  .dentist-quick {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dentist-split,
+  .dentist-split.is-chart {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dentist-patient-grid,
+  .dentist-file-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dentist-week {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dentist-week-day {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .dentist-hero {
+    padding: var(--space-4);
+  }
+
+  .dentist-hero-actions,
+  .dentist-hero-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .dentist-info-grid,
+  .dentist-columns,
+  .dentist-patient-grid,
+  .dentist-file-grid,
+  .dentist-file-grid.is-two,
+  .dentist-list-fields,
+  .dentist-list-fields.is-three,
+  .dentist-form-row,
+  .dentist-form-row.is-three,
+  .dentist-cert-types,
+  .dentist-followup-tiles,
+  .dentist-week {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dentist-chart,
+  .dentist-chart-labels {
+    gap: var(--space-1);
+  }
+
+  /* Two rows of eight per jaw, so a tooth stays big enough to tap. */
+  .dental-jaw {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    row-gap: var(--space-2);
+  }
+
+  .dental-tooth.is-midline::after {
+    display: none;
+  }
+
+  .dentist-schedule-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .dentist-schedule-chips {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+
+  .dentist-profile-figures {
+    width: 100%;
+  }
+
+  .dentist-figure {
+    flex: 1;
+  }
+
+  .dentist-detail-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}

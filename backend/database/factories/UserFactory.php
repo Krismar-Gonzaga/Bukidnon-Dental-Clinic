@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Models\Clinic;
+use App\Models\ClinicMembership;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -31,6 +33,33 @@ class UserFactory extends Factory
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];
+    }
+
+    public function role(string $role): static
+    {
+        return $this->afterMaking(fn (User $user) => $user->role = $role);
+    }
+
+    public function suspended(): static
+    {
+        return $this->afterMaking(function (User $user) {
+            $user->status = User::STATUS_SUSPENDED;
+            $user->suspended_at = now();
+        });
+    }
+
+    /**
+     * Give the user an active membership in a clinic with the given role.
+     */
+    public function memberOf(Clinic $clinic, string $role, string $status = ClinicMembership::STATUS_ACTIVE): static
+    {
+        return $this->afterCreating(function (User $user) use ($clinic, $role, $status) {
+            $membership = new ClinicMembership(['status' => $status]);
+            $membership->clinic_id = $clinic->id;
+            $membership->user_id = $user->id;
+            $membership->role = $role;
+            $membership->save();
+        });
     }
 
     /**

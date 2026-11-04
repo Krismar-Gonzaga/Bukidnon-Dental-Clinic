@@ -1,0 +1,63 @@
+/* Two-factor sign-in and signed-in devices, shown on every kind of account's security page. */
+.account-security {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.account-security > * {
+  margin: 0;
+}
+
+.account-security-qr {
+  display: block;
+  width: 180px;
+  height: 180px;
+  margin: var(--space-3) auto;
+}
+
+.account-security-codes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.account-security-sessions {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.account-security-session {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid #e5e8ee;
+  border-radius: 12px;
+}
+
+.account-security-session .clinic-tile-icon {
+  flex: none;
+  margin: 0;
+}
+
+.account-security-session-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-security-session-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}

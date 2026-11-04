@@ -6,7 +6,8 @@ export const PATIENT_NOTIFICATIONS_HREF = '/patient/notifications';
 export const PATIENT_SAVED_CLINICS_HREF = '/patient/saved-clinics';
 export const PATIENT_CLINIC_LOCATOR_HREF = '/patient/clinic-locator';
 export const PATIENT_REVIEWS_HREF = '/patient/reviews';
-export const PATIENT_FIND_CLINICS_HREF = '/patient/clinics';
+// Patients browse clinics on the public directory, signed in (Figma).
+export const PATIENT_FIND_CLINICS_HREF = '/clinics';
 export const PATIENT_PROFILE_HREF = '/patient/profile';
 export const PATIENT_EDIT_PROFILE_HREF = '/patient/profile/edit';
 export const PATIENT_CHANGE_PASSWORD_HREF = '/patient/profile/password';
@@ -17,8 +18,8 @@ export const getAppointmentDetailsHref = (appointmentId) =>
 export const getPatientClinicHref = (clinicId) =>
   `${PATIENT_FIND_CLINICS_HREF}/${encodeURIComponent(clinicId)}`;
 
-export const getBookClinicHref = (clinicId) =>
-  `${PATIENT_BOOK_HREF}?clinic=${encodeURIComponent(clinicId)}`;
+export const getBookClinicHref = (clinicId, dentistId) =>
+  `${PATIENT_BOOK_HREF}?clinic=${encodeURIComponent(clinicId)}${dentistId ? `&dentist=${encodeURIComponent(dentistId)}` : ''}`;
 
 export const getReviewHref = (appointmentId) =>
   `${PATIENT_REVIEWS_HREF}?appointment=${encodeURIComponent(appointmentId)}`;

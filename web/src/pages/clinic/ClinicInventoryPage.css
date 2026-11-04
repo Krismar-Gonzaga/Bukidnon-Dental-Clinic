@@ -1,0 +1,50 @@
+/* Inventory Management (clinic admin design). */
+
+.clinic-inventory-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+
+.clinic-inventory-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+  padding: var(--space-5);
+  border: 1px solid #f6e3a1;
+  border-radius: 14px;
+  background-color: #fffbeb;
+  color: #92660a;
+}
+
+.clinic-inventory-alert > svg {
+  flex-shrink: 0;
+}
+
+.clinic-inventory-alert-title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: var(--font-weight-semibold);
+  color: #7a5608;
+}
+
+.clinic-inventory-alert-text {
+  margin: 2px 0 0;
+  font-size: 0.9375rem;
+}
+
+.clinic-inventory-toolbar .clinic-inventory-supplier {
+  margin-left: auto;
+}
+
+.clinic-stock-qty.is-success { color: #0a7d45; }
+.clinic-stock-qty.is-warning { color: #b7791f; }
+.clinic-stock-qty.is-danger { color: #c81e1e; }
+
+@media (max-width: 1100px) {
+  .clinic-inventory-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

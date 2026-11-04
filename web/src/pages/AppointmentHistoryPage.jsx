@@ -1,29 +1,22 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import PatientLayout from '../layouts/PatientLayout';
 import StatusFilterChips from '../components/patient/StatusFilterChips';
 import AppointmentHistoryCard from '../components/patient/AppointmentHistoryCard';
+import { QueryState } from '../components/StatusMessage';
 import { ALL_APPOINTMENTS_FILTER, APPOINTMENT_FILTERS } from '../config/appointments';
 import { PATIENT_HISTORY_HREF } from '../config/patientNavigation';
-import { MOCK_APPOINTMENT_HISTORY } from '../mocks/appointmentHistory';
-import { MOCK_DASHBOARD_NOTIFICATIONS, MOCK_PATIENT } from '../mocks/patientDashboard';
+import { getAppointments } from '../services/patientApi';
 import './AppointmentHistoryPage.css';
 
-// Patient appointment history with MOCK data; not connected to the backend yet.
+export const PATIENT_APPOINTMENTS_KEY = ['patient', 'appointments'];
+
 function AppointmentHistoryPage() {
   const [filterId, setFilterId] = useState(ALL_APPOINTMENTS_FILTER.id);
-
-  const appointments =
-    filterId === ALL_APPOINTMENTS_FILTER.id
-      ? MOCK_APPOINTMENT_HISTORY
-      : MOCK_APPOINTMENT_HISTORY.filter(({ status }) => status === filterId);
+  const query = useQuery({ queryKey: PATIENT_APPOINTMENTS_KEY, queryFn: getAppointments });
 
   return (
-    <PatientLayout
-      title="Appointment History"
-      activeHref={PATIENT_HISTORY_HREF}
-      user={MOCK_PATIENT}
-      hasUnreadNotifications={MOCK_DASHBOARD_NOTIFICATIONS.some(({ unread }) => unread)}
-    >
+    <PatientLayout title="Appointment History" activeHref={PATIENT_HISTORY_HREF}>
       <div className="appointment-history">
         <StatusFilterChips
           filters={APPOINTMENT_FILTERS}
@@ -32,17 +25,24 @@ function AppointmentHistoryPage() {
           label="Filter appointments by status"
         />
 
-        {appointments.length > 0 ? (
-          <ul className="appointment-history-list">
-            {appointments.map((appointment) => (
-              <li key={appointment.id}>
-                <AppointmentHistoryCard appointment={appointment} />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="appointment-history-empty">No appointments in this category.</p>
-        )}
+        <QueryState query={query} loadingLabel="Loading appointments…">
+          {(all) => {
+            const appointments =
+              filterId === ALL_APPOINTMENTS_FILTER.id ? all : all.filter(({ status }) => status === filterId);
+
+            return appointments.length > 0 ? (
+              <ul className="appointment-history-list">
+                {appointments.map((appointment) => (
+                  <li key={appointment.id}>
+                    <AppointmentHistoryCard appointment={appointment} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="appointment-history-empty">No appointments in this category.</p>
+            );
+          }}
+        </QueryState>
       </div>
     </PatientLayout>
   );

@@ -1,13 +1,9 @@
-import SiteHeader from '../components/SiteHeader';
-import SiteFooter from '../components/SiteFooter';
 import './DirectoryPageLayout.css';
 
-// Shared shell for listing-style pages (clinics, dentists, services, contact):
-// header, intro band, optional filter bar, content area, footer.
+// Shared content layout for listing-style pages and their intro/filter sections.
 function DirectoryPageLayout({
-  activeHref,
-  account,
   title,
+  eyebrow,
   description,
   filters,
   resultsLabel,
@@ -17,14 +13,13 @@ function DirectoryPageLayout({
 }) {
   return (
     <div className="directory-page">
-      <SiteHeader activeHref={activeHref} account={account} />
-
       <main className="directory-page-main">
         <section
           className={`directory-page-intro${centeredIntro ? ' is-centered' : ''}`}
           aria-labelledby="directory-page-title"
         >
           <div className="directory-page-container">
+            {eyebrow && <span className="directory-page-eyebrow">{eyebrow}</span>}
             <h1 id="directory-page-title" className="directory-page-title">
               {title}
             </h1>
@@ -47,8 +42,6 @@ function DirectoryPageLayout({
           <div className="directory-page-container">{children}</div>
         </section>
       </main>
-
-      <SiteFooter />
     </div>
   );
 }

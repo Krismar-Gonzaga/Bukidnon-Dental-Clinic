@@ -1,65 +1,46 @@
 .clinics-map-section {
-  padding: var(--space-9) 0;
-}
-
-.clinics-map-inner {
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-  padding: 0 var(--space-5);
+  background-color: var(--color-surface);
 }
 
 .clinics-map-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-5) var(--space-4);
 }
 
 .clinics-map-title {
+  margin-bottom: var(--space-1);
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
-  letter-spacing: -0.01em;
   color: var(--color-text);
-  margin-bottom: var(--space-2);
 }
 
 .clinics-map-text {
   color: var(--color-text-muted);
 }
 
-/* Placeholder map canvas: soft land color with a faint road grid */
 .clinics-map {
   position: relative;
-  width: 100%;
-  aspect-ratio: 21 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 450px;
+  padding: var(--space-6) var(--space-4);
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
-  background-color: var(--color-primary-soft);
-  background-image:
-    linear-gradient(
-      100deg,
-      transparent 47%,
-      var(--color-surface) 47%,
-      var(--color-surface) 48.5%,
-      transparent 48.5%
-    ),
-    linear-gradient(
-      15deg,
-      transparent 58%,
-      var(--color-surface) 58%,
-      var(--color-surface) 59%,
-      transparent 59%
-    ),
-    linear-gradient(var(--color-border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--color-border) 1px, transparent 1px);
-  background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
+  background-color: #5f8a9a;
+}
+
+.clinics-map-land {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: #b2c9b9;
 }
 
 .clinics-map-markers {
+  position: absolute;
+  inset: 0;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -67,90 +48,73 @@
 
 .clinics-map-marker {
   position: absolute;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  /* Anchor the pin tip on the marker coordinate */
-  transform: translate(-18px, -50%);
+  transform: translate(-50%, -100%);
 }
 
 .clinics-map-pin {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--color-surface);
+  display: inline-flex;
+  padding: var(--space-1);
   border-radius: 50%;
-  background-color: var(--color-primary);
-  color: var(--color-on-primary);
-  box-shadow: var(--shadow-md);
+  background-color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  color: #2b78b5;
 }
 
-.clinics-map-label {
-  display: flex;
-  flex-direction: column;
-  padding: var(--space-1) var(--space-3);
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  white-space: nowrap;
+.clinics-map-pin:hover,
+.clinics-map-pin:focus-visible {
+  color: var(--color-primary);
 }
 
-.clinics-map-label-name {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+.clinics-map-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 385px;
+  padding: var(--space-6);
+  border-radius: var(--radius-xl);
+  background-color: #ffffff;
+  box-shadow: var(--shadow-lg);
+  color: var(--color-primary);
+  text-align: center;
+}
+
+.clinics-map-card-title {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: 1.0625rem;
+  font-weight: var(--font-weight-medium);
   color: var(--color-text);
 }
 
-.clinics-map-label-location {
-  font-size: 0.75rem;
+.clinics-map-card-text {
+  margin-bottom: var(--space-5);
+  line-height: 1.6;
   color: var(--color-text-muted);
 }
 
-.clinics-map-note {
-  position: absolute;
-  left: var(--space-4);
-  bottom: var(--space-3);
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
+.clinics-map-card-button {
+  width: 100%;
+  min-height: 52px;
+  justify-content: center;
+  border-radius: var(--radius-sm);
 }
 
-@media (max-width: 900px) {
-  .clinics-map {
-    aspect-ratio: 4 / 3;
-  }
-}
-
-/* Small screens: pins only; names stay available to screen readers */
 @media (max-width: 600px) {
-  .clinics-map-section {
-    padding: var(--space-8) 0;
-  }
-
-  .clinics-map-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    border: 0;
-  }
-
   .clinics-map {
-    aspect-ratio: 1 / 1;
+    min-height: 380px;
+  }
+
+  .clinics-map-title {
+    font-size: 1.625rem;
   }
 }
 
 @media (max-width: 480px) {
-  .clinics-map-inner {
-    padding: 0 var(--space-4);
+  .clinics-map-header {
+    padding-right: var(--space-4);
+    padding-left: var(--space-4);
   }
 
-  .clinics-map-header .btn {
-    width: 100%;
+  .clinics-map-card {
+    padding: var(--space-5);
   }
 }

@@ -1,53 +1,57 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import ClinicLocatorPage from './ClinicLocatorPage';
-import { LOCATOR_CLINICS } from '../mocks/clinicProfiles';
+import { getClinicMap } from '../services/publicApi';
+import { getNotifications } from '../services/notificationApi';
+import { PATIENT_USER, renderWithProviders } from '../testUtils';
+import { clinicSummary, emptyNotifications } from '../testFixtures';
 
-test('lists clinics with map pins and shows the first clinic selected', () => {
-  render(<ClinicLocatorPage />);
-  expect(screen.getByRole('heading', { level: 1, name: 'Clinic Locator' })).toBeInTheDocument();
-  const list = screen.getByRole('list', { name: 'Clinics' });
-  expect(within(list).getAllByRole('button')).toHaveLength(LOCATOR_CLINICS.length);
-  expect(screen.getAllByRole('button', { name: /^Show .* on map$/ })).toHaveLength(
-    LOCATOR_CLINICS.length
-  );
+jest.mock('../services/publicApi');
+jest.mock('../services/notificationApi');
 
-  const selected = screen.getByRole('region', {
-    name: 'Selected clinic: Braganza Dental Clinic',
-  });
-  expect(selected).toHaveTextContent('Sayre Highway, Valencia City, Bukidnon');
-  expect(selected).toHaveTextContent('Mon–Sat 8AM–5PM');
-  expect(within(selected).getByRole('link', { name: 'Details' })).toHaveAttribute(
-    'href',
-    '/patient/clinics/mock-dir-2'
-  );
-  expect(within(selected).getByRole('link', { name: 'Book' })).toHaveAttribute(
-    'href',
-    '/patient/book?clinic=mock-dir-2'
-  );
+beforeEach(() => {
+  getNotifications.mockResolvedValue(emptyNotifications);
+  getClinicMap.mockResolvedValue([
+    clinicSummary(),
+    clinicSummary({ id: 8, name: 'Malaybalay Dental', city: 'Malaybalay City', latitude: null, longitude: null }),
+  ]);
 });
 
-test('picking a list item or a pin changes the selected clinic', () => {
-  render(<ClinicLocatorPage />);
-  const list = screen.getByRole('list', { name: 'Clinics' });
-  fireEvent.click(within(list).getByRole('button', { name: /Maramag Dental Hub/ }));
-  expect(
-    screen.getByRole('region', { name: 'Selected clinic: Maramag Dental Hub' })
-  ).toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole('button', { name: 'Show Kitaotao Family Dental on map' }));
-  expect(
-    screen.getByRole('region', { name: 'Selected clinic: Kitaotao Family Dental' })
-  ).toBeInTheDocument();
+afterEach(() => {
+  delete navigator.geolocation;
 });
 
-test('search filters the list and pins', () => {
-  render(<ClinicLocatorPage />);
-  const search = screen.getByRole('searchbox', { name: 'Search clinics' });
-  fireEvent.change(search, { target: { value: 'valencia' } });
-  expect(
-    within(screen.getByRole('list', { name: 'Clinics' })).getAllByRole('button')
-  ).toHaveLength(2);
+test('lists clinics, pins the ones with coordinates and links to directions', async () => {
+  renderWithProviders(<ClinicLocatorPage />, { user: PATIENT_USER });
 
-  fireEvent.change(search, { target: { value: 'zzz' } });
-  expect(screen.getByText('No clinics match your search.')).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: /Malaybalay Dental/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Show Valencia Smiles on map' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Show Malaybalay Dental on map' })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /Directions/ })).toHaveAttribute('href', expect.stringContaining('destination=7.906'));
+
+  fireEvent.change(screen.getByPlaceholderText('Search clinics...'), { target: { value: 'malay' } });
+  expect(screen.queryByRole('button', { name: /^Valencia Smiles/ })).not.toBeInTheDocument();
+});
+
+test('asks for location only on click and handles a denied permission', async () => {
+  navigator.geolocation = {
+    getCurrentPosition: jest.fn((success, failure) => failure({ code: 1, PERMISSION_DENIED: 1 })),
+  };
+  renderWithProviders(<ClinicLocatorPage />, { user: PATIENT_USER });
+
+  const button = await screen.findByRole('button', { name: 'Use My Location' });
+  expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
+  fireEvent.click(button);
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Location permission was denied');
+  expect(screen.getByRole('link', { name: /Directions/ })).toBeInTheDocument();
+});
+
+test('adds the current position as the directions origin when allowed', async () => {
+  navigator.geolocation = {
+    getCurrentPosition: jest.fn((success) => success({ coords: { latitude: 8.15, longitude: 125.12 } })),
+  };
+  renderWithProviders(<ClinicLocatorPage />, { user: PATIENT_USER });
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Use My Location' }));
+  expect(await screen.findByRole('link', { name: /Directions/ })).toHaveAttribute('href', expect.stringContaining('origin=8.15%2C125.12'));
 });

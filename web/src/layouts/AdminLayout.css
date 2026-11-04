@@ -1,0 +1,54 @@
+/* System administrator frame. Sidebar, top bar and colors are the clinic admin's
+   (ClinicShell.css, ClinicShellGrouped.css); this adds the account card under the logo. */
+
+.admin-shell {
+  --admin-card-radius: 16px;
+}
+
+.admin-sidebar-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) var(--space-2) 0;
+  padding: var(--space-3);
+  border-radius: 12px;
+  background-color: var(--clinic-surface-low);
+}
+
+.admin-sidebar-card-text {
+  min-width: 0;
+}
+
+.admin-sidebar-card-name,
+.admin-sidebar-card-role {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-sidebar-card-name {
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--clinic-on-surface);
+}
+
+.admin-sidebar-card-role {
+  font-size: 0.75rem;
+  color: var(--clinic-on-surface-variant);
+}
+
+.admin-shell .clinic-sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.admin-content {
+  padding: var(--space-5) var(--space-6);
+}
+
+@media (max-width: 900px) {
+  .admin-content {
+    padding: var(--space-4) var(--space-3);
+  }
+}

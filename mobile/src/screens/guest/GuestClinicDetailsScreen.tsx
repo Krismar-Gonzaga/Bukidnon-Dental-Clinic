@@ -1,41 +1,75 @@
-// Clinic details for guests. Shows the saved copy immediately, refreshes it (and its
-// reviews) when online, and routes "Book" through login/registration.
+// Clinic details for guests, with the website's four tabs. Shows the saved copy immediately,
+// refreshes it when online, and routes booking and saving through login/registration.
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Linking,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useAuth } from '../../context/AuthContext';
 import { useSync } from '../../context/SyncContext';
-import { isNetworkError } from '../../services/api';
-import OfflineBanner from '../../components/common/OfflineBanner';
-import ClinicImage from '../../components/guest/ClinicImage';
+import { useBookClinic } from '../../components/guest/GuestClinicCard';
+import GuestShell, { GuestFooter } from '../../components/guest/GuestShell';
 import {
+  accentFor,
+  Avatar,
+  Card,
+  CardTitle,
+  guestColors,
+  Message,
+  PrimaryButton,
+  reviewsLabel,
+  Stars,
+} from '../../components/guest/GuestUi';
+import { openDaysSummary } from '../../components/guest/workingHours';
+import { isNetworkError, patientService } from '../../services/api';
+import {
+  ClinicBranch,
+  ClinicDentist,
+  ClinicDetails,
   ClinicReview,
+  ClinicService,
   ClinicSummary,
   fetchClinicDetails,
   getCachedClinicDetails,
 } from '../../services/offline/publicRepository';
-import { palette, radius, shadow, spacing, type } from '../../theme/tokens';
-import { formatClock, getOpenStatus, timeAgo } from '../../utils/format';
+import { spacing, type } from '../../theme/tokens';
+import { formatClock, formatPrice, timeAgo } from '../../utils/format';
+
+type TabKey = 'overview' | 'dentists' | 'services' | 'reviews';
+
+const TABS: Array<{ key: TabKey; label: string }> = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'dentists', label: 'Dentists' },
+  { key: 'services', label: 'Services' },
+  { key: 'reviews', label: 'Reviews' },
+];
+
+const GALLERY_OPACITY = [1, 0.7, 0.4];
+
+const branchHours = (branch: ClinicBranch) =>
+  openDaysSummary(branch.hours.map(({ day, opensAt, closesAt }) => ({ day, start: opensAt, end: closesAt })));
+
+const InfoRow = ({ icon, label, value }: { icon: string; label: string; value: string }) => (
+  <View style={styles.infoRow}>
+    <Icon name={icon} size={18} color={guestColors.primary} />
+    <View style={styles.flex}>
+      <Text style={styles.infoLabel}>{label.toUpperCase()}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
+    </View>
+  </View>
+);
 
 const GuestClinicDetailsScreen = ({ navigation, route }: { navigation: any; route: any }) => {
   const id: number = route.params.id;
   const { isReady, isOnline } = useSync();
+  const { isAuthenticated } = useAuth();
+  const book = useBookClinic(navigation);
+  const [saved, setSaved] = useState(false);
 
-  const [clinic, setClinic] = useState<ClinicSummary | null>(null);
+  const [clinic, setClinic] = useState<ClinicSummary | ClinicDetails | null>(null);
   const [reviews, setReviews] = useState<ClinicReview[] | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [tab, setTab] = useState<TabKey>('overview');
 
   const load = useCallback(async () => {
     // 1. Local copy first, so the page appears instantly (and offline).
@@ -69,350 +103,401 @@ const GuestClinicDetailsScreen = ({ navigation, route }: { navigation: any; rout
     }
   }, [isReady, load]);
 
-  const openUrl = (url: string, failure: string) =>
-    Linking.openURL(url).catch(() => Alert.alert('Not available', failure));
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+    patientService
+      .getSavedClinics()
+      .then((response: any) => setSaved((response.data.data as any[]).some((item) => Number(item.id) === Number(id))))
+      .catch(() => undefined);
+  }, [isAuthenticated, id]);
 
-  const handleCall = () =>
-    clinic?.contactNumber && openUrl(`tel:${clinic.contactNumber}`, 'Calling is not supported on this device.');
-  const handleEmail = () =>
-    clinic?.email && openUrl(`mailto:${clinic.email}`, 'No email app is set up on this device.');
-  const handleDirections = () =>
-    clinic &&
-    openUrl(
-      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${clinic.name}, ${clinic.fullAddress}`)}`,
-      'No maps app could be opened on this device.',
-    );
+  const toggleSaved = async () => {
+    const next = !saved;
+    setSaved(next);
+    try {
+      await (next ? patientService.saveClinic(id) : patientService.unsaveClinic(id));
+    } catch {
+      setSaved(!next);
+      Alert.alert('Not saved', 'This needs an internet connection. Please try again.');
+    }
+  };
 
-  const handleBook = () =>
-    Alert.alert('Sign in to book', 'Create a free account or log in to book an appointment with this clinic.', [
+  const openUrl = (url: string) =>
+    Linking.openURL(url).catch(() => Alert.alert('Maps unavailable', 'No maps app could be opened on this device.'));
+
+  const promptSignInToSave = () =>
+    Alert.alert('Sign in to save', 'Log in to keep this clinic in your saved clinics.', [
       { text: 'Not now', style: 'cancel' },
       { text: 'Log In', onPress: () => navigation.navigate('Login') },
-      { text: 'Register', onPress: () => navigation.navigate('Register') },
     ]);
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={palette.primary} />
-      </View>
+      <GuestShell navigation={navigation} patientTitle="Clinic Details">
+        <ActivityIndicator style={styles.loader} size="large" color={guestColors.primary} />
+      </GuestShell>
     );
   }
 
   if (!clinic) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.topBar}>
-          <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()} accessibilityLabel="Back">
-            <Icon name="arrow-back" size={24} color={palette.primary} />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.centered}>
-          {refreshing ? (
-            <ActivityIndicator size="large" color={palette.primary} />
-          ) : (
-            <>
-              <Icon name={isOnline ? 'alert-circle-outline' : 'cloud-offline-outline'} size={40} color={palette.outline} />
-              <Text style={styles.emptyTitle}>{isOnline ? 'Clinic not found' : 'Not saved on this device'}</Text>
-              <Text style={styles.emptyBody}>
-                {isOnline
-                  ? 'This clinic may no longer be listed.'
-                  : 'Connect to the internet to view this clinic.'}
-              </Text>
-              <TouchableOpacity style={styles.outlineButton} onPress={load}>
-                <Text style={styles.outlineButtonText}>Try again</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </SafeAreaView>
+      <GuestShell navigation={navigation} patientTitle="Clinic Details">
+        {refreshing ? (
+          <ActivityIndicator style={styles.loader} size="large" color={guestColors.primary} />
+        ) : (
+          <Message
+            icon={isOnline ? 'alert-circle-outline' : 'cloud-offline-outline'}
+            title={isOnline ? 'Clinic not found' : 'Not saved on this device'}
+            body={isOnline ? 'This clinic may no longer be listed.' : 'Connect to the internet to view this clinic.'}
+            actionLabel="Try again"
+            onAction={load}
+          />
+        )}
+      </GuestShell>
     );
   }
 
-  const status = getOpenStatus(clinic.openingTime, clinic.closingTime);
-  const opening = formatClock(clinic.openingTime);
-  const closing = formatClock(clinic.closingTime);
+  // Only a clinic opened online before has these; the directory entry does not.
+  const details = clinic as Partial<ClinicDetails> & ClinicSummary;
+  const hasDetails = details.services !== undefined;
+  const dentists = details.dentists ?? [];
+  const services = details.services ?? [];
+  const branches = details.branches ?? [];
+  const mainBranch = branches.find((branch) => branch.isMain) ?? branches[0];
+  const otherBranches = branches.filter((branch) => branch !== mainBranch);
+  const hours = mainBranch ? branchHours(mainBranch) : '';
+  const dailyHours =
+    clinic.openingTime && clinic.closingTime ? `Daily ${formatClock(clinic.openingTime)} – ${formatClock(clinic.closingTime)}` : '';
+  const coordinates = clinic.latitude !== null && clinic.longitude !== null ? `${clinic.latitude},${clinic.longitude}` : null;
+  const destination = encodeURIComponent(coordinates ?? `${clinic.name}, ${clinic.fullAddress}`);
+
+  const notLoadedYet = refreshing ? (
+    <ActivityIndicator style={styles.tabLoader} size="large" color={guestColors.primary} />
+  ) : (
+    <Message
+      icon={isOnline ? 'alert-circle-outline' : 'cloud-offline-outline'}
+      title={isOnline ? 'Could not load this' : 'Not saved on this device'}
+      body={isOnline ? 'Please try again.' : 'Open this clinic once while online to keep this list on your device.'}
+      actionLabel="Try again"
+      onAction={load}
+    />
+  );
+
+  const renderDentist = (dentist: ClinicDentist) => (
+    <Card key={dentist.id} style={styles.dentistCard}>
+      <Avatar name={dentist.name} color={accentFor(dentist.id)} size={48} />
+      <View style={styles.flex}>
+        <Text style={styles.rowTitle}>{dentist.name}</Text>
+        <Text style={styles.rowText}>{dentist.specialization ?? 'General Dentistry'}</Text>
+        {dentist.rating !== null ? (
+          <View style={styles.ratingRow}>
+            <Stars rating={dentist.rating} size={14} />
+            <Text style={styles.rowText}>
+              {dentist.rating.toFixed(1)} ({reviewsLabel(dentist.reviewCount)})
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.rowText}>No reviews yet</Text>
+        )}
+        <Text style={[styles.status, dentist.isAvailable ? styles.statusOn : styles.statusOff]}>
+          {dentist.isAvailable ? 'Available' : 'Unavailable'}
+        </Text>
+        <TouchableOpacity
+          style={styles.inlineLink}
+          onPress={() => navigation.navigate('GuestDentistProfile', { id: dentist.id })}
+          accessibilityRole="link"
+          accessibilityLabel={`View profile of ${dentist.name}`}
+        >
+          <Text style={styles.linkText}>View Profile</Text>
+          <Icon name="arrow-forward" size={14} color={guestColors.primary} />
+        </TouchableOpacity>
+      </View>
+    </Card>
+  );
+
+  const renderService = (service: ClinicService) => (
+    <Card key={service.id}>
+      <Text style={styles.rowTitle}>{service.name}</Text>
+      {service.description ? <Text style={styles.rowText}>{service.description}</Text> : null}
+      <View style={styles.serviceFooter}>
+        <Text style={styles.price}>{formatPrice(service.price, service.currency)}</Text>
+        <Text style={styles.rowText}>{service.durationMinutes} min</Text>
+      </View>
+    </Card>
+  );
+
+  const renderReview = (review: ClinicReview) => (
+    <Card key={review.id}>
+      <View style={styles.reviewAuthor}>
+        <Avatar name={review.patientName} color={accentFor(review.id)} />
+        <View style={styles.flex}>
+          <Text style={styles.rowTitle}>{review.patientName}</Text>
+          <Text style={styles.rowText}>Verified visit{review.date ? ` · ${review.date}` : ''}</Text>
+        </View>
+      </View>
+      <Stars rating={review.rating} size={15} />
+      {review.comment ? <Text style={styles.reviewText}>{review.comment}</Text> : null}
+    </Card>
+  );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <StatusBar barStyle="dark-content" backgroundColor={palette.surfaceContainerLowest} />
-      <View style={styles.topBar}>
-        <View style={styles.topBarLeft}>
-          <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()} accessibilityLabel="Back">
-            <Icon name="arrow-back" size={24} color={palette.primary} />
-          </TouchableOpacity>
-          <Text style={styles.topBarTitle} numberOfLines={1}>
-            Clinic Details
-          </Text>
-        </View>
-        {refreshing && <ActivityIndicator size="small" color={palette.primary} />}
-      </View>
-      <OfflineBanner />
-
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <ClinicImage uri={clinic.image} name={clinic.name} style={styles.hero} />
-
-        <View style={styles.body}>
-          <View style={styles.titleRow}>
-            <Text style={styles.name}>{clinic.name}</Text>
-            {clinic.isVerified && (
-              <View style={styles.verified}>
-                <Icon name="checkmark-circle" size={14} color={palette.onSecondaryContainer} />
-                <Text style={styles.verifiedText}>Verified</Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.metaRow}>
-            <Icon name="star" size={16} color={palette.secondary} />
-            <Text style={styles.metaStrong}>{clinic.rating.toFixed(1)}</Text>
-            {reviews && (
-              <Text style={styles.metaText}>
-                · {reviews.length} recent review{reviews.length === 1 ? '' : 's'}
-              </Text>
-            )}
-          </View>
-
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <Icon name="location-outline" size={20} color={palette.primary} />
-              <Text style={styles.infoText}>{clinic.fullAddress}</Text>
+    <GuestShell navigation={navigation} patientTitle="Clinic Details">
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <View style={[styles.hero, { backgroundColor: accentFor(clinic.id) }]}>
+          {clinic.isVerified && (
+            <View style={styles.verified}>
+              <Icon name="shield-checkmark-outline" size={13} color={guestColors.successText} />
+              <Text style={styles.verifiedText}>Verified</Text>
             </View>
-            {opening && closing && (
-              <View style={styles.infoRow}>
-                <Icon name="time-outline" size={20} color={palette.primary} />
-                <Text style={styles.infoText}>
-                  Daily {opening} – {closing}
-                  {status ? (
-                    <Text style={status.isOpen ? styles.openText : styles.closedText}>
-                      {'  '}
-                      {status.isOpen ? 'Open now' : 'Closed now'}
-                    </Text>
-                  ) : null}
-                </Text>
-              </View>
-            )}
-            {clinic.contactNumber && (
-              <View style={styles.infoRow}>
-                <Icon name="call-outline" size={20} color={palette.primary} />
-                <Text style={styles.infoText}>{clinic.contactNumber}</Text>
-              </View>
-            )}
-            {clinic.email && (
-              <View style={styles.infoRow}>
-                <Icon name="mail-outline" size={20} color={palette.primary} />
-                <Text style={styles.infoText}>{clinic.email}</Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.actionButton, !clinic.contactNumber && styles.actionDisabled]}
-              onPress={handleCall}
-              disabled={!clinic.contactNumber}
-            >
-              <Icon name="call-outline" size={20} color={palette.primary} />
-              <Text style={styles.actionText}>Call</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, !clinic.email && styles.actionDisabled]}
-              onPress={handleEmail}
-              disabled={!clinic.email}
-            >
-              <Icon name="mail-outline" size={20} color={palette.primary} />
-              <Text style={styles.actionText}>Email</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={handleDirections}>
-              <Icon name="navigate-outline" size={20} color={palette.primary} />
-              <Text style={styles.actionText}>Directions</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.sectionTitle}>About</Text>
-          <Text style={styles.paragraph}>{clinic.description ?? 'No description provided yet.'}</Text>
-
-          {clinic.specializations.length > 0 && (
-            <>
-              <Text style={styles.sectionTitle}>Specializations</Text>
-              <View style={styles.tags}>
-                {clinic.specializations.map((spec) => (
-                  <View key={spec.name} style={styles.tag}>
-                    <Text style={styles.tagText}>{spec.name}</Text>
-                  </View>
-                ))}
-              </View>
-            </>
           )}
+          <Text style={styles.heroName} accessibilityRole="header">
+            {clinic.name}
+          </Text>
+          <View style={styles.heroAddress}>
+            <Icon name="location-outline" size={16} color="rgba(255,255,255,0.85)" />
+            <Text style={styles.heroAddressText}>{clinic.fullAddress}</Text>
+          </View>
+        </View>
 
-          <Text style={styles.sectionTitle}>Patient Reviews</Text>
-          {reviews === null ? (
-            <Text style={styles.mutedText}>
-              {isOnline ? 'Loading reviews…' : 'Reviews will load the next time you are online.'}
+        <View style={styles.bar}>
+          <View style={styles.ratingRow}>
+            <Stars rating={clinic.rating} />
+            <Text style={styles.ratingText}>
+              {clinic.rating.toFixed(1)} ({reviewsLabel(clinic.reviewCount)})
             </Text>
-          ) : reviews.length === 0 ? (
-            <Text style={styles.mutedText}>No reviews yet.</Text>
-          ) : (
-            reviews.map((review) => (
-              <View key={review.id} style={styles.review}>
-                <View style={styles.reviewHeader}>
-                  <Text style={styles.reviewName}>{review.patientName}</Text>
-                  <View style={styles.reviewStars}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Icon
-                        key={star}
-                        name={star <= review.rating ? 'star' : 'star-outline'}
-                        size={14}
-                        color={palette.secondary}
+            {refreshing && <ActivityIndicator size="small" color={guestColors.primary} />}
+          </View>
+          <View style={styles.barActions}>
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={isAuthenticated ? toggleSaved : promptSignInToSave}
+              accessibilityRole="button"
+              accessibilityLabel={isAuthenticated ? `${saved ? 'Remove' : 'Save'} ${clinic.name}` : `Sign in to save ${clinic.name}`}
+            >
+              <Icon name={saved ? 'heart' : 'heart-outline'} size={20} color={saved ? '#f25c5c' : guestColors.text} />
+            </TouchableOpacity>
+            <PrimaryButton label="Book Appointment" onPress={() => book(clinic.id)} style={styles.flex} />
+          </View>
+        </View>
+
+        <View style={styles.tabs} accessibilityRole="tablist">
+          {TABS.map(({ key, label }) => {
+            const active = key === tab;
+            return (
+              <TouchableOpacity
+                key={key}
+                style={[styles.tab, active && styles.tabActive]}
+                onPress={() => setTab(key)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+              >
+                <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.panel}>
+          {tab === 'overview' && (
+            <>
+              <Card>
+                <CardTitle>Clinic Information</CardTitle>
+                {clinic.description ? <Text style={styles.description}>{clinic.description}</Text> : null}
+                <View style={styles.infoList}>
+                  <InfoRow icon="location-outline" label="Address" value={clinic.fullAddress} />
+                  {hours || dailyHours ? <InfoRow icon="time-outline" label="Operating Hours" value={hours || dailyHours} /> : null}
+                  {clinic.contactNumber ? <InfoRow icon="call-outline" label="Phone" value={clinic.contactNumber} /> : null}
+                  {clinic.email ? <InfoRow icon="mail-outline" label="Email" value={clinic.email} /> : null}
+                </View>
+              </Card>
+
+              {branches.length > 0 && (
+                <Card>
+                  <CardTitle>Branches</CardTitle>
+                  <View style={styles.infoList}>
+                    {mainBranch && (
+                      <InfoRow
+                        icon="business-outline"
+                        label="Main Branch"
+                        value={[mainBranch.address, branchHours(mainBranch)].filter(Boolean).join(' · ')}
+                      />
+                    )}
+                    {otherBranches.map((branch) => (
+                      <InfoRow
+                        key={branch.id}
+                        icon="business-outline"
+                        label={branch.name}
+                        value={[branch.address, branchHours(branch)].filter(Boolean).join(' · ')}
                       />
                     ))}
                   </View>
+                </Card>
+              )}
+
+              {/* TEMPORARY placeholders until clinics can upload gallery photos. */}
+              <Card>
+                <CardTitle>Gallery</CardTitle>
+                <View style={styles.gallery}>
+                  {GALLERY_OPACITY.map((opacity) => (
+                    <View key={opacity} style={[styles.galleryTile, { backgroundColor: accentFor(clinic.id), opacity }]}>
+                      <Icon name="business-outline" size={24} color="#ffffff" />
+                    </View>
+                  ))}
                 </View>
-                {review.comment ? <Text style={styles.paragraph}>{review.comment}</Text> : null}
-                {review.date ? <Text style={styles.mutedText}>{review.date}</Text> : null}
-              </View>
-            ))
+              </Card>
+
+              <Card>
+                <CardTitle>Location</CardTitle>
+                <View style={styles.mapPlaceholder}>
+                  <Icon name="map-outline" size={36} color={guestColors.textMuted} />
+                </View>
+                <Text style={styles.rowText}>{clinic.fullAddress}</Text>
+                <View style={styles.mapLinks}>
+                  <TouchableOpacity
+                    style={styles.inlineLink}
+                    onPress={() => openUrl(`https://www.google.com/maps/dir/?api=1&destination=${destination}`)}
+                    accessibilityRole="link"
+                  >
+                    <Text style={styles.linkText}>Get Directions</Text>
+                    <Icon name="arrow-forward" size={14} color={guestColors.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.inlineLink}
+                    onPress={() => openUrl(`https://www.google.com/maps/search/?api=1&query=${destination}`)}
+                    accessibilityRole="link"
+                  >
+                    <Text style={styles.linkText}>Open in Maps</Text>
+                    <Icon name="arrow-forward" size={14} color={guestColors.primary} />
+                  </TouchableOpacity>
+                </View>
+              </Card>
+
+              <Card>
+                <CardTitle>Quick Book</CardTitle>
+                <Text style={styles.description}>Ready to book your appointment at {clinic.name}?</Text>
+                <PrimaryButton label="Book Now" onPress={() => book(clinic.id)} />
+              </Card>
+            </>
           )}
 
-          {savedAt && !isOnline && <Text style={styles.savedNote}>Saved on this device {timeAgo(savedAt)}.</Text>}
-        </View>
-      </ScrollView>
+          {tab === 'dentists' &&
+            (!hasDetails ? notLoadedYet : dentists.length > 0 ? dentists.map(renderDentist) : (
+              <Message icon="people-outline" title="No dentists listed yet" />
+            ))}
 
-      <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.bookButton} onPress={handleBook} activeOpacity={0.85}>
-          <Icon name="calendar-outline" size={20} color={palette.onPrimary} />
-          <Text style={styles.bookButtonText}>Book Appointment</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+          {tab === 'services' &&
+            (!hasDetails ? notLoadedYet : services.length > 0 ? services.map(renderService) : (
+              <Message icon="medical-outline" title="No services listed yet" />
+            ))}
+
+          {tab === 'reviews' &&
+            (reviews === null ? notLoadedYet : reviews.length > 0 ? reviews.map(renderReview) : (
+              <Message icon="chatbubble-outline" title="No reviews yet" body="Reviews come from patients after a completed visit." />
+            ))}
+
+          {savedAt && !isOnline ? <Text style={styles.savedNote}>Saved on this device {timeAgo(savedAt)}.</Text> : null}
+        </View>
+
+        <GuestFooter navigation={navigation} />
+      </ScrollView>
+    </GuestShell>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: palette.background },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.lg,
-    backgroundColor: palette.background,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.marginMobile,
-    paddingVertical: spacing.base,
-    backgroundColor: palette.surfaceContainerLowest,
-    borderBottomWidth: 1,
-    borderBottomColor: palette.outlineVariant,
-    ...shadow.sm,
-    zIndex: 2,
-  },
-  topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.base, flex: 1 },
-  topBarTitle: { ...type.headlineMd, fontSize: 22, fontWeight: '700', color: palette.primary, flex: 1 },
-  iconButton: { padding: spacing.base, borderRadius: radius.full },
+  flex: { flex: 1 },
+  loader: { marginTop: 64 },
+  tabLoader: { marginVertical: spacing.xl },
 
-  scrollContent: { paddingBottom: spacing.xl },
-  hero: { width: '100%', height: 220 },
-  body: { padding: spacing.marginMobile },
-  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.base, marginBottom: spacing.xs },
-  name: { ...type.headlineMd, color: palette.onSurface, flex: 1 },
+  hero: { paddingHorizontal: spacing.marginMobile, paddingTop: spacing.xl + spacing.md, paddingBottom: spacing.lg, alignItems: 'flex-start' },
   verified: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: spacing.base,
-    paddingVertical: 4,
-    borderRadius: radius.full,
-    backgroundColor: palette.secondaryContainer,
-    marginTop: 6,
-  },
-  verifiedText: { ...type.labelMd, fontSize: 11, color: palette.onSecondaryContainer },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md },
-  metaStrong: { ...type.labelMd, fontSize: 14, color: palette.secondary },
-  metaText: { ...type.bodyMd, color: palette.onSurfaceVariant },
-
-  infoCard: {
-    backgroundColor: palette.surfaceContainerLowest,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(194,198,212,0.5)',
-    padding: spacing.md,
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  infoText: { ...type.bodyMd, color: palette.onSurface, flex: 1 },
-  openText: { color: palette.secondary, fontWeight: '600' },
-  closedText: { color: palette.error, fontWeight: '600' },
-
-  actions: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  actionButton: {
-    flex: 1,
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.lg,
-    backgroundColor: palette.primaryFixed,
-  },
-  actionDisabled: { opacity: 0.4 },
-  actionText: { ...type.labelMd, color: palette.primary },
-
-  sectionTitle: { ...type.titleLg, color: palette.onSurface, marginTop: spacing.md, marginBottom: spacing.sm },
-  paragraph: { ...type.bodyMd, color: palette.onSurfaceVariant },
-  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.base },
-  tag: {
     paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: radius.full,
-    backgroundColor: palette.tertiaryFixed,
-  },
-  tagText: { ...type.labelMd, color: palette.onTertiaryFixedVariant },
-  mutedText: { ...type.bodyMd, fontSize: 12, color: palette.outline },
-  review: {
-    backgroundColor: palette.surfaceContainerLowest,
-    borderRadius: radius.xl,
-    padding: spacing.md,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: guestColors.successSoft,
     marginBottom: spacing.sm,
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: 'rgba(194,198,212,0.4)',
   },
-  reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  reviewName: { ...type.labelMd, fontSize: 14, color: palette.onSurface },
-  reviewStars: { flexDirection: 'row', gap: 1 },
-  savedNote: { ...type.bodyMd, fontSize: 12, color: palette.outline, marginTop: spacing.lg, textAlign: 'center' },
+  verifiedText: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: guestColors.successText },
+  heroName: { fontSize: 24, lineHeight: 30, fontWeight: '700', color: '#ffffff' },
+  heroAddress: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.base },
+  heroAddressText: { ...type.bodyMd, flex: 1, color: 'rgba(255,255,255,0.9)' },
 
-  emptyTitle: { ...type.titleLg, fontSize: 18, color: palette.onSurface, textAlign: 'center' },
-  emptyBody: { ...type.bodyMd, color: palette.onSurfaceVariant, textAlign: 'center' },
-  outlineButton: {
-    marginTop: spacing.xs,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: palette.primary,
-  },
-  outlineButtonText: { ...type.labelMd, color: palette.primary },
-
-  bottomBar: {
-    paddingHorizontal: spacing.marginMobile,
-    paddingVertical: spacing.sm,
-    backgroundColor: palette.surfaceContainerLowest,
-    borderTopWidth: 1,
-    borderTopColor: palette.outlineVariant,
-  },
-  bookButton: {
-    flexDirection: 'row',
+  bar: { paddingHorizontal: spacing.marginMobile, paddingVertical: spacing.lg, gap: spacing.md },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.base, flexWrap: 'wrap' },
+  ratingText: { fontSize: 15, lineHeight: 20, color: guestColors.text },
+  barActions: { flexDirection: 'row', gap: spacing.sm },
+  saveButton: {
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.base,
-    paddingVertical: spacing.md,
-    borderRadius: radius.lg,
-    backgroundColor: palette.primary,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: guestColors.border,
+    backgroundColor: guestColors.surface,
   },
-  bookButtonText: { ...type.labelMd, fontSize: 14, color: palette.onPrimary },
+
+  tabs: { flexDirection: 'row', marginHorizontal: spacing.marginMobile, borderBottomWidth: 1, borderBottomColor: guestColors.border },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 2, borderBottomColor: 'transparent', marginBottom: -1 },
+  tabActive: { borderBottomColor: guestColors.primary },
+  tabText: { fontSize: 14, lineHeight: 20, fontWeight: '500', color: guestColors.text },
+  tabTextActive: { color: guestColors.primary },
+
+  panel: { padding: spacing.marginMobile, paddingTop: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md },
+
+  description: { ...type.bodyMd, color: guestColors.textMuted, marginBottom: spacing.md },
+  infoList: { gap: spacing.md },
+  infoRow: { flexDirection: 'row', gap: spacing.sm },
+  infoLabel: { fontSize: 12, lineHeight: 16, fontWeight: '600', letterSpacing: 0.4, color: guestColors.textMuted },
+  infoValue: { ...type.bodyMd, color: guestColors.text },
+
+  gallery: { flexDirection: 'row', gap: spacing.sm },
+  galleryTile: { flex: 1, aspectRatio: 1.5, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  mapPlaceholder: {
+    height: 150,
+    borderRadius: 12,
+    backgroundColor: guestColors.neutralSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  mapLinks: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md },
+
+  inlineLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.base },
+  linkText: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: guestColors.primary },
+
+  dentistCard: { flexDirection: 'row', gap: spacing.md },
+  rowTitle: { fontSize: 16, lineHeight: 22, fontWeight: '600', color: guestColors.text },
+  rowText: { ...type.bodyMd, color: guestColors.textMuted },
+  status: {
+    alignSelf: 'flex-start',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+    borderRadius: 999,
+    borderWidth: 1,
+    overflow: 'hidden',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    marginTop: spacing.xs,
+  },
+  statusOn: { color: guestColors.successText, backgroundColor: guestColors.successSoft, borderColor: guestColors.successBorder },
+  statusOff: { color: guestColors.textMuted, backgroundColor: guestColors.neutralSoft, borderColor: guestColors.border },
+
+  serviceFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm },
+  price: { fontSize: 20, lineHeight: 28, fontWeight: '700', color: guestColors.primary },
+
+  reviewAuthor: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  reviewText: { ...type.bodyMd, color: guestColors.text, marginTop: spacing.sm },
+
+  savedNote: { ...type.bodyMd, fontSize: 12, color: guestColors.textMuted, textAlign: 'center' },
 });
 
 export default GuestClinicDetailsScreen;

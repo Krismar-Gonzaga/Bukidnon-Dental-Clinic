@@ -5,9 +5,10 @@ import './DentistDirectoryCard.css';
 const ACCENT_COUNT = 6;
 const MAX_STARS = 5;
 
-// Directory listing card. View Profile is visual only until profiles exist.
+// Directory listing card. profileHref links the action to the dentist's
+// profile. Dentists without published reviews show no stars.
 // The letter avatar is a TEMPORARY stand-in for dentist photos.
-function DentistDirectoryCard({ dentist, accentIndex = 0 }) {
+function DentistDirectoryCard({ dentist, accentIndex = 0, profileHref }) {
   const {
     id,
     name,
@@ -22,11 +23,12 @@ function DentistDirectoryCard({ dentist, accentIndex = 0 }) {
   const accent = (accentIndex % ACCENT_COUNT) + 1;
   // Initial of the first name after any title such as "Dr."
   const initial = name.replace(/^Dr\.?\s+/i, '').charAt(0).toUpperCase();
+  const hasRating = typeof rating === 'number';
   // Figma shows whole stars only (e.g. 4.9 renders four filled stars).
-  const filledStars = Math.floor(rating);
+  const filledStars = hasRating ? Math.floor(rating) : 0;
 
   return (
-    <article className="dentist-card" aria-labelledby={titleId}>
+    <article className="public-dentist-card" aria-labelledby={titleId}>
       <div
         className={`dentist-card-avatar dentist-card-avatar--${accent}`}
         aria-hidden="true"
@@ -45,29 +47,31 @@ function DentistDirectoryCard({ dentist, accentIndex = 0 }) {
         </p>
       )}
 
-      <p className="dentist-card-rating">
-        <span
-          className="dentist-card-stars"
-          role="img"
-          aria-label={`Rated ${rating.toFixed(1)} out of 5`}
-        >
-          {Array.from({ length: MAX_STARS }, (_, index) => (
-            <Icon
-              key={index}
-              name="star"
-              size={15}
-              className={
-                index < filledStars
-                  ? 'dentist-card-star is-filled'
-                  : 'dentist-card-star'
-              }
-            />
-          ))}
-        </span>
-        <span>
-          {rating.toFixed(1)} ({reviewCount} reviews)
-        </span>
-      </p>
+      {hasRating && (
+        <p className="dentist-card-rating">
+          <span
+            className="dentist-card-stars"
+            role="img"
+            aria-label={`Rated ${rating.toFixed(1)} out of 5`}
+          >
+            {Array.from({ length: MAX_STARS }, (_, index) => (
+              <Icon
+                key={index}
+                name="star"
+                size={15}
+                className={
+                  index < filledStars
+                    ? 'dentist-card-star is-filled'
+                    : 'dentist-card-star'
+                }
+              />
+            ))}
+          </span>
+          <span>
+            {rating.toFixed(1)} ({reviewCount} reviews)
+          </span>
+        </p>
+      )}
 
       <ul className="dentist-card-meta" aria-label="Details">
         <li className="dentist-card-chip">{yearsExperience} years exp.</li>
@@ -80,9 +84,11 @@ function DentistDirectoryCard({ dentist, accentIndex = 0 }) {
         </li>
       </ul>
 
-      <button type="button" className="btn btn-primary dentist-card-action">
-        View Profile
-      </button>
+      {profileHref && (
+        <a href={profileHref} className="btn btn-primary dentist-card-action" aria-label={`View profile of ${name}`}>
+          View Profile
+        </a>
+      )}
     </article>
   );
 }

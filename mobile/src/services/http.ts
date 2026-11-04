@@ -1,9 +1,18 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from './config';
 import { setOnline } from './offline/network';
+import { clearSession, readToken } from './session';
 
-console.log('API URL:', API_BASE_URL);
+if (__DEV__) {
+  console.log('API URL:', API_BASE_URL);
+}
+
+// Called when the server rejects the saved token (expired, revoked, account
+// suspended) so the app can return to the sign-in screen.
+let onSessionExpired: (() => void) | null = null;
+export const setSessionExpiredHandler = (handler: (() => void) | null) => {
+  onSessionExpired = handler;
+};
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -17,13 +26,12 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await readToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
       return config;
-    } catch (error) {
-      console.error('Error getting token:', error);
+    } catch {
       return config;
     }
   },
@@ -44,10 +52,13 @@ api.interceptors.response.use(
     } else {
       setOnline(true);
     }
-    if (error.response?.status === 401) {
-      await AsyncStorage.removeItem('token');
-      await AsyncStorage.removeItem('user');
-      // You might want to navigate to login screen here
+    // A signed-in request was rejected: the token expired or was revoked
+    // (password change, suspension). Forget it and return to sign-in. The
+    // login request itself also answers 401 for a wrong password; skip that.
+    const isLoginAttempt = String(error.config?.url ?? '').endsWith('/login');
+    if (error.response?.status === 401 && !isLoginAttempt) {
+      await clearSession();
+      onSessionExpired?.();
     }
     return Promise.reject(error);
   }

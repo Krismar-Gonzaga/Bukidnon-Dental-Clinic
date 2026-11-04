@@ -1,92 +1,55 @@
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import PatientDashboardPage from './PatientDashboardPage';
-import {
-  PATIENT_NAV_ITEMS,
-  PATIENT_QUICK_ACTIONS,
-} from '../config/patientNavigation';
-import {
-  MOCK_DASHBOARD_APPOINTMENTS,
-  MOCK_DASHBOARD_STATS,
-  MOCK_PATIENT,
-} from '../mocks/patientDashboard';
-import { getGreeting } from '../utils/patientDashboard';
+import { PATIENT_NAV_ITEMS } from '../config/patientNavigation';
+import { getPatientDashboard } from '../services/patientApi';
+import { getNotifications } from '../services/notificationApi';
+import { apiError, PATIENT_USER, renderWithProviders } from '../testUtils';
+import { appointment, notification } from '../testFixtures';
 
-test('renders the page title and sidebar navigation with Dashboard active', () => {
-  render(<PatientDashboardPage />);
-  expect(
-    screen.getByRole('heading', { level: 1, name: 'Dashboard' })
-  ).toBeInTheDocument();
+jest.mock('../services/patientApi');
+jest.mock('../services/notificationApi');
+
+const COUNTS = { upcoming: 2, pending: 1, completed: 3, awaiting_review: 1, saved_clinics: 4, reviews_given: 2 };
+
+beforeEach(() => {
+  getNotifications.mockResolvedValue({ notifications: [notification()], unreadCount: 1, pageCount: 1 });
+});
+
+const renderPage = () => renderWithProviders(<PatientDashboardPage />, { user: PATIENT_USER });
+
+test('shows the sidebar, welcome summary and stats from the API', async () => {
+  getPatientDashboard.mockResolvedValue({
+    name: 'Juan Dela Cruz',
+    upcoming: [appointment(), appointment({ id: 13, status: 'confirmed' })],
+    counts: COUNTS,
+    unreadNotifications: 1,
+  });
+  renderPage();
 
   const nav = screen.getByRole('navigation', { name: 'Patient' });
-  PATIENT_NAV_ITEMS.forEach(({ label }) => {
-    expect(within(nav).getByRole('link', { name: label })).toBeInTheDocument();
-  });
-  expect(within(nav).getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
-    'aria-current',
-    'page'
-  );
-  expect(screen.getByRole('button', { name: 'Log Out' })).toBeInTheDocument();
+  PATIENT_NAV_ITEMS.forEach(({ label }) => expect(within(nav).getByRole('link', { name: label })).toBeInTheDocument());
+  expect(within(nav).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page');
+
+  expect(await screen.findByRole('heading', { level: 2, name: 'Juan Dela Cruz' })).toBeInTheDocument();
+  expect(screen.getByText(/You have/).closest('p')).toHaveTextContent('You have 1 confirmed appointment and 1 pending approval.');
+  expect(screen.getByText('4')).toBeInTheDocument(); // saved clinics
+  expect(screen.getAllByRole('link', { name: 'View Dental Cleaning' })).toHaveLength(2);
+  expect(await screen.findByText('Appointment confirmed')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Notifications, 1 unread' })).toBeInTheDocument();
 });
 
-test('welcome banner summarizes confirmed and pending appointments', () => {
-  render(<PatientDashboardPage />);
-  expect(
-    screen.getByRole('heading', { level: 2, name: MOCK_PATIENT.name })
-  ).toBeInTheDocument();
-  expect(
-    screen.getByText(/You have/).closest('p')
-  ).toHaveTextContent(
-    'You have 1 confirmed appointment and 1 pending approval.'
-  );
+test('shows an empty state with a booking link when nothing is upcoming', async () => {
+  getPatientDashboard.mockResolvedValue({ name: 'Juan', upcoming: [], counts: { ...COUNTS, upcoming: 0, pending: 0 }, unreadNotifications: 0 });
+  renderPage();
+
+  expect(await screen.findByText('No upcoming appointments')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Book an Appointment' })).toHaveAttribute('href', '/patient/book');
 });
 
-test('renders a stat card per summary item', () => {
-  render(<PatientDashboardPage />);
-  const stats = screen.getByRole('region', { name: 'Summary' });
-  MOCK_DASHBOARD_STATS.forEach(({ label }) => {
-    expect(within(stats).getByText(label)).toBeInTheDocument();
-  });
-});
+test('shows an error with a retry button when the API fails', async () => {
+  getPatientDashboard.mockRejectedValue(apiError(500, { message: 'Something went wrong. Please try again later.' }));
+  renderPage();
 
-test('renders appointments with status-specific actions', () => {
-  render(<PatientDashboardPage />);
-  MOCK_DASHBOARD_APPOINTMENTS.forEach(({ id, service }) => {
-    expect(screen.getByRole('link', { name: `View ${service}` })).toHaveAttribute(
-      'href',
-      `/patient/appointments/${id}`
-    );
-  });
-  expect(screen.getByText('Pending')).toBeInTheDocument();
-  expect(
-    screen.getByRole('link', { name: 'Reschedule Braces Consultation' })
-  ).toHaveAttribute('href', '/patient/appointments/hist-2/reschedule');
-  expect(
-    screen.queryByRole('link', { name: 'Reschedule Root Canal Treatment' })
-  ).not.toBeInTheDocument();
-});
-
-test('notifications panel shows the unread count', () => {
-  render(<PatientDashboardPage />);
-  const panel = screen.getByRole('region', { name: 'Notifications' });
-  expect(within(panel).getByText('2')).toBeInTheDocument();
-  expect(
-    within(panel).getByRole('link', { name: 'View all notifications' })
-  ).toBeInTheDocument();
-});
-
-test('greeting follows the time of day', () => {
-  expect(getGreeting(new Date(2026, 0, 1, 8))).toBe('Good morning');
-  expect(getGreeting(new Date(2026, 0, 1, 14))).toBe('Good afternoon');
-  expect(getGreeting(new Date(2026, 0, 1, 20))).toBe('Good evening');
-});
-
-test('renders every quick action as a link', () => {
-  render(<PatientDashboardPage />);
-  const panel = screen.getByRole('region', { name: 'Quick Actions' });
-  PATIENT_QUICK_ACTIONS.forEach(({ label, href }) => {
-    expect(within(panel).getByRole('link', { name: label })).toHaveAttribute(
-      'href',
-      href
-    );
-  });
+  expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong');
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
 });

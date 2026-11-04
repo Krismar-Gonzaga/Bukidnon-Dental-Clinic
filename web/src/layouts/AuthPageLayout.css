@@ -1,7 +1,7 @@
 .auth-page {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  flex: 1;
   /* Restrained brand glows in opposite corners of the page background */
   background-color: var(--color-background);
   background-image: radial-gradient(

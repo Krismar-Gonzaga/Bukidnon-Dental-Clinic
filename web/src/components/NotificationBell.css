@@ -1,0 +1,159 @@
+/* Bell dropdown in the portal top bar. No Figma design for the dropdown:
+   sizes follow the account menu and notification cards (estimated). */
+
+.notification-bell {
+  position: relative;
+}
+
+/* Self-contained (used by both the patient and clinic top bars). */
+.notification-bell .patient-topbar-bell {
+  position: relative;
+  display: inline-flex;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.notification-bell .patient-topbar-bell:hover,
+.notification-bell .patient-topbar-bell.is-active {
+  color: var(--color-primary);
+}
+
+.notification-bell .patient-topbar-bell-dot {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-danger);
+  border: 1.5px solid var(--color-surface);
+}
+
+.notification-bell-panel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: min(360px, calc(100vw - 2 * var(--space-4)));
+  max-height: min(480px, 70vh);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.notification-bell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.notification-bell-title {
+  font-weight: var(--font-weight-semibold);
+}
+
+.notification-bell-mark-all {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.notification-bell-mark-all:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.notification-bell-status {
+  padding: var(--space-5) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.notification-bell-list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1) 0;
+}
+
+.notification-bell-item {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-6);
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.notification-bell-item:hover,
+.notification-bell-item:focus-visible {
+  background-color: var(--color-primary-soft);
+}
+
+.notification-bell-item.is-unread::before {
+  content: '';
+  position: absolute;
+  top: calc(var(--space-3) + 6px);
+  left: var(--space-3);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+}
+
+.notification-bell-item-title {
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-medium);
+}
+
+.notification-bell-item.is-unread .notification-bell-item-title {
+  font-weight: var(--font-weight-semibold);
+}
+
+.notification-bell-item-message {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.notification-bell-item-time {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.notification-bell-all {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-primary);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-medium);
+  text-align: center;
+  text-decoration: none;
+}
+
+.notification-bell-all:hover {
+  background-color: var(--color-primary-soft);
+}

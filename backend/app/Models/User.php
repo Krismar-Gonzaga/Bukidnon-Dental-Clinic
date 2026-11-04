@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -11,21 +12,34 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_SUSPENDED = 'suspended';
+
+    // `role` and `status` are deliberately not fillable: they are set only by
+    // explicit, authorized code paths, never from request input.
     protected $fillable = [
         'name',
         'email',
         'password',
-        'role',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
+
+    protected $appends = ['two_factor_enabled'];
 
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'suspended_at' => 'datetime',
         'password' => 'hashed',
+        'notification_preferences' => 'array',
+        'two_factor_secret' => 'encrypted',
+        'two_factor_recovery_codes' => 'encrypted:array',
+        'two_factor_confirmed_at' => 'datetime',
     ];
 
     // Relationships
@@ -42,6 +56,39 @@ class User extends Authenticatable
     public function clinicStaff()
     {
         return $this->hasOne(ClinicStaff::class);
+    }
+
+    public function clinicMemberships(): HasMany
+    {
+        return $this->hasMany(ClinicMembership::class);
+    }
+
+    // Account state
+    public function isActive(): bool
+    {
+        return $this->status !== self::STATUS_SUSPENDED;
+    }
+
+    // Clinic-scoped authorization
+    public function activeMembershipFor(Clinic|int $clinic): ?ClinicMembership
+    {
+        $clinicId = $clinic instanceof Clinic ? $clinic->getKey() : $clinic;
+
+        return $this->clinicMemberships()
+            ->active()
+            ->where('clinic_id', $clinicId)
+            ->first();
+    }
+
+    public function getTwoFactorEnabledAttribute(): bool
+    {
+        return $this->two_factor_confirmed_at !== null;
+    }
+
+    public function hasClinicPermission(Clinic|int $clinic, string $permission): bool
+    {
+        return $this->isActive()
+            && (bool) $this->activeMembershipFor($clinic)?->grants($permission);
     }
 
     // Check role methods

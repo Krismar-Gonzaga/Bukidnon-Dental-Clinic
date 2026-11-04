@@ -1,24 +1,32 @@
 <?php
 
-namespace App\Http\Controllers\API;
+namespace App\Http\Controllers\Api;
 
+use App\Support\PlatformSettings;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\BranchResource;
+use App\Http\Resources\ClinicSummaryResource;
+use App\Http\Resources\DentistResource;
+use App\Http\Resources\ReviewResource;
+use App\Http\Resources\ServiceRateResource;
 use App\Models\Clinic;
-use App\Models\Specialization;
-use App\Models\Service;
 use App\Models\Review;
+use App\Models\Service;
 use App\Models\ServiceRate;
+use App\Models\Specialization;
+use App\Support\DentistRatings;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
+/** Public directory: only approved, published clinics are ever returned. */
 class HomeController extends Controller
 {
-    /**
-     * Get home page data
-     */
     public function index(Request $request)
     {
-        $featuredClinics = Clinic::with(['specializations'])
-            ->where('is_verified', true)
+        $featuredClinics = Clinic::publiclyListed()
+            ->with(['specializations'])
+            ->withCount(['reviews' => fn ($q) => $q->where('status', Review::STATUS_APPROVED)])
             ->orderBy('rating', 'desc')
             ->limit(4)
             ->get()
@@ -29,188 +37,254 @@ class HomeController extends Controller
                     'address' => $clinic->full_address,
                     'city' => $clinic->city,
                     'rating' => $clinic->rating_stars,
+                    'review_count' => $clinic->reviews_count,
                     'logo' => $clinic->image,
+                    'latitude' => $clinic->latitude,
+                    'longitude' => $clinic->longitude,
                     'specializations' => $clinic->specializations->pluck('name')->take(2),
-                    'is_verified' => $clinic->is_verified
+                    'is_verified' => $clinic->is_verified,
                 ];
             });
 
         $specializations = Specialization::where('is_active', true)
             ->get()
-            ->map(function ($spec) {
-                return [
-                    'id' => $spec->id,
-                    'name' => $spec->name,
-                    'description' => $spec->description,
-                    'icon' => $spec->icon
-                ];
-            });
+            ->map(fn ($spec) => [
+                'id' => $spec->id,
+                'name' => $spec->name,
+                'description' => $spec->description,
+                'icon' => $spec->icon,
+            ]);
 
         $popularServices = Service::orderBy('sort_order')
             ->limit(6)
             ->get()
-            ->map(function ($service) {
-                return [
-                    'id' => $service->id,
-                    'name' => $service->name,
-                    'description' => $service->description,
-                    'icon' => $service->icon_name,
-                    'color' => $service->color,
-                ];
-            });
+            ->map(fn ($service) => [
+                'id' => $service->id,
+                'name' => $service->name,
+                'description' => $service->description,
+                'icon' => $service->icon_name,
+                'color' => $service->color,
+            ]);
 
-        // Lowest available price per service across verified clinics
-        $serviceRates = ServiceRate::where('is_available', true)
-            ->whereHas('clinic', fn ($q) => $q->where('is_verified', true))
+        // Lowest available price per service across listed clinics
+        $serviceRates = ServiceRate::available()
+            ->whereHas('clinic', fn ($q) => $q->publiclyListed())
             ->selectRaw('service_name, MIN(price) as starting_price, COUNT(DISTINCT clinic_id) as clinic_count, MAX(currency) as currency')
             ->groupBy('service_name')
             ->orderBy('starting_price')
             ->limit(6)
             ->get()
-            ->map(function ($rate) {
-                return [
-                    'service_name' => $rate->service_name,
-                    'starting_price' => (float) $rate->starting_price,
-                    'currency' => $rate->currency ?? 'PHP',
-                    'clinic_count' => (int) $rate->clinic_count,
-                ];
-            });
+            ->map(fn ($rate) => [
+                'service_name' => $rate->service_name,
+                'starting_price' => (float) $rate->starting_price,
+                'currency' => $rate->currency ?? 'PHP',
+                'clinic_count' => (int) $rate->clinic_count,
+            ]);
 
         $recentReviews = Review::with(['clinic', 'patient.user'])
-            ->where('status', 'approved')
+            ->where('status', Review::STATUS_APPROVED)
+            ->whereHas('clinic', fn ($q) => $q->publiclyListed())
             ->orderBy('created_at', 'desc')
             ->limit(6)
             ->get()
-            ->map(function ($review) {
-                return [
-                    'id' => $review->id,
-                    'patient_name' => $review->patient?->user?->name ?? 'Anonymous',
-                    'clinic_name' => $review->clinic->name ?? null,
-                    'rating' => $review->rating,
-                    'comment' => $review->comment,
-                    'date' => $review->created_at->diffForHumans()
-                ];
-            });
+            ->map(fn ($review) => [
+                'id' => $review->id,
+                'patient_name' => (new ReviewResource($review))->resolve()['patient_name'],
+                'clinic_name' => $review->clinic->name ?? null,
+                'rating' => $review->rating,
+                'comment' => $review->comment,
+                'date' => $review->created_at->diffForHumans(),
+            ]);
+
+        $reviewTotals = Review::query()->toBase()->where('status', Review::STATUS_APPROVED)
+            ->selectRaw('COUNT(*) AS total, SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END) AS positive')
+            ->first();
+        $listed = Clinic::publiclyListed()->toBase()
+            ->selectRaw('COUNT(*) AS total, COUNT(DISTINCT city) AS cities')
+            ->first();
 
         $stats = [
-            'verified_clinics' => Clinic::where('is_verified', true)->count(),
-            'total_reviews' => Review::where('status', 'approved')->count(),
-            'total_specializations' => Specialization::where('is_active', true)->count()
+            'verified_clinics' => (int) $listed->total,
+            'municipalities' => (int) $listed->cities,
+            'patients' => DB::table('clinic_patients')->whereIn('clinic_id', Clinic::publiclyListed()->select('id'))->distinct()->count('patient_id'),
+            'total_reviews' => (int) $reviewTotals->total,
+            // Share of published reviews rated 4 or 5; null until there are reviews.
+            'satisfaction_rate' => $reviewTotals->total ? (int) round($reviewTotals->positive / $reviewTotals->total * 100) : null,
+            'total_specializations' => Specialization::where('is_active', true)->count(),
         ];
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'featured_clinics' => $featuredClinics,
-                'specializations' => $specializations,
-                'popular_services' => $popularServices,
-                'service_rates' => $serviceRates,
-                'recent_reviews' => $recentReviews,
-                'stats' => $stats,
-                'meta' => [
-                    'page_title' => 'Find Trusted Dental Clinics Across Bukidnon',
-                    'page_description' => 'Search clinics, compare services, view dentists by specialization, and book appointments online with the most reliable dental network in the province.'
-                ]
-            ]
+        return $this->ok([
+            'featured_clinics' => $featuredClinics,
+            'specializations' => $specializations,
+            'popular_services' => $popularServices,
+            'service_rates' => $serviceRates,
+            'recent_reviews' => $recentReviews,
+            'stats' => $stats,
+            'meta' => [
+                'page_title' => 'Find Trusted Dental Clinics Across Bukidnon',
+                'page_description' => 'Search clinics, compare services, view dentists by specialization, and book appointments online with the most reliable dental network in the province.',
+            ],
         ]);
     }
 
     /**
-     * Search clinics
+     * Search the directory. Filters: search, city, specialization_id,
+     * service_id (catalog service) or service (name contains), sort
+     * (rating|newest|name|price). Paginated (per_page up to 100).
+     *
+     * Response keeps Laravel's paginator shape under `data` for older clients.
      */
     public function searchClinics(Request $request)
     {
-        $query = Clinic::with(['specializations'])
-            ->where('is_verified', true);
+        $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'specialization_id' => ['nullable', 'integer'],
+            'specialization' => ['nullable', 'string', 'max:100'],
+            'service_id' => ['nullable', 'integer'],
+            'service' => ['nullable', 'string', 'max:100'],
+            'sort' => ['nullable', 'in:rating,reviews,newest,name,price'],
+        ]);
 
-        // Search by name, city or address (case-insensitive). Grouped so the
-        // OR can't bypass the is_verified constraint above.
+        $query = Clinic::publiclyListed()
+            ->with(['specializations'])
+            ->withCount(['reviews' => fn ($q) => $q->where('status', Review::STATUS_APPROVED)])
+            ->addSelect(['starting_price' => ServiceRate::selectRaw('MIN(price)')
+                ->whereColumn('service_rates.clinic_id', 'clinics.id')
+                ->where('is_available', true)]);
+
         if ($request->filled('search')) {
-            $term = '%' . mb_strtolower($request->search) . '%';
-            $query->where(function ($q) use ($term) {
-                $q->whereRaw('LOWER(name) LIKE ?', [$term])
-                    ->orWhereRaw('LOWER(city) LIKE ?', [$term])
-                    ->orWhereRaw('LOWER(address) LIKE ?', [$term]);
-            });
+            $term = '%'.mb_strtolower($request->search).'%';
+            $query->where(fn (Builder $q) => $q
+                ->whereRaw('LOWER(name) LIKE ?', [$term])
+                ->orWhereRaw('LOWER(city) LIKE ?', [$term])
+                ->orWhereRaw('LOWER(address) LIKE ?', [$term]));
         }
 
-        // Filter by city (filled() so an empty ?city= from the app is ignored)
         if ($request->filled('city')) {
             $query->where('city', $request->city);
         }
 
-        // Filter by specialization
         if ($request->filled('specialization_id')) {
-            $query->whereHas('specializations', function ($q) use ($request) {
-                $q->where('specialization_id', $request->specialization_id);
-            });
+            $query->whereHas('specializations', fn ($q) => $q->where('specializations.id', $request->specialization_id));
         }
 
-        // Sort by rating or distance
-        $sort = $request->get('sort', 'rating');
-        if ($sort === 'rating') {
-            $query->orderBy('rating', 'desc');
-        } else if ($sort === 'newest') {
-            $query->orderBy('created_at', 'desc');
+        if ($request->filled('specialization')) {
+            $query->whereHas('specializations', fn ($q) => $q->where('specializations.name', $request->specialization));
         }
 
-        $clinics = $query->paginate(10);
+        if ($request->filled('service_id')) {
+            $query->whereHas('serviceRates', fn ($q) => $q->available()->where('service_id', $request->service_id));
+        }
 
-        return response()->json([
-            'success' => true,
-            'data' => $clinics
-        ]);
+        if ($request->filled('service')) {
+            $term = '%'.mb_strtolower($request->service).'%';
+            $query->whereHas('serviceRates', fn ($q) => $q->available()->whereRaw('LOWER(service_name) LIKE ?', [$term]));
+        }
+
+        match ($request->get('sort', 'rating')) {
+            'newest' => $query->orderBy('created_at', 'desc'),
+            'reviews' => $query->orderBy('reviews_count', 'desc')->orderBy('rating', 'desc'),
+            'name' => $query->orderBy('name'),
+            'price' => $query->orderByRaw('starting_price IS NULL')->orderBy('starting_price'),
+            default => $query->orderBy('rating', 'desc')->orderBy('name'),
+        };
+
+        $page = $query->paginate($this->perPage($request, 10))->withQueryString();
+        $page->setCollection($page->getCollection()->map(fn ($clinic) => (new ClinicSummaryResource($clinic))->resolve()));
+
+        return $this->ok($page);
     }
 
-    /**
-     * Get clinic details
-     */
+    /** Full public profile of a listed clinic. */
     public function clinicDetails($id)
     {
-        // Note: dentists/services aren't clinic-scoped in the current schema
-        // (no clinic_id column on either table), so they're left out here.
-        $clinic = Clinic::with([
-            'specializations',
-            'reviews' => function ($q) {
-                $q->where('status', 'approved')->limit(5);
-            }
-        ])->findOrFail($id);
+        $clinic = Clinic::publiclyListed()
+            ->with(['specializations', 'branches' => fn ($q) => $q->where('is_active', true)->with('operatingHours')])
+            ->withCount(['reviews' => fn ($q) => $q->where('status', Review::STATUS_APPROVED)])
+            ->findOrFail($id);
 
-        return response()->json([
-            'success' => true,
-            'data' => $clinic
-        ]);
-    }
-
-    /**
-     * Get all specializations
-     */
-    public function getSpecializations()
-    {
-        $specializations = Specialization::where('is_active', true)
-            ->select('id', 'name', 'description', 'icon')
+        $reviews = $clinic->reviews()
+            ->where('status', Review::STATUS_APPROVED)
+            ->with('patient.user')
+            ->latest()
+            ->limit(5)
             ->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $specializations
+        $ratingBreakdown = $clinic->reviews()
+            ->where('status', Review::STATUS_APPROVED)
+            ->selectRaw('rating, COUNT(*) as total')
+            ->groupBy('rating')
+            ->pluck('total', 'rating');
+
+        $dentists = $clinic->dentistProfiles()->with(['user', 'specialization'])->withCount('schedules')->get();
+        $dentistRatings = DentistRatings::for($dentists->pluck('id'));
+
+        return $this->ok([
+            ...(new ClinicSummaryResource($clinic))->resolve(),
+            'branches' => BranchResource::collection($clinic->branches)->resolve(),
+            'services' => ServiceRateResource::collection(
+                $clinic->serviceRates()->available()->with('service')->orderBy('service_name')->get()
+            )->resolve(),
+            'dentists' => $dentists->map(fn ($dentist) => [
+                ...(new DentistResource($dentist))->resolve(),
+                ...DentistRatings::fields($dentistRatings, $dentist->id),
+                'is_available' => $dentist->schedules_count > 0,
+            ])->values(),
+            'reviews' => ReviewResource::collection($reviews)->resolve(),
+            'rating_breakdown' => collect(range(5, 1))->mapWithKeys(fn ($r) => [$r => (int) ($ratingBreakdown[$r] ?? 0)]),
         ]);
     }
 
-    /**
-     * Get all cities with clinics
-     */
+    public function getSpecializations()
+    {
+        return $this->ok(
+            Specialization::where('is_active', true)->select('id', 'name', 'description', 'icon')->get()
+        );
+    }
+
+    /** Platform name, support email and whether sign-up and the platform itself are open. */
+    public function platform()
+    {
+        return response()->json(['success' => true, 'data' => PlatformSettings::publicValues()]);
+    }
+
     public function getCities()
     {
-        $cities = Clinic::where('is_verified', true)
-            ->distinct()
-            ->pluck('city')
-            ->filter()
-            ->values();
+        return $this->ok(
+            Clinic::publiclyListed()->distinct()->orderBy('city')->pluck('city')->filter()->values()
+        );
+    }
 
-        return response()->json([
-            'success' => true,
-            'data' => $cities
-        ]);
+    /**
+     * Catalog services with the published price and duration range across
+     * listed clinics that offer them (null when no clinic offers it yet).
+     */
+    public function getServices()
+    {
+        $ranges = ServiceRate::available()
+            ->whereHas('clinic', fn ($q) => $q->publiclyListed())
+            ->selectRaw('service_id, MIN(price) as price_min, MAX(price) as price_max, MIN(duration_minutes) as duration_min, MAX(duration_minutes) as duration_max, COUNT(DISTINCT clinic_id) as clinic_count')
+            ->groupBy('service_id')
+            ->get()
+            ->keyBy('service_id');
+
+        return $this->ok(Service::orderBy('sort_order')->get()->map(function (Service $service) use ($ranges) {
+            $range = $ranges->get($service->id);
+
+            return [
+                'id' => $service->id,
+                'name' => $service->name,
+                'slug' => $service->slug,
+                'description' => $service->description,
+                'category' => $service->category,
+                'icon' => $service->icon_name,
+                'price_min' => $range ? (float) $range->price_min : null,
+                'price_max' => $range ? (float) $range->price_max : null,
+                'duration_min' => $range ? (int) $range->duration_min : null,
+                'duration_max' => $range ? (int) $range->duration_max : null,
+                'clinic_count' => $range ? (int) $range->clinic_count : 0,
+            ];
+        }));
     }
 }

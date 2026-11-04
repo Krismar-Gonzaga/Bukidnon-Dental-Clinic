@@ -1,35 +1,29 @@
-import { LOGIN_HREF, MAIN_NAV_ITEMS, REGISTER_HREF } from './navigation';
+import { COOKIES_HREF, MAIN_NAV_ITEMS, PRIVACY_HREF, TERMS_HREF } from './navigation';
 
-// Footer content. Hash hrefs are placeholders until those pages exist.
-export const FOOTER_TAGLINE =
-  'Helping patients find trusted dental clinics and book appointments across Bukidnon.';
+// Footer content.
+export const FOOTER_TAGLINE = 'Simplifying dental care access for all Bukidnon residents through digital innovation.';
+
+const QUICK_LINKS = ['Home', 'Find Clinics', 'Dentists', 'Services'];
 
 export const FOOTER_LINK_GROUPS = [
   {
     title: 'Quick Links',
-    links: MAIN_NAV_ITEMS,
+    links: MAIN_NAV_ITEMS.filter(({ label }) => QUICK_LINKS.includes(label)),
   },
   {
-    title: 'For Patients',
+    title: 'Legal',
     links: [
-      { label: 'Find Clinics', href: '/clinics' },
-      { label: 'Book Appointment', href: '#find-clinics' },
-      { label: 'Login', href: LOGIN_HREF },
-      { label: 'Register', href: REGISTER_HREF },
+      { label: 'Privacy Policy', href: PRIVACY_HREF },
+      { label: 'Terms of Service', href: TERMS_HREF },
+      { label: 'Cookie Policy', href: COOKIES_HREF },
     ],
   },
 ];
 
-// PROVISIONAL contact details: placeholders, not real contact information.
-// Replace with confirmed values (or backend/config data) before launch.
+// PROVISIONAL contact details from the design's sample content. Replace with
+// confirmed values (or backend/config data) before launch.
 export const FOOTER_CONTACT = {
-  email: 'hello@bukidnondental.example',
-  phone: '+63 900 000 0000',
+  email: 'support@bukidnondental.ph',
+  phone: '+63 912 345 6789',
   location: 'Bukidnon, Philippines',
 };
-
-// PROVISIONAL: social profile URLs are not confirmed yet.
-export const FOOTER_SOCIAL_LINKS = [
-  { label: 'Facebook', icon: 'facebook', href: '#' },
-  { label: 'Instagram', icon: 'instagram', href: '#' },
-];

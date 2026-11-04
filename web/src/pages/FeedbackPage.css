@@ -1,7 +1,7 @@
 /* Same column as the appointment details pages. */
 .feedback-page {
   max-width: 672px;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .feedback-intro {
@@ -104,4 +104,13 @@
   .feedback-card {
     padding: var(--space-5) var(--space-4);
   }
+}
+
+.feedback-error {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background-color: var(--color-danger-soft);
+  color: var(--color-danger-text);
+  font-size: var(--font-size-sm);
 }

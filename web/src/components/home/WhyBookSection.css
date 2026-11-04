@@ -1,5 +1,5 @@
 .why-book {
-  padding: var(--space-9) 0;
+  padding: var(--space-7) 0;
   background-color: var(--color-surface);
 }
 
@@ -9,22 +9,12 @@
   padding: 0 var(--space-5);
 }
 
-.why-book-header {
-  max-width: 640px;
-  margin: 0 auto var(--space-7);
-  text-align: center;
-}
-
 .why-book-title {
+  margin-bottom: var(--space-7);
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
-  letter-spacing: -0.01em;
   color: var(--color-text);
-  margin-bottom: var(--space-2);
-}
-
-.why-book-text {
-  color: var(--color-text-muted);
+  text-align: center;
 }
 
 .why-book-grid {
@@ -37,56 +27,45 @@
 }
 
 .why-book-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 0;
-  padding: var(--space-7) var(--space-6);
   text-align: center;
-  background-color: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
 }
 
 .why-book-icon {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
-  margin-bottom: var(--space-5);
-  border-radius: var(--radius-lg);
-  background-color: var(--color-primary);
-  color: var(--color-on-primary);
+  width: 80px;
+  height: 80px;
+  margin-bottom: var(--space-4);
+  border-radius: 50%;
 }
 
+.why-book-icon.is-mint { background-color: #67fcc6; color: #005139; }
+.why-book-icon.is-blue { background-color: #d7e2ff; color: #003f87; }
+.why-book-icon.is-grey { background-color: #dbe4ed; color: #3a434a; }
+
 .why-book-item-title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-1);
+  font-size: 1.0625rem;
+  font-weight: var(--font-weight-medium);
   color: var(--color-text);
-  margin-bottom: var(--space-2);
 }
 
 .why-book-item-text {
-  max-width: 36ch;
-  font-size: var(--font-size-sm);
+  max-width: 34ch;
+  margin: 0 auto;
+  line-height: 1.6;
   color: var(--color-text-muted);
 }
 
-@media (max-width: 860px) {
+@media (max-width: 760px) {
   .why-book-grid {
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-4);
   }
 
-  .why-book-item {
-    padding: var(--space-6) var(--space-5);
-  }
-}
-
-@media (max-width: 600px) {
-  .why-book {
-    padding: var(--space-8) 0;
+  .why-book-title {
+    margin-bottom: var(--space-6);
+    font-size: 1.625rem;
   }
 }
 

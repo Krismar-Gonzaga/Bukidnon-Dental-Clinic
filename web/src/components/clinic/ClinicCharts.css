@@ -1,0 +1,232 @@
+/* Clinic charts. Plot areas leave 56px on the left for the value axis. */
+
+.clinic-chart {
+  position: relative;
+  margin: 0;
+}
+
+.clinic-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+  color: var(--clinic-on-surface-variant);
+}
+
+.clinic-chart-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.clinic-chart-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.clinic-chart-swatch.is-blue { background-color: #1f6fd0; }
+.clinic-chart-swatch.is-amber { background-color: #c98500; }
+.clinic-chart-swatch.is-red { background-color: #e5484d; }
+
+/* ---------- Grid ---------- */
+.clinic-bars-plot,
+.clinic-line-plot {
+  position: relative;
+  margin-left: 56px;
+}
+
+.clinic-chart-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.clinic-chart-gridline {
+  position: absolute;
+  right: 0;
+  left: 0;
+  border-top: 1px dashed #e5e8ee;
+}
+
+.clinic-chart-gridline span {
+  position: absolute;
+  right: 100%;
+  top: -9px;
+  padding-right: var(--space-2);
+  font-size: 0.75rem;
+  color: var(--clinic-on-surface-variant);
+  white-space: nowrap;
+}
+
+/* ---------- Bars ---------- */
+.clinic-bars-columns {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.clinic-bars-column {
+  position: relative;
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  height: 100%;
+  border-radius: 6px;
+  outline-offset: -2px;
+}
+
+.clinic-bars-column:hover {
+  background-color: rgba(0, 63, 135, 0.04);
+}
+
+.clinic-bars-stack {
+  display: flex;
+  justify-content: flex-start;
+  height: 100%;
+}
+
+.clinic-bars-stack.is-stacked {
+  flex-direction: column-reverse;
+  gap: 2px;
+  width: 24px;
+}
+
+.clinic-bars-stack.is-grouped {
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.clinic-bars-stack.is-grouped .clinic-bars-segment {
+  width: 18px;
+  border-radius: 4px 4px 0 0;
+}
+
+.clinic-bars-segment {
+  display: block;
+  min-height: 2px;
+}
+
+.clinic-bars-stack.is-stacked .clinic-bars-segment:last-child {
+  border-radius: 4px 4px 0 0;
+}
+
+.clinic-bars-segment.is-blue { background-color: #1f6fd0; }
+.clinic-bars-segment.is-amber { background-color: #c98500; }
+.clinic-bars-segment.is-red { background-color: #e5484d; }
+
+.clinic-bars-labels {
+  display: flex;
+  margin: var(--space-2) 0 0 56px;
+  font-size: 0.8125rem;
+  color: var(--clinic-on-surface-variant);
+}
+
+.clinic-bars-labels span {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+/* ---------- Tooltip ---------- */
+.clinic-chart-tooltip {
+  position: absolute;
+  bottom: 40%;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid #e5e8ee;
+  border-radius: 10px;
+  background-color: #ffffff;
+  box-shadow: 0 6px 18px rgba(24, 28, 32, 0.14);
+  font-size: 0.8125rem;
+  color: var(--clinic-on-surface);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.clinic-chart-tooltip strong {
+  font-weight: var(--font-weight-semibold);
+}
+
+.clinic-chart-tooltip span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--clinic-on-surface-variant);
+}
+
+.clinic-chart-tooltip.is-line {
+  bottom: auto;
+  margin-top: var(--space-3);
+  transform: translateX(12px);
+}
+
+.clinic-chart-tooltip.is-line.is-left {
+  transform: translateX(calc(-100% - 12px));
+}
+
+/* ---------- Line ---------- */
+.clinic-line-area {
+  position: absolute;
+  inset: 0;
+}
+
+.clinic-line-area svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.clinic-line-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background-color: #003f87;
+  box-sizing: content-box;
+  transform: translate(-50%, -50%);
+}
+
+.clinic-line-cross {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: var(--clinic-outline-variant);
+}
+
+.clinic-line-hits {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.clinic-line-hits div {
+  flex: 1;
+  outline-offset: -2px;
+}
+
+.clinic-line-labels {
+  position: relative;
+  height: 24px;
+  margin: var(--space-2) var(--space-4) 0 56px;
+  font-size: 0.8125rem;
+  color: var(--clinic-on-surface-variant);
+}
+
+.clinic-line-labels span {
+  position: absolute;
+  transform: translateX(-50%);
+}

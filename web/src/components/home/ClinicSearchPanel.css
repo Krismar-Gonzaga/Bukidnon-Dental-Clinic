@@ -1,4 +1,4 @@
-.clinic-search {
+.home-search {
   display: grid;
   grid-template-columns: 1.3fr 1fr 1fr auto;
   align-items: end;
@@ -76,25 +76,25 @@
   cursor: pointer;
 }
 
-.clinic-search-submit {
+.home-search-submit {
   height: var(--control-height);
   padding: 0 var(--space-6);
 }
 
 @media (max-width: 900px) {
-  .clinic-search {
+  .home-search {
     grid-template-columns: 1fr 1fr;
     padding: var(--space-5);
   }
 
   .search-field:first-child,
-  .clinic-search-submit {
+  .home-search-submit {
     grid-column: 1 / -1;
   }
 }
 
 @media (max-width: 560px) {
-  .clinic-search {
+  .home-search {
     grid-template-columns: 1fr;
   }
 }

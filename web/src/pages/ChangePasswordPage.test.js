@@ -1,83 +1,45 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import ChangePasswordPage from './ChangePasswordPage';
-import { getPasswordStrength } from '../utils/passwordStrength';
+import { changePassword } from '../services/authService';
+import { getNotifications } from '../services/notificationApi';
+import { apiError, PATIENT_USER, renderWithProviders } from '../testUtils';
+import { emptyNotifications } from '../testFixtures';
 
-const fill = (label, value) =>
-  fireEvent.change(screen.getByLabelText(label), { target: { value } });
+jest.mock('../services/authService', () => ({ changePassword: jest.fn(), fetchCurrentUser: jest.fn(), logout: jest.fn() }));
+jest.mock('../services/notificationApi');
 
-const fillForm = ({ current = 'oldpass123', next, confirm = next }) => {
-  fill('Current Password', current);
-  fill('New Password', next);
-  fill('Confirm New Password', confirm);
+beforeEach(() => getNotifications.mockResolvedValue(emptyNotifications));
+
+const fill = (current, next, confirm = next) => {
+  fireEvent.change(screen.getByLabelText('Current Password'), { target: { value: current } });
+  fireEvent.change(screen.getByLabelText('New Password'), { target: { value: next } });
+  fireEvent.change(screen.getByLabelText('Confirm New Password'), { target: { value: confirm } });
+  fireEvent.click(screen.getByRole('button', { name: 'Update Password' }));
 };
 
-test('renders the form inside the patient layout with My Profile active', () => {
-  render(<ChangePasswordPage />);
-  expect(screen.getByRole('heading', { level: 1, name: 'Change Password' })).toBeInTheDocument();
-  expect(screen.getByRole('form', { name: 'Change Password' })).toBeInTheDocument();
-  const nav = screen.getByRole('navigation', { name: 'Patient' });
-  expect(within(nav).getByRole('link', { name: 'My Profile' })).toHaveAttribute(
-    'aria-current',
-    'page'
-  );
-  expect(screen.getByRole('link', { name: 'Back to Profile' })).toHaveAttribute(
-    'href',
-    '/patient/profile'
-  );
-  ['Current Password', 'New Password', 'Confirm New Password'].forEach((label) => {
-    expect(screen.getByLabelText(label)).toHaveAttribute('type', 'password');
-  });
-});
+test('checks length and match locally before calling the API', () => {
+  renderWithProviders(<ChangePasswordPage />, { user: PATIENT_USER });
 
-test('the eye button shows and hides a password', () => {
-  render(<ChangePasswordPage />);
-  const toggle = screen.getByRole('button', { name: 'Show new password' });
-  fireEvent.click(toggle);
-  expect(screen.getByLabelText('New Password')).toHaveAttribute('type', 'text');
-  expect(screen.getByRole('button', { name: 'Hide new password' })).toHaveAttribute(
-    'aria-pressed',
-    'true'
-  );
-});
-
-test('the strength meter follows the new password', () => {
-  render(<ChangePasswordPage />);
-  fill('New Password', 'password1');
-  expect(screen.getByLabelText('New Password')).toHaveAccessibleDescription(
-    'Medium — add a symbol to strengthen'
-  );
-  fill('New Password', 'Password1!');
-  expect(screen.getByLabelText('New Password')).toHaveAccessibleDescription('Strong');
-});
-
-test('getPasswordStrength scores one point per rule', () => {
-  expect(getPasswordStrength('')).toMatchObject({ score: 0, level: 'weak' });
-  expect(getPasswordStrength('abc')).toMatchObject({ score: 0, level: 'weak' });
-  expect(getPasswordStrength('abcdefgh')).toMatchObject({ score: 1, label: 'Weak' });
-  expect(getPasswordStrength('Abcdefg1')).toMatchObject({ score: 3, label: 'Good' });
-  expect(getPasswordStrength('Abcdef1!')).toMatchObject({ score: 4, hint: '' });
-});
-
-test('rejects a short or mismatched new password', () => {
-  render(<ChangePasswordPage />);
-  fillForm({ next: 'short' });
-  fireEvent.click(screen.getByRole('button', { name: 'Update Password' }));
+  fill('old-pass', 'short');
   expect(screen.getByRole('alert')).toHaveTextContent('at least 8 characters');
-
-  fillForm({ next: 'Password1!', confirm: 'Password2!' });
-  fireEvent.click(screen.getByRole('button', { name: 'Update Password' }));
-  expect(screen.getByRole('alert')).toHaveTextContent('New passwords do not match.');
+  fill('old-pass', 'long-enough-1', 'different-1');
+  expect(screen.getByRole('alert')).toHaveTextContent('do not match');
+  expect(changePassword).not.toHaveBeenCalled();
 });
 
-test('a valid form shows the Password Changed screen', () => {
-  render(<ChangePasswordPage />);
-  fillForm({ next: 'Password1!' });
-  fireEvent.click(screen.getByRole('button', { name: 'Update Password' }));
+test('changes the password and mentions other devices were signed out', async () => {
+  changePassword.mockResolvedValue('Password changed successfully');
+  renderWithProviders(<ChangePasswordPage />, { user: PATIENT_USER });
 
-  expect(screen.getByRole('heading', { name: 'Password Changed!' })).toHaveFocus();
-  expect(screen.getByText('Your password has been updated successfully.')).toBeInTheDocument();
-  expect(screen.queryByLabelText('New Password')).not.toBeInTheDocument();
-  screen.getAllByRole('link', { name: 'Back to Profile' }).forEach((link) => {
-    expect(link).toHaveAttribute('href', '/patient/profile');
-  });
+  fill('old-pass', 'brand-new-1');
+  expect(await screen.findByText(/Other devices were signed out/)).toBeInTheDocument();
+  expect(changePassword).toHaveBeenCalledWith({ currentPassword: 'old-pass', newPassword: 'brand-new-1' });
+});
+
+test('shows a wrong current password from the server', async () => {
+  changePassword.mockRejectedValue(apiError(422, { errors: { current_password: ['Current password is incorrect.'] } }));
+  renderWithProviders(<ChangePasswordPage />, { user: PATIENT_USER });
+
+  fill('wrong', 'brand-new-1');
+  expect(await screen.findByText('Current password is incorrect.')).toBeInTheDocument();
 });

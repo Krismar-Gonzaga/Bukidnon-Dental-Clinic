@@ -1,123 +1,144 @@
 <?php
 
-namespace App\Http\Controllers\API;
+namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\AppointmentResource;
 use App\Models\Appointment;
+use App\Models\Clinic;
+use App\Models\Patient;
+use App\Services\AppointmentService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
+/**
+ * The signed-in patient's own appointments. Every lookup is scoped to the
+ * patient, so other patients' appointments are simply "not found".
+ */
 class AppointmentController extends Controller
 {
-    /**
-     * List the authenticated patient's appointments.
-     *
-     * The appointments table has no patient_id/user_id column (it stores
-     * denormalized patient_name/email/phone), so appointments are matched
-     * to the authenticated user by email.
-     */
+    private const RELATIONS = ['clinic', 'branch', 'dentist.user', 'serviceRate', 'review'];
+
+    public function __construct(private readonly AppointmentService $appointments)
+    {
+    }
+
     public function patientAppointments(Request $request)
     {
-        $user = $request->user();
-
-        $appointments = Appointment::with('clinic')
-            ->where('patient_email', $user->email)
-            ->orderBy('appointment_date', 'desc')
-            ->orderBy('appointment_time', 'desc')
-            ->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $appointments,
+        $request->validate([
+            'status' => ['nullable', 'string'],
+            'scope' => ['nullable', 'in:upcoming,past'],
         ]);
+
+        $query = $this->ownAppointments($request)->with(self::RELATIONS);
+
+        if ($request->filled('status')) {
+            $query->whereIn('status', explode(',', $request->status));
+        }
+
+        match ($request->query('scope')) {
+            'upcoming' => $query->where('starts_at', '>=', now())->orderBy('starts_at'),
+            'past' => $query->where('starts_at', '<', now())->orderByDesc('starts_at'),
+            default => $query->orderByDesc('appointment_date')->orderByDesc('appointment_time'),
+        };
+
+        return $this->ok($query->get()->map(fn ($a) => (new AppointmentResource($a))->resolve()));
+    }
+
+    public function show(Request $request, int $id)
+    {
+        $appointment = $this->ownAppointments($request)
+            ->with([...self::RELATIONS, 'statusHistory'])
+            ->findOrFail($id);
+
+        return $this->ok((new AppointmentResource($appointment))->resolve());
     }
 
     /**
-     * Book a new appointment for the authenticated patient.
+     * Request an appointment. Send an Idempotency-Key header (any unique
+     * string per booking attempt) so a retried request cannot book twice.
      */
     public function store(Request $request)
     {
-        $user = $request->user()->load('patient');
-
-        $validator = Validator::make($request->all(), [
-            'clinic_id' => 'required|exists:clinics,id',
-            'service_id' => 'nullable|exists:services,id',
-            'appointment_date' => 'required|date|after_or_equal:today',
-            'appointment_time' => 'required',
-            'reason' => 'nullable|string|max:255',
-            'notes' => 'nullable|string',
+        $data = $request->validate([
+            'clinic_id' => ['required', 'integer'],
+            'service_rate_id' => ['required', 'integer'],
+            'dentist_id' => ['required', 'integer'],
+            'branch_id' => ['required', 'integer'],
+            'starts_at' => ['required', 'date'],
+            'reason' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
+        $patient = $this->patient($request);
+        $clinic = Clinic::publiclyListed()->findOrFail($data['clinic_id']);
+        $key = $request->header('Idempotency-Key');
+        $key = $key ? substr($key, 0, 64) : null;
 
-        $notes = trim(collect([$request->reason, $request->notes])->filter()->implode(' — '));
+        $appointment = $this->appointments->book($clinic, $patient, $data, $request->user(), $key);
 
-        $appointment = Appointment::create([
-            'clinic_id' => $request->clinic_id,
-            'service_id' => $request->service_id,
-            'patient_name' => $user->name,
-            'patient_email' => $user->email,
-            'patient_phone' => $user->patient->phone ?? '',
-            'appointment_date' => $request->appointment_date,
-            'appointment_time' => $request->appointment_time,
-            'status' => 'pending',
-            'notes' => $notes !== '' ? $notes : null,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Appointment booked successfully',
-            'data' => $appointment->load('clinic'),
-        ], 201);
+        return $this->ok(
+            (new AppointmentResource($appointment->load(self::RELATIONS)))->resolve(),
+            'Appointment request sent',
+            $appointment->wasRecentlyCreated ? 201 : 200
+        );
     }
 
     /**
-     * Update one of the authenticated patient's own appointments.
+     * Ask for a new time. Accepts `starts_at`, or the older
+     * `appointment_date` + `appointment_time` pair.
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, int $id)
     {
-        $user = $request->user();
-        $appointment = Appointment::where('patient_email', $user->email)->findOrFail($id);
-
-        $validator = Validator::make($request->all(), [
-            'appointment_date' => 'sometimes|date|after_or_equal:today',
-            'appointment_time' => 'sometimes',
-            'notes' => 'sometimes|nullable|string',
+        $data = $request->validate([
+            'starts_at' => ['required_without:appointment_date', 'nullable', 'date'],
+            'appointment_date' => ['required_without:starts_at', 'nullable', 'date_format:Y-m-d'],
+            'appointment_time' => ['required_with:appointment_date', 'nullable', 'date_format:H:i'],
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
+        $appointment = $this->ownAppointments($request)->findOrFail($id);
+        $startsAt = $data['starts_at'] ?? "{$data['appointment_date']} {$data['appointment_time']}";
 
-        $appointment->update($request->only('appointment_date', 'appointment_time', 'notes'));
+        $appointment = $this->appointments->requestReschedule($appointment, $startsAt, $request->user());
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Appointment updated successfully',
-            'data' => $appointment->load('clinic'),
-        ]);
+        return $this->ok(
+            (new AppointmentResource($appointment->fresh(self::RELATIONS)))->resolve(),
+            $appointment->status === Appointment::RESCHEDULE_REQUESTED
+                ? 'Reschedule request sent to the clinic'
+                : 'Appointment moved'
+        );
     }
 
-    /**
-     * Cancel one of the authenticated patient's own appointments.
-     */
-    public function cancel(Request $request, $id)
+    public function cancel(Request $request, int $id)
+    {
+        $data = $request->validate(['reason' => ['nullable', 'string', 'max:500']]);
+        $appointment = $this->ownAppointments($request)->findOrFail($id);
+
+        $this->appointments->cancelByPatient($appointment, $request->user(), $data['reason'] ?? null);
+
+        return $this->ok(message: 'Appointment cancelled successfully');
+    }
+
+    /** Includes legacy rows that were matched to patients by email only. */
+    private function ownAppointments(Request $request): Builder
     {
         $user = $request->user();
-        $appointment = Appointment::where('patient_email', $user->email)->findOrFail($id);
-        $appointment->update(['status' => 'cancelled']);
+        $patientId = $user->patient?->id;
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Appointment cancelled successfully',
-        ]);
+        return Appointment::query()->where(fn (Builder $q) => $q
+            ->when($patientId, fn ($q) => $q->where('patient_id', $patientId))
+            ->orWhere(fn ($q) => $q->whereNull('patient_id')->whereRaw('LOWER(patient_email) = ?', [strtolower($user->email)])));
+    }
+
+    private function patient(Request $request): Patient
+    {
+        $patient = $request->user()->patient;
+
+        if (! $patient) {
+            throw new AccessDeniedHttpException('Only patient accounts can book appointments.');
+        }
+
+        return $patient;
     }
 }

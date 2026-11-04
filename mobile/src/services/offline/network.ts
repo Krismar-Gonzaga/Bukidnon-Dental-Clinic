@@ -9,7 +9,13 @@ import { API_BASE_URL } from '../config';
 
 type Listener = (online: boolean) => void;
 
-const PROBE_TIMEOUT_MS = 6000;
+// Generous: a local `php artisan serve` handles one request at a time, so the
+// probe can wait behind slow API calls to a remote database.
+const PROBE_TIMEOUT_MS = 10000;
+
+// Laravel's health route (GET /up, outside /api) answers without touching the
+// database, so a slow database never makes the app look offline.
+const HEALTH_URL = `${API_BASE_URL.replace(/\/api\/?$/, '')}/up`;
 
 // Optimistic until the first probe or request says otherwise, so the very first
 // launch tries the network instead of assuming there is none.
@@ -39,9 +45,8 @@ export const probe = async (): Promise<boolean> => {
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
     // Any HTTP response proves reachability, whatever its status.
-    await fetch(`${API_BASE_URL}/cities`, {
+    await fetch(HEALTH_URL, {
       method: 'GET',
-      headers: { Accept: 'application/json' },
       signal: controller.signal,
     });
     setOnline(true);

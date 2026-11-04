@@ -1,154 +1,110 @@
 <?php
 
-namespace App\Http\Controllers\API;
+namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\ClinicVerification;
-use App\Models\User;
+use App\Models\ClinicApplication;
+use App\Services\AuditLogger;
+use App\Services\ClinicApplicationService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
+/**
+ * Older one-step endpoints used by the mobile app. They now run the
+ * clinic application workflow: files go to private storage and the
+ * application is submitted for review.
+ */
 class ClinicVerificationController extends Controller
 {
+    public function __construct(
+        private readonly ClinicApplicationService $applications,
+        private readonly AuditLogger $audit,
+    ) {
+    }
+
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'clinic_name' => 'required|string|max:255',
-            'business_permit' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'doh_license' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'prc_id' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'bir_registration' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
+        $user = $request->user();
+        if ($user->role !== 'clinic_admin') {
+            throw new AccessDeniedHttpException('Only clinic administrators can submit verification');
+        }
+
+        $file = ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'mimetypes:application/pdf,image/jpeg,image/png', 'max:5120'];
+        $data = $request->validate([
+            'clinic_name' => ['required', 'string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'contact_number' => ['nullable', 'string', 'max:30'],
+            'representative_name' => ['nullable', 'string', 'max:255'],
+            'business_permit' => $file,
+            'doh_license' => $file,
+            'prc_id' => $file,
+            'bir_registration' => $file,
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
+        $hasOpen = ClinicApplication::where('applicant_id', $user->id)
+            ->whereIn('status', [ClinicApplication::PENDING, ClinicApplication::UNDER_REVIEW, ClinicApplication::APPROVED])
+            ->exists();
+        if ($hasOpen) {
+            return $this->fail('You already have a pending or verified application', 409);
         }
 
-        try {
-            $user = $request->user();
-
-            // Check if user is clinic_admin
-            if ($user->role !== 'clinic_admin') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Only clinic administrators can submit verification'
-                ], 403);
-            }
-
-            // Check if already submitted
-            $existing = ClinicVerification::where('user_id', $user->id)
-                ->whereIn('status', ['pending', 'verified'])
-                ->first();
-
-            if ($existing) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'You already have a pending or verified application'
-                ], 400);
-            }
-
-            // Upload files
-            $filePaths = [];
-            $documents = ['business_permit', 'doh_license', 'prc_id', 'bir_registration'];
-
-            foreach ($documents as $doc) {
-                if ($request->hasFile($doc)) {
-                    $file = $request->file($doc);
-                    $path = $file->store("verifications/{$user->id}", 'public');
-                    $filePaths[$doc] = $path;
-                }
-            }
-
-            // Create verification record
-            $verification = ClinicVerification::create([
-                'user_id' => $user->id,
-                'clinic_name' => $request->clinic_name,
-                'business_permit' => $filePaths['business_permit'] ?? null,
-                'doh_license' => $filePaths['doh_license'] ?? null,
-                'prc_id' => $filePaths['prc_id'] ?? null,
-                'bir_registration' => $filePaths['bir_registration'] ?? null,
-                'status' => 'pending',
-                'submitted_at' => now(),
+        $application = DB::transaction(function () use ($data, $user, $request) {
+            $application = new ClinicApplication([
+                'clinic_name' => $data['clinic_name'],
+                'address' => $data['address'] ?? $user->patient?->address,
+                'city' => $data['city'] ?? null,
+                'contact_number' => $data['contact_number'] ?? null,
+                'representative_name' => $data['representative_name'] ?? $user->name,
             ]);
+            $application->applicant_id = $user->id;
+            $application->status = ClinicApplication::DRAFT;
+            $application->save();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Verification documents submitted successfully',
-                'data' => $verification
-            ], 201);
+            foreach (ClinicApplication::REQUIRED_DOCUMENTS as $type) {
+                $this->applications->storeDocument($application, $type, $request->file($type), $user);
+            }
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to submit verification: ' . $e->getMessage()
-            ], 500);
+            return $application;
+        });
+
+        // Address/city may still be missing from this short form; the
+        // application then stays a draft for the owner to complete.
+        try {
+            $this->applications->submit($application);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException) {
         }
+
+        return $this->ok($this->legacyShape($application->fresh()), 'Verification documents submitted successfully', 201);
     }
 
     public function status(Request $request)
     {
-        $user = $request->user();
-        $verification = ClinicVerification::where('user_id', $user->id)
-            ->orderBy('created_at', 'desc')
-            ->first();
+        $application = ClinicApplication::where('applicant_id', $request->user()->id)->latest()->first();
 
-        if (!$verification) {
-            return response()->json([
-                'success' => true,
-                'data' => null,
-                'message' => 'No verification found'
-            ]);
+        if (! $application) {
+            return $this->ok(null, 'No verification found');
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => $verification
-        ]);
+        return $this->ok($this->legacyShape($application));
     }
 
-    public function update(Request $request, $id)
+    /** Field names the mobile app reads; "verified" maps to approved. */
+    private function legacyShape(ClinicApplication $application): array
     {
-        $verification = ClinicVerification::findOrFail($id);
-
-        // Only system admin can update status
-        if ($request->user()->role !== 'system_admin') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized'
-            ], 403);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'status' => 'required|in:pending,verified,rejected',
-            'rejection_reason' => 'required_if:status,rejected|string|nullable',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $verification->update([
-            'status' => $request->status,
-            'rejection_reason' => $request->rejection_reason,
-            'verified_at' => $request->status === 'verified' ? now() : null,
-        ]);
-
-        // If verified, create clinic
-        if ($request->status === 'verified') {
-            // Create clinic logic here
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Verification status updated',
-            'data' => $verification
-        ]);
+        return [
+            'id' => $application->id,
+            'clinic_name' => $application->clinic_name,
+            'status' => match ($application->status) {
+                ClinicApplication::APPROVED => 'verified',
+                ClinicApplication::REJECTED => 'rejected',
+                default => 'pending',
+            },
+            'application_status' => $application->status,
+            'rejection_reason' => $application->status === ClinicApplication::REJECTED ? $application->review_notes : null,
+            'submitted_at' => $application->submitted_at,
+            'verified_at' => $application->status === ClinicApplication::APPROVED ? $application->reviewed_at : null,
+        ];
     }
 }

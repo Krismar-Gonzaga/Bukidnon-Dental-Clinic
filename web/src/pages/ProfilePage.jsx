@@ -1,165 +1,105 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import PatientLayout from '../layouts/PatientLayout';
 import Icon from '../components/Icon';
 import Tabs from '../components/Tabs';
-import ProfileInfoCard from '../components/patient/ProfileInfoCard';
-import ProfileTag from '../components/patient/ProfileTag';
-import ProfileMedicalHistory from '../components/patient/ProfileMedicalHistory';
-import ProfileAllergiesMedications from '../components/patient/ProfileAllergiesMedications';
-import ProfileEmergencyContact from '../components/patient/ProfileEmergencyContact';
+import ProfileAvatar from '../components/patient/ProfileAvatar';
+import { AllergiesPanel, EmergencyPanel, MedicalPanel, OverviewPanel } from '../components/patient/ProfilePanels';
+import { QueryState } from '../components/StatusMessage';
 import { PROFILE_TABS } from '../config/profile';
 import {
-  getEditProfileHref,
   PATIENT_CHANGE_PASSWORD_HREF,
   PATIENT_EDIT_PROFILE_HREF,
   PATIENT_PROFILE_HREF,
 } from '../config/patientNavigation';
-import { MOCK_APPOINTMENT_HISTORY } from '../mocks/appointmentHistory';
-import {
-  MOCK_DASHBOARD_NOTIFICATIONS,
-  MOCK_DASHBOARD_STATS,
-  MOCK_PATIENT,
-} from '../mocks/patientDashboard';
-import { MOCK_PATIENT_PROFILE } from '../mocks/patientProfile';
-import { countAppointmentsByStatus } from '../utils/patientDashboard';
-import { formatBirthDate, getAge, getFullName } from '../utils/profile';
+import { getPatientDashboard, getProfile } from '../services/patientApi';
+import { PATIENT_DASHBOARD_KEY } from './PatientDashboardPage';
+import { PATIENT_PROFILE_KEY } from './profileKeys';
+import { getMedicalAlerts, getProfileChips } from '../utils/profile';
 import './ProfilePage.css';
 
-// My Profile with MOCK data. Cards on the section tabs link to the matching
-// Edit Profile tab.
-function ProfilePage({ profile = MOCK_PATIENT_PROFILE, appointments = MOCK_APPOINTMENT_HISTORY }) {
+export { PATIENT_PROFILE_KEY };
+
+function ProfilePage() {
   const [activeTab, setActiveTab] = useState('overview');
-  const fullName = getFullName(profile);
-  const reviewsGiven = MOCK_DASHBOARD_STATS.find(({ id }) => id === 'reviews')?.value ?? 0;
-  const activity = [
-    { label: 'Total Appointments', value: appointments.length },
-    { label: 'Completed', value: countAppointmentsByStatus(appointments, 'completed') },
-    { label: 'Upcoming', value: countAppointmentsByStatus(appointments, 'upcoming') },
-    { label: 'Reviews Submitted', value: reviewsGiven },
-  ];
+  const profile = useQuery({ queryKey: PATIENT_PROFILE_KEY, queryFn: getProfile });
+  const dashboard = useQuery({ queryKey: PATIENT_DASHBOARD_KEY, queryFn: getPatientDashboard });
 
-  const renderPanel = () => {
-    const sectionProps = { profile, editHref: getEditProfileHref(activeTab) };
-    if (activeTab === 'medical') return <ProfileMedicalHistory {...sectionProps} />;
-    if (activeTab === 'allergies') return <ProfileAllergiesMedications {...sectionProps} />;
-    if (activeTab === 'emergency') return <ProfileEmergencyContact {...sectionProps} />;
-    return (
-      <>
-        <div className="profile-overview-grid">
-          <ProfileInfoCard
-            title="Personal Information"
-            subtitle="Basic demographic details"
-            rows={[
-              { label: 'Full Name', value: fullName },
-              { label: 'Date of Birth', value: formatBirthDate(profile.birthDate) },
-              { label: 'Age', value: `${getAge(profile.birthDate)} years old` },
-              { label: 'Gender', value: profile.gender },
-              { label: 'Civil Status', value: profile.civilStatus },
-              { label: 'Blood Type', value: profile.bloodType },
-            ]}
-          />
-          <ProfileInfoCard
-            title="Contact Details"
-            subtitle="How we reach you"
-            rows={[
-              { label: 'Email', value: profile.email },
-              { label: 'Mobile', value: profile.phone },
-              { label: 'City', value: profile.city },
-              { label: 'Province', value: profile.province },
-              { label: 'Zip Code', value: profile.zipCode },
-            ]}
-          />
-        </div>
-
-        <section className="profile-activity" aria-labelledby="profile-activity-title">
-          <h2 id="profile-activity-title" className="profile-activity-title">
-            Activity Summary
-          </h2>
-          <dl className="profile-activity-grid">
-            {activity.map(({ label, value }) => (
-              <div key={label} className="profile-activity-item">
-                <dt>{label}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      </>
-    );
+  const renderPanel = (data) => {
+    if (activeTab === 'medical') return <MedicalPanel health={data.health} />;
+    if (activeTab === 'allergies') return <AllergiesPanel health={data.health} />;
+    if (activeTab === 'emergency') return <EmergencyPanel profile={data} />;
+    return <OverviewPanel profile={data} counts={dashboard.data?.counts} />;
   };
 
   return (
-    <PatientLayout
-      title="My Profile"
-      activeHref={PATIENT_PROFILE_HREF}
-      user={MOCK_PATIENT}
-      hasUnreadNotifications={MOCK_DASHBOARD_NOTIFICATIONS.some(({ unread }) => unread)}
-    >
-      <div className="profile-page">
-        <section className="profile-header" aria-label="Profile summary">
-          <div className="profile-header-avatar">
-            <span aria-hidden="true">{fullName.charAt(0).toUpperCase()}</span>
-            <a
-              href={PATIENT_EDIT_PROFILE_HREF}
-              className="profile-header-photo"
-              aria-label="Change profile photo"
-            >
-              <Icon name="camera" size={14} />
-            </a>
-          </div>
-          <div className="profile-header-body">
-            <h2 className="profile-header-name">{fullName}</h2>
-            <p className="profile-header-meta">{profile.email}</p>
-            <p className="profile-header-meta">
-              {profile.phone} · {profile.city}, {profile.province}
-            </p>
-            <ul className="profile-header-tags" aria-label="Health tags">
-              {profile.tags.map(({ label, tone }) => (
-                <li key={label}>
-                  <ProfileTag tone={tone}>{label}</ProfileTag>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="profile-header-actions">
-            <a href={PATIENT_EDIT_PROFILE_HREF} className="btn btn-primary">
-              <Icon name="pencil" size={16} />
-              Edit Profile
-            </a>
-            <a href={PATIENT_CHANGE_PASSWORD_HREF} className="btn profile-password">
-              <Icon name="lock" size={16} />
-              Password
-            </a>
-          </div>
-        </section>
+    <PatientLayout title="My Profile" activeHref={PATIENT_PROFILE_HREF}>
+      <QueryState query={profile} loadingLabel="Loading your profile…">
+        {(data) => {
+          const chips = getProfileChips(data);
+          const alerts = getMedicalAlerts(data);
+          const place = [data.city, data.province].filter(Boolean).join(', ') || data.address;
 
-        {profile.medicalAlert && (
-          <div className="profile-alert" role="note">
-            <Icon name="alertCircle" size={20} />
-            <div>
-              <p className="profile-alert-title">Important Medical Alerts</p>
-              <p className="profile-alert-text">{profile.medicalAlert}</p>
+          return (
+            <div className="profile-page">
+              <section className="profile-header" aria-label="Profile summary">
+                <ProfileAvatar name={data.name} photoVersion={data.photoVersion} />
+                <div className="profile-header-body">
+                  <h2 className="profile-header-name">{data.name}</h2>
+                  <p className="profile-header-meta">{data.email}</p>
+                  <p className="profile-header-meta">{[data.phone, place].filter(Boolean).join(' · ')}</p>
+                  {chips.length > 0 && (
+                    <ul className="profile-chips" aria-label="Health summary">
+                      {chips.map(({ label, tone }) => (
+                        <li key={label} className={`profile-chip is-${tone}`}>
+                          {label}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="profile-header-actions">
+                  <a href={PATIENT_EDIT_PROFILE_HREF} className="btn btn-primary">
+                    <Icon name="pencil" size={16} />
+                    Edit Profile
+                  </a>
+                  <a href={PATIENT_CHANGE_PASSWORD_HREF} className="btn profile-password">
+                    <Icon name="lock" size={16} />
+                    Password
+                  </a>
+                </div>
+              </section>
+
+              {alerts && (
+                <section className="profile-alerts" role="note" aria-label="Important medical alerts">
+                  <Icon name="alertCircle" size={20} />
+                  <div>
+                    <p className="profile-alerts-title">Important Medical Alerts</p>
+                    <p>{alerts}</p>
+                  </div>
+                </section>
+              )}
+
+              <Tabs
+                tabs={PROFILE_TABS}
+                activeId={activeTab}
+                onChange={setActiveTab}
+                idPrefix="profile"
+                label="Profile sections"
+                variant="pill"
+              />
+              <div
+                role="tabpanel"
+                id={`profile-panel-${activeTab}`}
+                aria-labelledby={`profile-tab-${activeTab}`}
+                className="profile-panel"
+              >
+                {renderPanel(data)}
+              </div>
             </div>
-          </div>
-        )}
-
-        <Tabs
-          tabs={PROFILE_TABS}
-          activeId={activeTab}
-          onChange={setActiveTab}
-          idPrefix="profile"
-          label="Profile sections"
-          variant="pill"
-        />
-        <div
-          role="tabpanel"
-          id={`profile-panel-${activeTab}`}
-          aria-labelledby={`profile-tab-${activeTab}`}
-          className="profile-panel"
-        >
-          {renderPanel()}
-        </div>
-      </div>
+          );
+        }}
+      </QueryState>
     </PatientLayout>
   );
 }

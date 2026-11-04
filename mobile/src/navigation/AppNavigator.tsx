@@ -6,27 +6,170 @@ import { createStackNavigator } from '@react-navigation/stack';
 
 // Import Screens
 import PatientHomeScreen from '../screens/patient/PatientHomeScreen';
-import ClinicsScreen from '../screens/patient/ClinicsScreen';
-import ClinicDetailsScreen from '../screens/patient/ClinicDetailsScreen';
 import AppointmentsScreen from '../screens/patient/AppointmentsScreen';
 import BookAppointmentScreen from '../screens/patient/BookAppointmentScreen';
 import ProfileScreen from '../screens/patient/ProfileScreen';
 import FeedbackScreen from '../screens/patient/FeedbackScreen';
+import AppointmentDetailsScreen from '../screens/patient/AppointmentDetailsScreen';
+import RescheduleScreen from '../screens/patient/RescheduleScreen';
+import SavedClinicsScreen from '../screens/patient/SavedClinicsScreen';
+import ClinicLocatorScreen from '../screens/patient/ClinicLocatorScreen';
+import EditProfileScreen from '../screens/patient/EditProfileScreen';
+import ChangePasswordScreen from '../screens/patient/ChangePasswordScreen';
+import NotificationsScreen from '../screens/patient/NotificationsScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import ClinicRequirementsScreen from '../screens/auth/ClinicRequirementsScreen';
+import StaffNoticeScreen from '../screens/auth/StaffNoticeScreen';
 import GuestHomeScreen from '../screens/guest/GuestHomeScreen';
 import GuestClinicsScreen from '../screens/guest/GuestClinicsScreen';
 import GuestClinicDetailsScreen from '../screens/guest/GuestClinicDetailsScreen';
+import GuestDentistsScreen from '../screens/guest/GuestDentistsScreen';
+import GuestDentistProfileScreen from '../screens/guest/GuestDentistProfileScreen';
+import GuestServicesScreen from '../screens/guest/GuestServicesScreen';
+import GuestAboutScreen from '../screens/guest/GuestAboutScreen';
+import GuestContactScreen from '../screens/guest/GuestContactScreen';
+import GuestLegalScreen from '../screens/guest/GuestLegalScreen';
+
+import ClinicDashboardScreen from '../screens/clinic/ClinicDashboardScreen';
+import DentistAppointments from '../screens/clinic/dentist/DentistAppointments';
+import DentistAppointmentDetail from '../screens/clinic/dentist/DentistAppointmentDetail';
+import { DentistPatientProfileScreen, DentistPatientsScreen } from '../screens/clinic/dentist/DentistPatients';
+import DentalChartScreen from '../screens/clinic/dentist/DentalChartScreen';
+import { ClinicalNotesScreen, TreatmentRecordsScreen } from '../screens/clinic/dentist/ClinicalRecordsScreens';
+import { DentalCertificatesScreen, PrescriptionsScreen } from '../screens/clinic/dentist/ClinicalDocumentsScreens';
+import { FollowUpsScreen, ImagingScreen } from '../screens/clinic/dentist/ImagingFollowUpScreens';
+import { DentistScheduleScreen } from '../screens/clinic/dentist/DentistScheduleProfile';
+import { useClinicPortal } from '../components/clinic/ClinicPortalContext';
+import ClinicAppointmentsScreen from '../screens/clinic/ClinicAppointmentsScreen';
+import ClinicAppointmentDetailScreen from '../screens/clinic/ClinicAppointmentDetailScreen';
+import ClinicPatientsScreen from '../screens/clinic/ClinicPatientsScreen';
+import ClinicPatientDetailScreen from '../screens/clinic/ClinicPatientDetailScreen';
+import ClinicInventoryScreen from '../screens/clinic/ClinicInventoryScreen';
+import ClinicInventoryItemScreen from '../screens/clinic/ClinicInventoryItemScreen';
+import ClinicServicesScreen from '../screens/clinic/ClinicServicesScreen';
+import ClinicDentistsScreen from '../screens/clinic/ClinicDentistsScreen';
+import ClinicBranchesScreen from '../screens/clinic/ClinicBranchesScreen';
+import ClinicStaffScreen from '../screens/clinic/ClinicStaffScreen';
+import ClinicScheduleScreen from '../screens/clinic/ClinicScheduleScreen';
+import ClinicRecordsScreen from '../screens/clinic/ClinicRecordsScreen';
+import ClinicReviewsScreen from '../screens/clinic/ClinicReviewsScreen';
+import ClinicReportsScreen from '../screens/clinic/ClinicReportsScreen';
+import ClinicSettingsScreen from '../screens/clinic/ClinicSettingsScreen';
+import ClinicNotificationsScreen from '../screens/clinic/ClinicNotificationsScreen';
+import ClinicAccountScreen from '../screens/clinic/ClinicAccountScreen';
+import ClinicDentistProfileScreen from '../screens/clinic/ClinicDentistProfileScreen';
+import { ClinicAddDentistScreen, ClinicAddStaffScreen } from '../screens/clinic/ClinicAddMemberScreens';
+import ClinicWalkInScreen from '../screens/clinic/ClinicWalkInScreen';
+import { ClinicPaymentProofScreen, ClinicSubscriptionScreen } from '../screens/clinic/ClinicSubscriptionScreens';
+import ClinicAdminSettingsScreen from '../screens/clinic/ClinicAdminSettingsScreen';
+import ClinicCheckInScreen from '../screens/clinic/ClinicCheckInScreen';
+import ClinicDentistScheduleScreen from '../screens/clinic/ClinicDentistScheduleScreen';
+
+import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
+import AdminApplicationsScreen from '../screens/admin/AdminApplicationsScreen';
+import AdminApplicationDetailScreen from '../screens/admin/AdminApplicationDetailScreen';
+import AdminClinicsScreen from '../screens/admin/AdminClinicsScreen';
+import AdminClinicDetailScreen from '../screens/admin/AdminClinicDetailScreen';
+import AdminSubscriptionsScreen from '../screens/admin/AdminSubscriptionsScreen';
+import AdminSubscriptionDetailScreen from '../screens/admin/AdminSubscriptionDetailScreen';
+import AdminReportsScreen from '../screens/admin/AdminReportsScreen';
+import AdminAnnouncementsScreen from '../screens/admin/AdminAnnouncementsScreen';
+import AdminAnnouncementFormScreen from '../screens/admin/AdminAnnouncementFormScreen';
+import AdminUsersScreen from '../screens/admin/AdminUsersScreen';
+import AdminReviewsScreen from '../screens/admin/AdminReviewsScreen';
+import AdminAuditLogScreen from '../screens/admin/AdminAuditLogScreen';
+import AdminSettingsScreen from '../screens/admin/AdminSettingsScreen';
+import AdminNotificationsScreen from '../screens/admin/AdminNotificationsScreen';
+import AdminAccountScreen from '../screens/admin/AdminAccountScreen';
 
 // Import Context
 import { useAuth } from '../context/AuthContext';
+import { ClinicPortalProvider } from '../components/clinic/ClinicPortalContext';
 
 const Stack = createStackNavigator();
 
+// Clinic portal pages, the same sections as the web portal. Each page draws
+// its own top bar (ClinicScreen); the server checks permissions on every call.
+// A screen dentists see in their own design, and everyone else in the clinic admin one.
+const forDentist = (Dentist: React.ComponentType<any>, Other: React.ComponentType<any>) =>
+  function ForDentist(props: any) {
+    const { membership } = useClinicPortal();
+    return membership?.role === 'dentist' ? <Dentist {...props} /> : <Other {...props} />;
+  };
+
+const CLINIC_SCREENS = [
+  { name: 'ClinicDashboard', component: ClinicDashboardScreen },
+  { name: 'ClinicAppointments', component: forDentist(DentistAppointments, ClinicAppointmentsScreen) },
+  { name: 'ClinicAppointmentDetail', component: forDentist(DentistAppointmentDetail, ClinicAppointmentDetailScreen) },
+  { name: 'ClinicPatients', component: forDentist(DentistPatientsScreen, ClinicPatientsScreen) },
+  { name: 'ClinicPatientDetail', component: forDentist(DentistPatientProfileScreen, ClinicPatientDetailScreen) },
+  { name: 'ClinicInventory', component: ClinicInventoryScreen },
+  { name: 'ClinicInventoryItem', component: ClinicInventoryItemScreen },
+  { name: 'ClinicServices', component: ClinicServicesScreen },
+  { name: 'ClinicDentists', component: ClinicDentistsScreen },
+  { name: 'ClinicBranches', component: ClinicBranchesScreen },
+  { name: 'ClinicStaff', component: ClinicStaffScreen },
+  { name: 'ClinicSchedule', component: ClinicScheduleScreen },
+  { name: 'ClinicRecords', component: ClinicRecordsScreen },
+  { name: 'ClinicReviews', component: ClinicReviewsScreen },
+  { name: 'ClinicReports', component: ClinicReportsScreen },
+  { name: 'ClinicSettings', component: ClinicSettingsScreen },
+  { name: 'ClinicNotifications', component: ClinicNotificationsScreen },
+  { name: 'ClinicAccount', component: ClinicAccountScreen },
+  { name: 'ClinicDentistProfile', component: ClinicDentistProfileScreen },
+  { name: 'ClinicAddDentist', component: ClinicAddDentistScreen },
+  { name: 'ClinicAddStaff', component: ClinicAddStaffScreen },
+  { name: 'ClinicWalkIn', component: ClinicWalkInScreen },
+  { name: 'ClinicSubscription', component: ClinicSubscriptionScreen },
+  { name: 'ClinicPaymentProof', component: ClinicPaymentProofScreen },
+  { name: 'ClinicAdminSettings', component: ClinicAdminSettingsScreen },
+  { name: 'ClinicCheckIn', component: ClinicCheckInScreen },
+  { name: 'ClinicDentistSchedule', component: ClinicDentistScheduleScreen },
+  { name: 'ClinicDentalChart', component: DentalChartScreen },
+  { name: 'ClinicClinicalNotes', component: ClinicalNotesScreen },
+  { name: 'ClinicTreatmentRecords', component: TreatmentRecordsScreen },
+  { name: 'ClinicPrescriptions', component: PrescriptionsScreen },
+  { name: 'ClinicCertificates', component: DentalCertificatesScreen },
+  { name: 'ClinicImaging', component: ImagingScreen },
+  { name: 'ClinicFollowUps', component: FollowUpsScreen },
+  { name: 'ClinicMySchedule', component: DentistScheduleScreen },
+];
+
+// Detail pages slide in; switching sections from the drawer or tabs does not.
+const CLINIC_PUSHED = ['ClinicAppointmentDetail', 'ClinicPatientDetail', 'ClinicInventoryItem', 'ClinicNotifications', 'ClinicAccount', 'ClinicDentistProfile', 'ClinicAddDentist', 'ClinicAddStaff', 'ClinicWalkIn', 'ClinicPaymentProof'];
+
+// System administrator pages (web admin portal). Each draws its own frame
+// (AdminScreen); the server checks the system_admin role on every call.
+const ADMIN_SCREENS = [
+  { name: 'AdminDashboard', component: AdminDashboardScreen },
+  { name: 'AdminApplications', component: AdminApplicationsScreen },
+  { name: 'AdminApplicationDetail', component: AdminApplicationDetailScreen },
+  { name: 'AdminClinics', component: AdminClinicsScreen },
+  { name: 'AdminClinicDetail', component: AdminClinicDetailScreen },
+  { name: 'AdminSubscriptions', component: AdminSubscriptionsScreen },
+  { name: 'AdminSubscriptionDetail', component: AdminSubscriptionDetailScreen },
+  { name: 'AdminReports', component: AdminReportsScreen },
+  { name: 'AdminAnnouncements', component: AdminAnnouncementsScreen },
+  { name: 'AdminAnnouncementForm', component: AdminAnnouncementFormScreen },
+  { name: 'AdminUsers', component: AdminUsersScreen },
+  { name: 'AdminReviews', component: AdminReviewsScreen },
+  { name: 'AdminAuditLog', component: AdminAuditLogScreen },
+  { name: 'AdminSettings', component: AdminSettingsScreen },
+  { name: 'AdminNotifications', component: AdminNotificationsScreen },
+  { name: 'AdminAccount', component: AdminAccountScreen },
+];
+const ADMIN_PUSHED = ['AdminApplicationDetail', 'AdminClinicDetail', 'AdminSubscriptionDetail', 'AdminAnnouncementForm', 'AdminNotifications', 'AdminAccount'];
+
 // Main App Navigator
 export default function AppNavigator() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
+  const isPatient = !user?.role || user.role === 'patient';
+  // System administrators get the admin portal; members of an approved
+  // clinic get the clinic portal (all web sections). Owners still applying
+  // use the web portal; see StaffNoticeScreen.
+  const isSystemAdmin = user?.role === 'system_admin';
+  const isClinicMember = Array.isArray(user?.memberships) && user.memberships.length > 0;
 
   if (loading) {
     return (
@@ -37,6 +180,7 @@ export default function AppNavigator() {
   }
 
   return (
+    <ClinicPortalProvider>
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
@@ -46,30 +190,51 @@ export default function AppNavigator() {
           headerBackTitle: 'Back',
         }}
       >
-        {isAuthenticated ? (
+        {isAuthenticated && isSystemAdmin ? (
           <>
-            {/* Main patient pages — each renders its own AppHeader/BottomNav/SideDrawer */}
+            {ADMIN_SCREENS.map(({ name, component }) => (
+              <Stack.Screen
+                key={name}
+                name={name}
+                component={component as React.ComponentType<any>}
+                options={{ headerShown: false, animation: ADMIN_PUSHED.includes(name) ? 'default' : 'none' }}
+              />
+            ))}
+          </>
+        ) : isAuthenticated && !isPatient && isClinicMember ? (
+          <>
+            {CLINIC_SCREENS.map(({ name, component }) => (
+              <Stack.Screen
+                key={name}
+                name={name}
+                component={component as React.ComponentType<any>}
+                options={{ headerShown: false, animation: CLINIC_PUSHED.includes(name) ? 'default' : 'none' }}
+              />
+            ))}
+          </>
+        ) : isAuthenticated && !isPatient ? (
+          <Stack.Screen name="StaffNotice" component={StaffNoticeScreen} options={{ headerShown: false }} />
+        ) : isAuthenticated ? (
+          <>
+            {/* Each patient page renders its own PatientShell (top bar and menu). */}
             <Stack.Screen name="Home" component={PatientHomeScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="Clinics" component={ClinicsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="BookAppointment" component={BookAppointmentScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Appointments" component={AppointmentsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="AppointmentDetails" component={AppointmentDetailsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Reschedule" component={RescheduleScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Feedback" component={FeedbackScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="SavedClinics" component={SavedClinicsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="ClinicLocator" component={ClinicLocatorScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
-
-            {/* Detail / form screens use the default Stack header with a back button */}
-            <Stack.Screen
-              name="ClinicDetails"
-              component={ClinicDetailsScreen}
-              options={{ title: 'Clinic Details' }}
-            />
-            <Stack.Screen
-              name="BookAppointment"
-              component={BookAppointmentScreen}
-              options={{ title: 'Book Appointment' }}
-            />
-            <Stack.Screen
-              name="Feedback"
-              component={FeedbackScreen}
-              options={{ title: 'Submit Feedback' }}
-            />
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: false }} />
+            {/* The public clinic and dentist pages; they adapt to a signed-in patient. */}
+            <Stack.Screen name="GuestClinics" component={GuestClinicsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="GuestClinicDetails" component={GuestClinicDetailsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="GuestDentists" component={GuestDentistsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="GuestDentistProfile" component={GuestDentistProfileScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="GuestLegal" component={GuestLegalScreen} options={{ headerShown: false }} />
           </>
         ) : (
           <>
@@ -82,6 +247,12 @@ export default function AppNavigator() {
               component={GuestClinicDetailsScreen}
               options={{ headerShown: false }}
             />
+            <Stack.Screen name="GuestDentists" component={GuestDentistsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="GuestDentistProfile" component={GuestDentistProfileScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="GuestServices" component={GuestServicesScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="GuestAbout" component={GuestAboutScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="GuestContact" component={GuestContactScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="GuestLegal" component={GuestLegalScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
           </>
@@ -98,6 +269,7 @@ export default function AppNavigator() {
         />
       </Stack.Navigator>
     </NavigationContainer>
+    </ClinicPortalProvider>
   );
 }
 

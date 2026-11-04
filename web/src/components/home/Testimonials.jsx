@@ -1,70 +1,37 @@
-import Icon from '../Icon';
-import { TESTIMONIALS } from '../../mocks/testimonials';
+import StarRating from '../StarRating';
+import { useHomeData } from '../../hooks/useHomeData';
 import './Testimonials.css';
 
-const MAX_RATING = 5;
+const AVATAR_TONES = ['is-navy', 'is-green', 'is-slate'];
 
-function getInitials(name) {
-  return name
-    .split(' ')
-    .map((part) => part.charAt(0))
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-function StarRating({ rating }) {
-  return (
-    <p
-      className="testimonial-stars"
-      role="img"
-      aria-label={`Rated ${rating} out of ${MAX_RATING}`}
-    >
-      {Array.from({ length: MAX_RATING }, (_, index) => (
-        <Icon
-          key={index}
-          name="star"
-          size={18}
-          className={
-            index < rating ? 'testimonial-star is-filled' : 'testimonial-star'
-          }
-        />
-      ))}
-    </p>
-  );
-}
-
-// Uses mock testimonials until verified reviews come from the backend.
+// Recent published reviews from verified visits (GET /home). The section is
+// hidden until there are reviews with comments: testimonials are never invented.
 function Testimonials() {
+  const home = useHomeData();
+  const reviews = (home.data?.reviews ?? []).filter(({ quote }) => quote).slice(0, 3);
+
+  if (reviews.length === 0) return null;
+
   return (
     <section className="testimonials" aria-labelledby="testimonials-title">
       <div className="testimonials-inner">
-        <div className="testimonials-header">
-          <h2 id="testimonials-title" className="testimonials-title">
-            What Patients Say
-          </h2>
-          <p className="testimonials-text">
-            Hear from patients who found their dentist through the
-            portal.
-          </p>
-        </div>
+        <h2 id="testimonials-title" className="testimonials-title">
+          What Patients Say
+        </h2>
 
         <ul className="testimonials-grid">
-          {TESTIMONIALS.map((item) => (
+          {reviews.map((item, index) => (
             <li key={item.id} className="testimonial-card">
               <figure className="testimonial-figure">
-                <div className="testimonial-top">
-                  <StarRating rating={item.rating} />
-                  <Icon name="quote" size={28} className="testimonial-quote-icon" />
-                </div>
+                <StarRating rating={item.rating} size={20} />
                 <blockquote className="testimonial-quote">
                   <p>{item.quote}</p>
                 </blockquote>
                 <figcaption className="testimonial-author">
-                  <span className="testimonial-avatar" aria-hidden="true">
-                    {getInitials(item.name)}
+                  <span className={`testimonial-avatar ${AVATAR_TONES[index % AVATAR_TONES.length]}`} aria-hidden="true">
+                    {item.name.charAt(0).toUpperCase()}
                   </span>
-                  <span className="testimonial-author-text">
+                  <span>
                     <span className="testimonial-name">{item.name}</span>
                     <span className="testimonial-detail">{item.detail}</span>
                   </span>

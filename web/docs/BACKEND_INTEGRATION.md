@@ -1,166 +1,65 @@
-# Backend Integration Guide
+# Backend integration
 
-How to replace the frontend's mock data with the Laravel API (`backend/`).
+How the web app talks to the Laravel API (`backend/`). For the endpoints themselves, see [docs/API.md](../../docs/API.md).
 
-Everything about the backend here was read from `backend/routes/api.php`, the controllers in `backend/app/Http/Controllers/Api/`, and the appointments migration on 2026-10-14. Nothing in `backend/` was changed. Check the backend again before relying on this, and ask the backend owner to confirm the request and response formats.
+## Layers
 
-## Where API code goes
+```
+pages/ and components/       UI only: no URLs, no Axios
+   │  useQuery / useMutation (TanStack Query)
+services/*Api.js             one function per endpoint, returns UI-shaped data
+   │  services/adapters.js   API JSON → UI objects (toAppointment, toClinicProfile, …)
+services/apiClient.js        Axios instance: base URL, cookies, CSRF, 419 retry
+```
 
-There is no API layer in the frontend yet. When integration starts:
-
-1. Add `src/services/apiClient.js`. It holds the Axios instance with the API base URL and the `Authorization: Bearer <token>` header (Laravel Sanctum).
-   - Read the base URL from an environment variable.
-   - Never hard-code tokens or log them.
-2. Add one service file per area, for example:
-   - `src/services/appointmentsService.js`
-   - `src/services/clinicsService.js`
-   - `src/services/feedbackService.js`
-3. Each service function calls the API and returns data shaped like the current mocks, using the [field mapping](#field-mapping) below. Pages then swap a mock import for a service call; components stay unchanged.
-4. Pages handle loading and error states. These do not exist yet, because the mocks load instantly.
-
-## Backend endpoints (current state)
-
-All endpoints are under `/api`. Those marked "token" need a logged-in user.
-
-### Public
-
-| Method and path | Use in frontend |
+| File | Covers |
 |---|---|
-| `GET /home` | Homepage sections |
-| `GET /clinics/search` | Find Clinics page; booking step 1 (clinic list) |
-| `GET /clinics/{id}` | Clinic details (includes reviews) |
-| `GET /specializations` | Search filters |
-| `GET /cities` | Search filters |
-| `POST /register` | Register page (`role` may be `patient` or `clinic_admin`) |
-| `POST /login` | Login page |
+| `services/apiClient.js` | Base URL from `config/api.js` (`REACT_APP_API_URL`). `withCredentials` + `withXSRFToken`. Fetches `/sanctum/csrf-cookie` before the first write and retries once on 419. |
+| `services/authService.js` | Login, register, logout, current user, forgot/reset/change password |
+| `services/publicApi.js` | Home, directory search, clinic profile, reviews, dentists, availability |
+| `services/patientApi.js` | Patient dashboard, appointments, booking, reschedule, cancel, reviews, saved clinics, profile, records |
+| `services/notificationApi.js` | Notifications and preferences |
+| `services/clinicPortalApi.js` | `/manage/clinics/{clinic}/...` (clinic portal) and clinic applications |
+| `services/adminApi.js` | `/admin/...` |
+| `services/apiErrors.js` | `getErrorMessage(error)` and `getFieldErrors(error)` for showing 422 errors on forms |
 
-### Logged-in user (token)
+## Authentication
 
-| Method and path | Use in frontend |
-|---|---|
-| `POST /logout` | Sidebar "Log Out" |
-| `GET /user` | Name and role in the sidebar and top bar |
-| `PUT /profile`, `POST /change-password` | Change Password page (`current_password`, `new_password`, `new_password_confirmation`; new password at least 8 characters) |
+- The web app **never handles a token**. Login creates a Laravel session stored in an HttpOnly cookie, and the browser sends it automatically.
+- `auth/AuthContext.jsx` loads `GET /user` on start and exposes `user`, `login`, `logout` and `refresh`.
+- `auth/RequireAuth.jsx` guards routes by role. It only keeps people out of screens they can't use: **the API enforces every permission**, so never rely on the guard for security.
+- `auth/homeRoutes.js` picks the landing page after login: patient portal, clinic portal (users with a clinic membership) or admin portal.
+- The web app and the API must use the same host name in development (`localhost` with `localhost`), or the session cookie isn't sent.
 
-### Patient (token)
+## Data rules
 
-| Method and path | Use in frontend | Status |
+- Show the server's error message (`getErrorMessage`) instead of inventing one. Map 422 `errors` to fields with `getFieldErrors`.
+- After a mutation, invalidate the matching query keys so lists refresh.
+- Dates and times come from the API in clinic time (`Asia/Manila`). Format them with the helpers in `adapters.js`, not with the browser's time zone.
+- Booking sends an `Idempotency-Key` per attempt (`patientApi.bookAppointment`), so a double click or a retry can't book twice.
+- Open time slots always come from `GET /clinics/{id}/availability`. The server checks the slot again on booking and may answer 409 if it was just taken.
+
+## Remaining static content
+
+| File | Used by | Why it is static |
 |---|---|---|
-| `GET /patient/appointments` | Dashboard, Appointment History, Appointment Details | Works |
-| `POST /patient/appointments` | Book Appointment, Confirm step | Works |
-| `PUT /patient/appointments/{id}` | Reschedule | Works |
-| `DELETE /patient/appointments/{id}` | Cancel Request / Cancel Appointment | Works |
-| `POST /patient/feedback` | Feedback & Ratings | Broken: `FeedbackController` does not exist |
-| `GET /patient/profile`, `PUT /patient/profile` | My Profile, Edit Profile | Works |
+| `mocks/aboutContent.js` | About page | Marketing copy; no CMS endpoint |
+| `mocks/contactContent.js` | Contact page | Contact details. The contact form has **no endpoint** and tells the user the message was not sent. |
+| `config/legal.js` | Privacy notice, terms | **Draft** text pending legal review |
 
-The staff, dentist, clinic-admin, and system-admin route groups point to controllers or methods that do not exist yet. Report these to the backend owner; they are not needed for the patient screens.
+Everything else (clinics, dentists, services, appointments, notifications, profile, clinic portal and admin data) comes from the API.
 
-## Mock files and what replaces them
+## Known gaps
 
-| Mock file | Used by | Replace with |
-|---|---|---|
-| `mocks/patientDashboard.js` (`MOCK_PATIENT`) | All patient pages: sidebar name and role | `GET /user` |
-| `mocks/patientDashboard.js` (stats, appointments) | Dashboard | Work them out from `GET /patient/appointments` |
-| `mocks/notifications.js` | Notifications page, dashboard panel, bell dot | No endpoint yet (see gaps) |
-| `mocks/clinicProfiles.js` (`PATIENT_CLINICS`, `LOCATOR_CLINICS`) | Clinic Details, Clinic Locator, Saved Clinics | `GET /clinics/{id}` and `GET /clinics/search`; hours, phone, email, and map coordinates must be in the response (see gaps) |
-| `mocks/patientProfile.js` | My Profile, Edit Profile | `GET /patient/profile` (medical details, tags, and emergency contact may need new fields; see gaps) |
-| `mocks/clinicProfiles.js` (`MOCK_SAVED_CLINIC_IDS`) | Saved Clinics, the save heart on Clinic Details | No endpoint yet (see gaps) |
-| `mocks/appointmentHistory.js` | History, Details, Reschedule, Feedback | `GET /patient/appointments` |
-| `mocks/bookingClinics.js` (from `directoryClinics.js`) | Booking step 1 | `GET /clinics/search` |
-| `mocks/bookingDentists.js` (from `directoryDentists.js`) | Booking step 2 | No endpoint yet (see gaps) |
-| `mocks/services.js` | Booking step 3, Services page | No clinic-services endpoint in the routes yet (see gaps) |
-| `mocks/bookingSchedule.js` | Booking step 4, Reschedule | No availability endpoint yet (see gaps) |
-| `mocks/directoryClinics.js` | Find Clinics | `GET /clinics/search` |
-| `mocks/directoryDentists.js` | Dentists page | No endpoint yet |
-| `mocks/featuredClinics.js`, `testimonials.js`, `clinicMapMarkers.js` | Homepage | `GET /home` |
+- The clinic and admin portals were built without Figma designs. Their layout follows the patient portal's components and may change once designs exist.
+- Embedded maps need `REACT_APP_GOOGLE_MAPS_EMBED_KEY` (`utils/maps.js`). Without it, pages show directions and search links to Google Maps instead. Clinics without coordinates are located by name and address.
+- Profile photo upload and the contact form have no endpoints.
+- Email (password reset, reminders) only works once the API has a mail provider configured.
 
-## Mock actions to replace
+## Tests
 
-Each of these pretends to succeed and saves nothing. Search the code for `MOCK` to find them.
+`src/testUtils.jsx` provides `renderWithProviders` (router, query client, auth). Page tests mock the `services/*Api.js` modules, so they never call the real API.
 
-| File | Action | Call |
-|---|---|---|
-| `pages/BookAppointmentPage.jsx` (`// MOCK submit`) | Confirm Appointment | `POST /patient/appointments` |
-| `pages/RescheduleAppointmentPage.jsx` (`// MOCK reschedule`) | Confirm Reschedule | `PUT /patient/appointments/{id}` with the new date and time |
-| `pages/AppointmentDetailsPage.jsx` (`handleConfirmCancel`) | Yes, Cancel | `DELETE /patient/appointments/{id}` |
-| `pages/FeedbackPage.jsx` (`// MOCK submit`) | Submit Review | `POST /patient/feedback` (backend broken) |
-| `components/auth/LoginForm.jsx` | Sign in | `POST /login` |
-| `components/auth/RegisterForm.jsx` | Register | `POST /register` |
-| `layouts/PatientLayout.jsx` | Log Out | `POST /logout` |
-| `components/contact/ContactForm.jsx` | Send message | No endpoint yet |
-| `pages/NotificationsPage.jsx` (`handleMarkAllRead`) | Mark all as read | No endpoint yet |
-| `pages/EditProfilePage.jsx` (`// MOCK save`) | Save Changes (shows Profile Updated) | `PUT /patient/profile` |
-| `pages/ChangePasswordPage.jsx` (`// MOCK change password`) | Update Password (shows Password Changed) | `POST /change-password`; show the backend's 422 errors, such as a wrong current password, on the form |
-| `pages/EditProfilePage.jsx` | Upload new photo | No photo upload endpoint yet |
-| `pages/SavedClinicsPage.jsx` (`handleUnsave`), `pages/ClinicDetailsPage.jsx` (save heart) | Save / unsave a clinic | No endpoint yet |
-
-## Field mapping
-
-### Appointment
-
-What the frontend expects, from `mocks/appointmentHistory.js`, next to the backend `appointments` table:
-
-| Frontend field | Example | Backend source | Notes |
-|---|---|---|---|
-| `id` | `'hist-1'` | `id` | Backend id is a number; use it as a string in links |
-| `reference` | `'000006'` | `id` | Display number. Suggest zero-padding `id` to 6 digits; confirm with backend |
-| `service` | `'Root Canal Treatment'` | `service_id` | The list response loads only `clinic`, not `service`. Backend needs to add `service` to `with(...)` |
-| `dentist` | `'Dr. Laura Reyes'` | none | The `appointments` table has no dentist column |
-| `clinic` | `'Don Carlos Dental Clinic'` | `clinic.name` | Loaded through `with('clinic')` |
-| `status` | `'upcoming'` | `status` | See [status mapping](#status-mapping) |
-| `date` | `'July 25, 2026'` | `appointment_date` (`YYYY-MM-DD`) | Format for display with `formatLongDate` in `utils/bookingCalendar.js` |
-| `time` | `'9:00 AM'` | `appointment_time` (`HH:MM:SS`) | Convert to 12-hour text |
-
-### Booking request
-
-The booking flow collects these and should send them to `POST /patient/appointments`:
-
-| Frontend state | Request field | Backend rule |
-|---|---|---|
-| `clinicId` | `clinic_id` | required, must exist |
-| `serviceId` | `service_id` | optional, must exist |
-| `dentistId` | none | Not accepted by the backend (see gaps) |
-| selected date (`YYYY-MM-DD` key from `toDateKey`) | `appointment_date` | required, today or later |
-| `time` (`'10:00 AM'`) | `appointment_time` | required; send 24-hour `HH:MM`, confirm the format with backend |
-
-### Status mapping
-
-| Backend (`appointments.status`) | Frontend status | Label |
-|---|---|---|
-| `pending` | `pending` | Pending |
-| `confirmed` | `upcoming` | Upcoming |
-| `completed` | `completed` | Completed |
-| `cancelled` | `cancelled` | Cancelled |
-
-Convert in the service layer, so components keep using the frontend values from `config/appointments.js`.
-
-## Gaps to raise with the backend owner
-
-These block a full integration. They are backend decisions; do not change `backend/` from the frontend task.
-
-1. **Feedback:** `POST /patient/feedback` points to a `FeedbackController` that does not exist. The frontend sends an appointment, a 1–5 star rating, and optional text.
-2. **Dentist on appointments:** the table has no dentist column, and `POST /patient/appointments` does not accept a dentist. The booking flow has a Select Dentist step, and History and Details show the dentist.
-3. **Dentists list:** there is no endpoint for a clinic's dentists (booking step 2) or the Dentists page. Each dentist needs a name, specialty, and whether they are available.
-4. **Clinic services:** there is no route listing a clinic's services with duration and price range (booking step 3). A `ServiceController` exists but is not in `routes/api.php`.
-5. **Availability:** there is no endpoint for open dates and time slots. The frontend currently shows today through the end of the month and hides time slots that have already passed today.
-6. **Who may cancel or reschedule what:** `PUT` and `DELETE /patient/appointments/{id}` do not check the status. The frontend only allows cancelling `pending` or `upcoming` appointments and rescheduling `upcoming` ones. The backend should enforce the same rules.
-7. **Rescheduling a confirmed appointment:** the backend keeps the status unchanged. Decide whether a reschedule should go back to `pending` for clinic approval.
-8. **Appointments linked by email:** patient appointments are matched by `patient_email`, not by user id, so changing the account email loses the history.
-9. **Notifications:** no endpoint yet. The frontend needs a list with `type` (`reminder`, `confirmed`, or `message`), `title`, `message`, time, and `unread`, plus a mark-all-as-read action.
-10. **Saved clinics:** there is no endpoint to list, save, or unsave a patient's clinics.
-11. **Clinic profile fields:** Clinic Details and Clinic Locator show street address, operating hours, phone, email, and map coordinates. Confirm `GET /clinics/{id}` returns them; the frontend hides any that are missing.
-12. **Patient medical profile:** My Profile shows blood type, civil status, zip code, health tags, and a medical alert. Its section tabs also show:
-    - Medical History: conditions, previous dental procedures (name, tooth, note, date), and vital notes (blood pressure, blood sugar, heart condition, pregnancy, bleeding disorder, recent surgery).
-    - Allergies & Medications: allergies (name, type, severity, reaction), medications (name, dosage, purpose, caution), and dental anxiety (level 1–5, preferred sedation, notes).
-    - Emergency Contact: name, relationship, phone, address, and five consent settings (`CONSENT_OPTIONS` in `config/profile.js`).
-
-    The shape is in `mocks/patientProfile.js`. Confirm which of these `GET /patient/profile` returns and which need new fields.
-13. **Controller folder case:** the namespace says `API` but the folder is `Api`. This breaks on case-sensitive hosting (Linux).
-
-## Integration order (suggested)
-
-1. Login, register, and `GET /user`: replace `MOCK_PATIENT` and store the token.
-2. `GET /patient/appointments`: History, Details, and Dashboard.
-3. Cancel (`DELETE`) and Reschedule (`PUT`).
-4. Booking (`POST`), once the dentist, services, and availability gaps are decided.
-5. Feedback, once the controller exists.
+```bash
+npm.cmd test -- --watchAll=false
+```

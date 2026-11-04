@@ -233,7 +233,7 @@
   background-color: var(--color-neutral-soft);
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 720px) {
   .clinic-locator {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -259,4 +259,41 @@
   .clinic-locator-selected-actions .btn {
     flex: 1;
   }
+}
+
+.clinic-locator-embed {
+  width: 100%;
+  border: 0;
+}
+
+.clinic-locator-location-error {
+  margin-top: var(--space-2);
+  color: var(--color-danger-text);
+  font-size: var(--font-size-sm);
+}
+
+.clinic-locator-selected-actions {
+  flex-wrap: wrap;
+}
+
+.clinic-locator-selected-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.clinic-locator-selected-links button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.clinic-locator-selected-links button:hover {
+  text-decoration: underline;
 }

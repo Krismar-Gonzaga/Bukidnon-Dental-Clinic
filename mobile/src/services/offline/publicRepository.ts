@@ -19,11 +19,44 @@ export type ClinicSummary = {
   email: string | null;
   image: string | null;
   rating: number;
+  reviewCount: number;
   isVerified: boolean;
   openingTime: string | null;
   closingTime: string | null;
   createdAt: string | null;
+  latitude: number | null;
+  longitude: number | null;
   specializations: ClinicSpecialization[];
+};
+
+export type ClinicService = {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+  currency: string;
+  durationMinutes: number;
+};
+
+export type ClinicDentist = {
+  id: number;
+  name: string;
+  specialization: string | null;
+  yearsExperience: number;
+  /** Published reviews of this dentist's visits; null until there are any. */
+  rating: number | null;
+  reviewCount: number;
+  /** Has weekly hours, so patients can book them. */
+  isAvailable: boolean;
+};
+
+export type ClinicBranch = {
+  id: number;
+  name: string;
+  address: string;
+  isMain: boolean;
+  /** Weekly hours: day 0 = Sunday ... 6 = Saturday; closed days are absent. */
+  hours: Array<{ day: number; opensAt: string; closesAt: string }>;
 };
 
 export type ClinicReview = {
@@ -38,7 +71,51 @@ export type ClinicReview = {
   createdAt: string | null;
 };
 
-export type ClinicDetails = ClinicSummary & { reviews: ClinicReview[] };
+export type ClinicDetails = ClinicSummary & {
+  reviews: ClinicReview[];
+  services: ClinicService[];
+  dentists: ClinicDentist[];
+  branches: ClinicBranch[];
+};
+
+export type DentistClinic = { id: number; name: string; city: string; address: string };
+
+export type DentistSchedule = { day: number; startsAt: string; endsAt: string };
+
+export type PublicDentist = {
+  id: number;
+  name: string;
+  specialization: string | null;
+  specializationId: number | null;
+  yearsExperience: number;
+  rating: number | null;
+  reviewCount: number;
+  isAvailable: boolean;
+  qualifications: string | null;
+  bio: string | null;
+  clinics: DentistClinic[];
+  schedules: DentistSchedule[];
+};
+
+export type CatalogService = {
+  id: number;
+  name: string;
+  category: string;
+  description: string;
+  priceMin: number | null;
+  priceMax: number | null;
+  durationMin: number | null;
+  durationMax: number | null;
+  clinicCount: number;
+};
+
+export type ContactMessage = {
+  first_name: string;
+  last_name: string;
+  email: string;
+  subject: string;
+  message: string;
+};
 
 export type Specialization = {
   id: number;
@@ -68,7 +145,15 @@ export type HomeData = {
   popularServices: PopularService[];
   serviceRates: ServiceRateSummary[];
   recentReviews: ClinicReview[];
-  stats: { verifiedClinics: number; totalReviews: number; totalSpecializations: number };
+  stats: {
+    verifiedClinics: number;
+    totalReviews: number;
+    totalSpecializations: number;
+    /** Null until counted by the server (or on a home page saved by an older version). */
+    patients?: number | null;
+    municipalities?: number | null;
+    satisfactionRate?: number | null;
+  };
   meta: { title: string | null; description: string | null };
 };
 
@@ -85,6 +170,9 @@ const KEYS = {
   home: 'public:home',
   specializations: 'public:specializations',
   clinicDetails: (id: number | string) => `public:clinic:${id}`,
+  dentists: 'public:dentists',
+  dentist: (id: number | string) => `public:dentist:${id}`,
+  services: 'public:services',
   lastSync: 'public:last_sync',
 };
 
@@ -135,11 +223,52 @@ export const normalizeClinic = (raw: any): ClinicSummary => {
     email: toText(raw?.email),
     image: toText(raw?.image) ?? toText(raw?.logo),
     rating: toNumber(raw?.rating ?? raw?.rating_stars),
+    reviewCount: toNumber(raw?.review_count ?? raw?.reviews_count),
     isVerified: Boolean(raw?.is_verified),
     openingTime: toText(raw?.opening_time),
     closingTime: toText(raw?.closing_time),
     createdAt: toText(raw?.created_at),
+    latitude: raw?.latitude != null ? toNumber(raw.latitude) : null,
+    longitude: raw?.longitude != null ? toNumber(raw.longitude) : null,
     specializations,
+  };
+};
+
+const list = (value: unknown): any[] => (Array.isArray(value) ? value : []);
+
+export const normalizeClinicDetails = (raw: any): ClinicDetails => {
+  const clinic = normalizeClinic(raw);
+  return {
+    ...clinic,
+    reviews: list(raw?.reviews).map((review: any) => normalizeReview(review, clinic.name)),
+    services: list(raw?.services).map((service: any) => ({
+      id: Number(service.id),
+      name: String(service.name ?? ''),
+      description: toText(service.description) ?? '',
+      price: toNumber(service.price),
+      currency: toText(service.currency) ?? 'PHP',
+      durationMinutes: toNumber(service.duration_minutes, 30),
+    })),
+    dentists: list(raw?.dentists).map((dentist: any) => ({
+      id: Number(dentist.id),
+      name: String(dentist.name ?? 'Dentist'),
+      specialization: toText(dentist.specialization),
+      yearsExperience: toNumber(dentist.years_experience),
+      rating: typeof dentist.rating === 'number' ? dentist.rating : null,
+      reviewCount: toNumber(dentist.review_count),
+      isAvailable: dentist.is_available ?? dentist.is_active !== false,
+    })),
+    branches: list(raw?.branches).map((branch: any) => ({
+      id: Number(branch.id),
+      name: String(branch.name ?? 'Branch'),
+      address: [toText(branch.address), toText(branch.city)].filter(Boolean).join(', '),
+      isMain: Boolean(branch.is_main),
+      hours: list(branch.operating_hours).map((h: any) => ({
+        day: toNumber(h.day_of_week),
+        opensAt: String(h.opens_at ?? ''),
+        closesAt: String(h.closes_at ?? ''),
+      })),
+    })),
   };
 };
 
@@ -195,6 +324,9 @@ const normalizeHome = (body: any): HomeData => {
       verifiedClinics: toNumber(data.stats?.verified_clinics),
       totalReviews: toNumber(data.stats?.total_reviews),
       totalSpecializations: toNumber(data.stats?.total_specializations),
+      patients: data.stats?.patients ?? null,
+      municipalities: data.stats?.municipalities ?? null,
+      satisfactionRate: data.stats?.satisfaction_rate ?? null,
     },
     meta: {
       title: toText(data.meta?.page_title),
@@ -210,11 +342,117 @@ const normalizeHome = (body: any): HomeData => {
 export const getCachedHome = () => readCache<HomeData>(KEYS.home);
 
 export const fetchHome = async (): Promise<HomeData> => {
-  const response = await api.get('/home', { timeout: 15000 });
+  const response = await api.get('/home');
   const home = normalizeHome(response.data);
   await writeCache(KEYS.home, home);
   return home;
 };
+
+// ---------------------------------------------------------------------------
+// Dentists
+// ---------------------------------------------------------------------------
+
+const normalizeDentist = (raw: any): PublicDentist => ({
+  id: Number(raw?.id),
+  name: String(raw?.name ?? 'Dentist'),
+  specialization: toText(raw?.specialization),
+  specializationId: raw?.specialization_id != null ? Number(raw.specialization_id) : null,
+  yearsExperience: toNumber(raw?.years_experience),
+  rating: typeof raw?.rating === 'number' ? raw.rating : null,
+  reviewCount: toNumber(raw?.review_count),
+  isAvailable: raw?.is_available ?? raw?.is_active !== false,
+  qualifications: toText(raw?.qualifications),
+  bio: toText(raw?.bio),
+  clinics: list(raw?.clinics).map((clinic: any) => ({
+    id: Number(clinic.id),
+    name: String(clinic.name ?? ''),
+    city: String(clinic.city ?? ''),
+    address: String(clinic.address ?? ''),
+  })),
+  schedules: list(raw?.schedules).map((schedule: any) => ({
+    day: toNumber(schedule.day_of_week),
+    startsAt: String(schedule.starts_at ?? ''),
+    endsAt: String(schedule.ends_at ?? ''),
+  })),
+});
+
+export const getCachedDentists = () => readCache<PublicDentist[]>(KEYS.dentists);
+
+/** The whole directory: search and filters then run on the device, like the clinics. */
+export const fetchDentists = async (): Promise<PublicDentist[]> => {
+  const dentists: PublicDentist[] = [];
+  let page = 1;
+  let lastPage = 1;
+  do {
+    const response = await api.get('/dentists', { params: { page, per_page: 100 } });
+    dentists.push(...list(response.data?.data).map(normalizeDentist));
+    lastPage = toNumber(response.data?.meta?.last_page, 1);
+    page += 1;
+  } while (page <= lastPage && page <= MAX_DIRECTORY_PAGES);
+  await writeCache(KEYS.dentists, dentists);
+  return dentists;
+};
+
+/** A saved profile, or the directory entry (which has no hours) if it was never opened. */
+export const getCachedDentist = async (id: number | string) => {
+  const saved = await readCache<PublicDentist>(KEYS.dentist(id));
+  if (saved) {
+    return saved;
+  }
+  const directory = await getCachedDentists();
+  const entry = directory?.value.find((dentist) => dentist.id === Number(id));
+  return entry && directory ? { value: entry, updatedAt: directory.updatedAt } : null;
+};
+
+export const fetchDentist = async (id: number | string): Promise<PublicDentist> => {
+  const response = await api.get(`/dentists/${id}`);
+  const dentist = normalizeDentist(response.data?.data);
+  await writeCache(KEYS.dentist(id), dentist);
+  return dentist;
+};
+
+// ---------------------------------------------------------------------------
+// Service catalog and contact form
+// ---------------------------------------------------------------------------
+
+const toNumberOrNull = (value: unknown) => (value == null ? null : toNumber(value));
+
+export const getCachedServiceCatalog = () => readCache<CatalogService[]>(KEYS.services);
+
+export const fetchServiceCatalog = async (): Promise<CatalogService[]> => {
+  const response = await api.get('/services');
+  const services = list(response.data?.data).map((service: any) => ({
+    id: Number(service.id),
+    name: String(service.name ?? ''),
+    category: toText(service.category) ?? 'General',
+    description: toText(service.description) ?? '',
+    priceMin: toNumberOrNull(service.price_min),
+    priceMax: toNumberOrNull(service.price_max),
+    durationMin: toNumberOrNull(service.duration_min),
+    durationMax: toNumberOrNull(service.duration_max),
+    clinicCount: toNumber(service.clinic_count),
+  }));
+  await writeCache(KEYS.services, services);
+  return services;
+};
+
+/** Clinics offering a service. The saved directory has no prices, so this needs a connection. */
+export const fetchClinicIdsOfferingService = async (service: string): Promise<number[]> => {
+  const ids: number[] = [];
+  let page = 1;
+  let lastPage = 1;
+  do {
+    const response = await api.get('/clinics/search', { params: { page, service } });
+    const payload = response.data?.data ?? {};
+    ids.push(...list(payload.data).map((clinic: any) => Number(clinic.id)));
+    lastPage = toNumber(payload.last_page, 1);
+    page += 1;
+  } while (page <= lastPage && page <= MAX_DIRECTORY_PAGES);
+  return ids;
+};
+
+/** Sends straight away: a message is never queued for later, the sender is told if it failed. */
+export const sendContactMessage = (message: ContactMessage) => api.post('/contact', message);
 
 // ---------------------------------------------------------------------------
 // Specializations
@@ -230,7 +468,7 @@ export const getSpecializations = async (): Promise<Specialization[]> => {
 };
 
 export const fetchSpecializations = async (): Promise<Specialization[]> => {
-  const response = await api.get('/specializations', { timeout: 15000 });
+  const response = await api.get('/specializations');
   const list = Array.isArray(response.data?.data)
     ? response.data.data.map(normalizeSpecialization)
     : [];
@@ -258,7 +496,6 @@ export const syncClinicDirectory = async (): Promise<number> => {
   do {
     const response = await api.get('/clinics/search', {
       params: { page, sort: 'rating' },
-      timeout: 15000,
     });
     const payload = response.data?.data ?? {};
     const items = Array.isArray(payload.data) ? payload.data : [];
@@ -380,15 +617,8 @@ export const getCachedClinicDetails = async (
 };
 
 export const fetchClinicDetails = async (id: number | string): Promise<ClinicDetails> => {
-  const response = await api.get(`/clinics/${id}`, { timeout: 15000 });
-  const raw = response.data?.data ?? {};
-  const clinic = normalizeClinic(raw);
-  const details: ClinicDetails = {
-    ...clinic,
-    reviews: Array.isArray(raw.reviews)
-      ? raw.reviews.map((review: any) => normalizeReview(review, clinic.name))
-      : [],
-  };
+  const response = await api.get(`/clinics/${id}`);
+  const details = normalizeClinicDetails(response.data?.data ?? {});
   await writeCache(KEYS.clinicDetails(id), details);
   return details;
 };

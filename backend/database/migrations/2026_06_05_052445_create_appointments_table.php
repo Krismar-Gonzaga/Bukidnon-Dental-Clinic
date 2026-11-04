@@ -1,4 +1,3 @@
-// database/migrations/xxxx_xx_xx_000004_create_appointments_table.php
 <?php
 
 use Illuminate\Database\Migrations\Migration;

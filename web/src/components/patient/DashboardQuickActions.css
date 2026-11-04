@@ -40,3 +40,8 @@
 .dashboard-quick-action-chevron {
   color: var(--color-text-muted);
 }
+
+/* The side column is narrow next to the appointments. */
+.dashboard-quick-action {
+  font-size: 0.875rem;
+}

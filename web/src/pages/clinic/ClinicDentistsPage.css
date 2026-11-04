@@ -1,0 +1,99 @@
+/* Dentist Management (clinic admin design). */
+
+.clinic-dentist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clinic-dentist-card {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  border: 1px solid #eef0f4;
+  border-radius: 20px;
+  background-color: #ffffff;
+  box-shadow: 0 4px 16px rgba(24, 28, 32, 0.06);
+}
+
+.clinic-dentist-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.clinic-dentist-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.clinic-dentist-name {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--clinic-on-surface);
+  overflow-wrap: anywhere;
+}
+
+.clinic-dentist-specialty {
+  font-size: 1rem;
+}
+
+.clinic-dentist-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: var(--space-3) 0 var(--space-4);
+  font-size: 0.875rem;
+  color: var(--clinic-on-surface-variant);
+}
+
+.clinic-dentist-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.clinic-dentist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.clinic-dentist-view {
+  flex: 1 1 8rem;
+  padding: 10px var(--space-4);
+}
+
+.clinic-dentist-edit {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2) 14px;
+  border: 1px solid var(--clinic-surface-high);
+  border-radius: 8px;
+  background: none;
+  color: var(--clinic-on-surface-variant);
+  cursor: pointer;
+}
+
+.clinic-dentist-edit:hover,
+.clinic-dentist-edit:focus-visible {
+  border-color: var(--clinic-primary);
+  color: var(--clinic-primary);
+}
+
+@media (max-width: 1100px) {
+  .clinic-dentist-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .clinic-dentist-card {
+    padding: var(--space-4);
+  }
+}
