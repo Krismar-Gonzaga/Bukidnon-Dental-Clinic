@@ -7,6 +7,32 @@ import { toAppointment } from './adapters';
 const base = (clinicId) => `/manage/clinics/${clinicId}`;
 const send = async (method, url, body) => (await apiClient[method](url, body)).data;
 
+// Saves a protected file through the signed-in session. An error comes back as
+// a blob, so it is read as JSON first to keep its message.
+async function saveBlob(url, fileName) {
+  let response;
+  try {
+    response = await apiClient.get(url, { responseType: 'blob' });
+  } catch (error) {
+    if (typeof Blob !== 'undefined' && error.response?.data instanceof Blob) {
+      try {
+        error.response.data = JSON.parse(await error.response.data.text());
+      } catch {
+        // Not JSON: keep the original error.
+      }
+    }
+    throw error;
+  }
+  const href = window.URL.createObjectURL(response.data);
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(href);
+}
+
 // Clinic profile, dashboard, reports
 export const getClinicOverview = (clinicId) => getData(base(clinicId));
 export const updateClinicProfile = (clinicId, body) => send('put', base(clinicId), body);
@@ -38,6 +64,11 @@ export const getClinicAppointment = async (clinicId, id) => toAppointment(await 
 export const appointmentAction = (clinicId, id, action, body) =>
   send('post', `${base(clinicId)}/appointments/${id}/${action}`, body);
 export const bookForPatient = (clinicId, body) => send('post', `${base(clinicId)}/appointments`, body);
+export const getCheckInQueue = (clinicId) => getData(`${base(clinicId)}/appointments/queue`);
+export const saveFrontDeskNotes = (clinicId, id, notes) => send('put', `${base(clinicId)}/appointments/${id}/front-desk-notes`, { notes });
+export const getMyClinicDetails = (clinicId) => getData(`${base(clinicId)}/me`);
+export const updateMyClinicDetails = (clinicId, body) => send('put', `${base(clinicId)}/me`, body);
+export const reassignAppointment = (clinicId, id, dentistId) => send('post', `${base(clinicId)}/appointments/${id}/reassign`, { dentist_id: dentistId });
 
 // Patients and clinical records
 export const getClinicPatients = (clinicId, params) => getPage(`${base(clinicId)}/patients`, params);
@@ -53,6 +84,14 @@ export const getClinicRecords = (clinicId, params) => getPage(`${base(clinicId)}
 export const createRecord =(clinicId, patientId, body) => send('post', `${base(clinicId)}/patients/${patientId}/records`, body);
 export const amendRecord = (clinicId, patientId, recordId, body) =>
   send('post', `${base(clinicId)}/patients/${patientId}/records/${recordId}/amend`, body);
+export const getPatientFiles = (clinicId, patientId) => getData(`${base(clinicId)}/patients/${patientId}/files`);
+export const uploadPatientFile = (clinicId, patientId, file) => {
+  const body = new FormData();
+  body.append('file', file);
+  return send('post', `${base(clinicId)}/patients/${patientId}/files`, body);
+};
+export const downloadPatientFile = (clinicId, patientId, file) =>
+  saveBlob(`${base(clinicId)}/patients/${patientId}/files/${file.id}`, file.name);
 
 // Inventory
 export const getInventoryItems = (clinicId, params) => getData(`${base(clinicId)}/inventory/items`, params);
@@ -71,16 +110,23 @@ export const createSupplier = (clinicId, body) => send('post', `${base(clinicId)
 export const getClinicServices = (clinicId) => getData(`${base(clinicId)}/services`);
 export const createClinicService = (clinicId, body) => send('post', `${base(clinicId)}/services`, body);
 export const updateClinicService = (clinicId, id, body) => send('put', `${base(clinicId)}/services/${id}`, body);
+export const archiveClinicService = (clinicId, id) => send('delete', `${base(clinicId)}/services/${id}`);
 export const getClinicDentists = (clinicId) => getData(`${base(clinicId)}/dentists`);
+export const getClinicDentist = (clinicId, id) => getData(`${base(clinicId)}/dentists/${id}`);
 export const updateDentist = (clinicId, id, body) => send('put', `${base(clinicId)}/dentists/${id}`, body);
 export const updateDentistSchedules = (clinicId, id, schedules) => send('put', `${base(clinicId)}/dentists/${id}/schedules`, { schedules });
 export const getBranches = (clinicId) => getData(`${base(clinicId)}/branches`);
 export const createBranch = (clinicId, body) => send('post', `${base(clinicId)}/branches`, body);
 export const updateBranch = (clinicId, id, body) => send('put', `${base(clinicId)}/branches/${id}`, body);
+export const removeBranch = (clinicId, id) => send('delete', `${base(clinicId)}/branches/${id}`);
 export const updateBranchHours = (clinicId, id, hours) => send('put', `${base(clinicId)}/branches/${id}/hours`, { hours });
 export const getHolidays = (clinicId) => getData(`${base(clinicId)}/holidays`);
 export const createHoliday = (clinicId, body) => send('post', `${base(clinicId)}/holidays`, body);
 export const deleteHoliday = (clinicId, id) => send('delete', `${base(clinicId)}/holidays/${id}`);
+// Dentists' schedule changes waiting for a decision.
+export const getScheduleChanges = (clinicId, params) => getData(`${base(clinicId)}/schedule-changes`, params);
+export const approveScheduleChange = (clinicId, id) => send('post', `${base(clinicId)}/schedule-changes/${id}/approve`);
+export const rejectScheduleChange = (clinicId, id, reason) => send('post', `${base(clinicId)}/schedule-changes/${id}/reject`, { reason });
 export const getScheduleBlocks = (clinicId) => getData(`${base(clinicId)}/schedule-blocks`);
 export const createScheduleBlock = (clinicId, body) => send('post', `${base(clinicId)}/schedule-blocks`, body);
 export const deleteScheduleBlock = (clinicId, id) => send('delete', `${base(clinicId)}/schedule-blocks/${id}`);
@@ -89,8 +135,31 @@ export const deleteScheduleBlock = (clinicId, id) => send('delete', `${base(clin
 export const getMembers = (clinicId) => getData(`${base(clinicId)}/members`);
 export const inviteMember = (clinicId, body) => send('post', `${base(clinicId)}/members`, body);
 export const updateMember = (clinicId, id, body) => send('put', `${base(clinicId)}/members/${id}`, body);
+export const resetMemberPassword = (clinicId, id) => send('post', `${base(clinicId)}/members/${id}/reset-password`);
 export const getClinicReviews = (clinicId, params) => getPage(`${base(clinicId)}/reviews`, params);
 export const reportReview = (clinicId, reviewId, reason) => send('post', `${base(clinicId)}/reviews/${reviewId}/report`, { reason });
+export const replyToReview = (clinicId, reviewId, reply) => send('post', `${base(clinicId)}/reviews/${reviewId}/reply`, { reply });
+
+// Clinic settings, role permissions and the clinic's audit log
+export const getClinicSettings = (clinicId) => getData(`${base(clinicId)}/settings`);
+export const updateClinicSettings = (clinicId, body) => send('put', `${base(clinicId)}/settings`, body);
+export const getRolePermissions = (clinicId) => getData(`${base(clinicId)}/role-permissions`);
+export const updateRolePermissions = (clinicId, positions) => send('put', `${base(clinicId)}/role-permissions`, { positions });
+export const getClinicAuditLogs = (clinicId, params) => getPage(`${base(clinicId)}/audit-logs`, params);
+export const exportClinicAuditLogs = (clinicId) => saveBlob(`${base(clinicId)}/audit-logs/export`, 'clinic-audit-log.csv');
+
+// Subscription (payment is made outside the app; proof is reviewed by a system administrator)
+export const getSubscription = (clinicId) => getData(`${base(clinicId)}/subscription`);
+export const submitPaymentProof = (clinicId, { method, reference, proof }) => {
+  const body = new FormData();
+  body.append('method', method);
+  if (reference) body.append('reference', reference);
+  body.append('proof', proof);
+  return send('post', `${base(clinicId)}/subscription/payments`, body);
+};
+export const requestRenewal = (clinicId) => send('post', `${base(clinicId)}/subscription/renewal-request`);
+export const downloadInvoice = (clinicId, payment) =>
+  saveBlob(`${base(clinicId)}/subscription/payments/${payment.id}/invoice`, `${payment.invoice_number ?? 'invoice'}.pdf`);
 
 // Shared lookups
 export const getSpecializationOptions = () => getData('/specializations');

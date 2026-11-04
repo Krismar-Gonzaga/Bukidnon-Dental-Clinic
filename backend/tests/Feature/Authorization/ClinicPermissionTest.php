@@ -92,11 +92,17 @@ class ClinicPermissionTest extends TestCase
 
     public function test_role_permission_map_keeps_clinical_records_restricted(): void
     {
-        $permissions = config('permissions.clinic_roles');
-
-        $this->assertNotContains('records.view', $permissions['clinic_admin']);
-        $this->assertNotContains('records.write', $permissions['staff']);
-        $this->assertContains('records.write', $permissions['dentist']);
+        // Dentists treat patients and administrators run the clinic (every access is logged);
+        // nobody else may read or write clinical records.
+        $roles = config('permissions.clinic_roles');
+        foreach (['dentist', 'clinic_admin'] as $role) {
+            $this->assertContains('records.view', $roles[$role]);
+            $this->assertContains('records.write', $roles[$role]);
+        }
+        foreach (['staff', 'inventory_staff'] as $role) {
+            $this->assertNotContains('records.view', $roles[$role]);
+            $this->assertNotContains('records.write', $roles[$role]);
+        }
     }
 
     public function test_audit_log_entries_cannot_be_modified_or_deleted(): void

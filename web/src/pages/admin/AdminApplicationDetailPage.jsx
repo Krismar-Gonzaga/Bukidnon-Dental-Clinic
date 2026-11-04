@@ -3,136 +3,141 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import AdminLayout from '../../layouts/AdminLayout';
 import Icon from '../../components/Icon';
-import { Field, FormError, Modal } from '../../components/portal/PortalUi';
+import { BackLink, Card } from '../../components/clinic/ClinicAdminUi';
+import { ActionDialog, StatusTag, WorkflowSteps } from '../../components/admin/AdminUi';
 import { useSensitiveAction } from '../../components/admin/AdminSecurity';
+import { Field, FormError } from '../../components/portal/PortalUi';
 import { QueryState } from '../../components/StatusMessage';
-import { ADMIN_APPLICATIONS_HREF, ADMIN_CLINICS_HREF, APPLICATION_STATUS_LABELS } from '../../config/adminNavigation';
+import { ADMIN_APPLICATIONS_HREF, CLINIC_STATUS, VERIFICATION_DOCUMENT_LABELS, getAdminClinicHref } from '../../config/adminNavigation';
 import {
   addApplicationNote,
   approveApplication,
   getApplication,
   openApplicationDocument,
   rejectApplication,
+  requestApplicationDocuments,
   startApplicationReview,
 } from '../../services/adminApi';
 import { getErrorMessage } from '../../services/apiErrors';
-import { formatDate, formatDateTime } from '../../utils/dateTime';
-import { DOCUMENT_LABELS } from '../clinic/ClinicApplicationPage';
-import './AdminApplicationDetailPage.css';
+import { formatDateTime, formatShortDate } from '../../utils/dateTime';
 
 const OPEN = ['pending', 'under_review'];
 
-const fileSize = (bytes) => {
-  if (!bytes) return '';
-  return bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+const HISTORY_LABELS = {
+  'clinic_application.submitted': 'Submission received',
+  'clinic_application.document_uploaded': 'Document uploaded',
+  'clinic_application.review_started': 'Review started',
+  'clinic_application.document_accessed': 'Document opened',
+  'clinic_application.note_added': 'Internal note added',
+  'clinic_application.approved': 'Clinic approved',
+  'clinic_application.rejected': 'Rejected',
+  'clinic_application.documents_requested': 'More documents requested',
 };
 
-const HISTORY = {
-  'clinic_application.submitted': { label: 'Submission received', icon: 'send', tone: 'neutral' },
-  'clinic_application.document_uploaded': { label: 'Document uploaded', icon: 'clipboardList', tone: 'neutral' },
-  'clinic_application.review_started': { label: 'Manual review started', icon: 'eye', tone: 'primary' },
-  'clinic_application.document_accessed': { label: 'Document opened', icon: 'lock', tone: 'neutral' },
-  'clinic_application.note_added': { label: 'Internal note added', icon: 'pencil', tone: 'neutral' },
-  'clinic_application.approved': { label: 'Clinic approved', icon: 'check', tone: 'success' },
-  'clinic_application.rejected': { label: 'Returned to the applicant', icon: 'alertCircle', tone: 'warning' },
+const DECISIONS = {
+  approve: {
+    title: 'Approve Clinic',
+    verb: 'approve',
+    detail: ' The clinic, its main branch and clinic admin access will be created. It stays hidden until the owner publishes it.',
+    label: 'Message to the applicant (optional)',
+    optional: true,
+    run: approveApplication,
+  },
+  reject: {
+    title: 'Reject Clinic',
+    verb: 'reject',
+    detail: ' They can correct it and submit again.',
+    label: 'Reason (sent to the applicant)',
+    optional: false,
+    run: rejectApplication,
+  },
+  request: {
+    title: 'Request More Documents',
+    verb: 'request more documents from',
+    detail: ' The registration goes back to them to add what is missing.',
+    label: 'What the applicant needs to send',
+    optional: false,
+    run: requestApplicationDocuments,
+  },
 };
 
-function ApprovedPanel({ app }) {
-  return (
-    <section className="admin-approved" aria-labelledby="admin-approved-title" role="status">
-      <span className="admin-approved-icon" aria-hidden="true">
-        <Icon name="checkCircle" size={32} />
-      </span>
-      <div className="admin-approved-body">
-        <h2 id="admin-approved-title" className="admin-approved-title">
-          Clinic approval confirmed
-        </h2>
-        <p>
-          <strong>{app.clinic_name}</strong> is a verified clinic{app.reviewed_at ? ` since ${formatDateTime(app.reviewed_at)}` : ''}.
-        </p>
-        <ul className="admin-approved-steps">
-          <li>The clinic, its main branch and the owner&apos;s clinic-admin access were created.</li>
-          <li>The applicant was notified. The clinic stays hidden from patients until the owner publishes it.</li>
-        </ul>
-        <div className="admin-approved-actions">
-          <a href={ADMIN_APPLICATIONS_HREF} className="btn btn-outline btn-sm">
-            Back to Registration Queue
-          </a>
-          <a href={`${ADMIN_CLINICS_HREF}?search=${encodeURIComponent(app.clinic_name)}`} className="btn btn-primary btn-sm">
-            View in Verification
-          </a>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Documents({ app }) {
+function SubmittedDocuments({ app }) {
   const [error, setError] = useState('');
-  const open = (doc, download) =>
+  const open = (doc, download) => {
+    setError('');
     openApplicationDocument('admin', app.id, doc.id, { download }).catch((e) => setError(getErrorMessage(e)));
+  };
 
   return (
-    <section className="admin-card admin-detail-card" aria-labelledby="admin-docs-title">
-      <div className="admin-card-header admin-detail-header">
-        <h3 id="admin-docs-title" className="admin-card-title">
-          <Icon name="clipboardList" size={22} className="admin-title-icon" />
-          Verification Documents
-        </h3>
-        <span className="admin-overline">
-          {app.documents.length} {app.documents.length === 1 ? 'File' : 'Files'} Uploaded
-        </span>
-      </div>
-      <p className="admin-detail-note">Links last 5 minutes and every view or download is recorded in the audit log.</p>
-      {app.documents.length === 0 ? (
-        <p className="admin-detail-note">No documents uploaded.</p>
-      ) : (
-        <ul className="admin-docs">
-          {app.documents.map((doc) => {
-            const label = DOCUMENT_LABELS[doc.document_type] ?? doc.document_type;
-            return (
-              <li key={doc.id} className="admin-doc">
-                <div className="admin-doc-head">
-                  <span className="admin-doc-icon" aria-hidden="true">
-                    <Icon name="shieldCheck" size={22} />
-                  </span>
-                  <div className="admin-doc-text">
-                    <p className="admin-doc-name">{label}</p>
-                    <p className="admin-doc-file">
-                      {doc.original_name}
-                      {doc.size ? ` • ${fileSize(doc.size)}` : ''}
-                    </p>
-                  </div>
-                </div>
-                <div className="admin-doc-actions">
-                  <button type="button" onClick={() => open(doc, false)} aria-label={`View ${label}`}>
-                    View
-                  </button>
-                  <button type="button" onClick={() => open(doc, true)} aria-label={`Download ${label}`}>
-                    Download
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+    <>
+      <h3 className="admin-subheading">Submitted Documents</h3>
+      <p className="admin-muted admin-small">Links last 5 minutes. Every view and download is recorded in the audit log.</p>
+      <ul className="admin-documents">
+        {app.documents.map((doc) => {
+          const label = VERIFICATION_DOCUMENT_LABELS[doc.document_type] ?? doc.document_type;
+          return (
+            <li key={doc.id} className="admin-document is-submitted">
+              <Icon name="checkCircle" size={18} />
+              <span className="admin-document-name">
+                {label}
+                <span className="admin-document-file">{doc.original_name}</span>
+              </span>
+              <button type="button" className="admin-document-action" aria-label={`View ${label}`} onClick={() => open(doc, false)}>
+                View
+              </button>
+              <button type="button" className="admin-document-action" aria-label={`Download ${label}`} onClick={() => open(doc, true)}>
+                Download
+              </button>
+              <span className="admin-document-state">Submitted</span>
+            </li>
+          );
+        })}
+        {app.missing_documents.map((type) => (
+          <li key={type} className="admin-document is-missing">
+            <Icon name="close" size={18} />
+            <span className="admin-document-name">{VERIFICATION_DOCUMENT_LABELS[type] ?? type}</span>
+            <span className="admin-document-state">Missing</span>
+          </li>
+        ))}
+      </ul>
       {error && (
         <p className="portal-inline-error" role="alert">
           {error}
         </p>
       )}
-      {app.missing_documents.length > 0 && (
-        <p className="portal-inline-error">Missing: {app.missing_documents.map((d) => DOCUMENT_LABELS[d] ?? d).join(', ')}</p>
-      )}
-    </section>
+    </>
   );
 }
 
-function InternalNotes({ app, queryKey }) {
+function ClinicDetails({ app }) {
+  const rows = [
+    ['Location', [app.address, app.city, app.province].filter(Boolean).join(', ')],
+    ['Contact Email', app.email],
+    ['Phone', app.contact_number],
+    ['Representative', [app.representative_name, app.representative_position].filter(Boolean).join(', ')],
+    ['Applicant Account', app.applicant ? `${app.applicant.name} (${app.applicant.email})` : ''],
+  ];
+
+  return (
+    <Card title="Clinic Details">
+      <dl className="admin-info-list">
+        {rows.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value || '—'}</dd>
+          </div>
+        ))}
+      </dl>
+      {app.description && <p className="admin-muted admin-spaced-top">{app.description}</p>}
+    </Card>
+  );
+}
+
+// Only administrators see these; they stay in the audit log and cannot be edited.
+function NotesAndHistory({ app, queryKey }) {
   const queryClient = useQueryClient();
   const [note, setNote] = useState('');
-  const notes = app.history.filter((h) => h.action === 'clinic_application.note_added').reverse();
+  const history = (app.history ?? []).slice().reverse();
   const save = useMutation({
     mutationFn: () => addApplicationNote(app.id, note.trim()),
     onSuccess: (response) => {
@@ -142,10 +147,7 @@ function InternalNotes({ app, queryKey }) {
   });
 
   return (
-    <section className="admin-card admin-detail-card" aria-labelledby="admin-notes-title">
-      <h3 id="admin-notes-title" className="admin-card-title admin-detail-heading">
-        Internal Notes
-      </h3>
+    <Card title="Internal Notes & History">
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -155,255 +157,182 @@ function InternalNotes({ app, queryKey }) {
         <Field
           label="New note"
           as="textarea"
-          className="admin-note-field"
-          placeholder="Leave a note about this clinic's verification process…"
-          hint="Only administrators see these notes. They are kept in the audit log and cannot be edited or deleted."
+          hint="Only administrators see notes. They are kept in the audit log and cannot be edited or deleted."
           maxLength={2000}
           value={note}
-          onChange={(e) => setNote(e.target.value)}
+          onChange={(event) => setNote(event.target.value)}
         />
         <FormError error={save.error} />
         <div className="admin-note-actions">
           {save.isSuccess && !note && (
-            <span className="admin-note-saved" role="status">
+            <span className="admin-success-text" role="status">
               Note saved
             </span>
           )}
-          <button type="submit" className="btn btn-primary btn-sm" disabled={!note.trim() || save.isPending}>
+          <button type="submit" className="btn btn-outline btn-sm" disabled={!note.trim() || save.isPending}>
             {save.isPending ? 'Saving…' : 'Save Note'}
           </button>
         </div>
       </form>
-      {notes.length > 0 && (
-        <ul className="admin-notes">
-          {notes.map((n) => (
-            <li key={n.id}>
-              <p className="admin-note-text">{n.note}</p>
-              <p className="admin-note-meta">
-                {n.actor ?? 'Administrator'} · {formatDateTime(n.at)}
-              </p>
+      {history.length > 0 && (
+        <ol className="admin-history">
+          {history.map((event) => (
+            <li key={event.id}>
+              <p className="admin-history-label">{HISTORY_LABELS[event.action] ?? event.action}</p>
+              {event.note && <p className="admin-history-note">{event.note}</p>}
+              {event.document_type && <p className="admin-history-note">{VERIFICATION_DOCUMENT_LABELS[event.document_type] ?? event.document_type}</p>}
+              <p className="admin-history-meta">{[formatDateTime(event.at), event.actor].filter(Boolean).join(' · ')}</p>
             </li>
           ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function Snapshot({ app }) {
-  const rows = [
-    { icon: 'mapPin', label: 'Location', value: [app.address, app.city, app.province].filter(Boolean).join(', ') },
-    { icon: 'mail', label: 'Contact Email', value: app.email },
-    { icon: 'phone', label: 'Phone', value: app.contact_number },
-    { icon: 'stethoscope', label: 'Representative', value: [app.representative_name, app.representative_position].filter(Boolean).join(', ') },
-    { icon: 'user', label: 'Applicant Account', value: app.applicant ? `${app.applicant.name} (${app.applicant.email})` : '' },
-  ];
-
-  return (
-    <section className="admin-card admin-detail-card admin-snapshot" aria-labelledby="admin-snapshot-title">
-      <h3 id="admin-snapshot-title" className="admin-card-title admin-detail-heading">
-        Clinic Snapshot
-      </h3>
-      <dl className="admin-snapshot-list">
-        {rows.map((row) => (
-          <div key={row.label} className="admin-snapshot-row">
-            <Icon name={row.icon} size={20} className="admin-snapshot-icon" />
-            <div>
-              <dt className="admin-overline">{row.label}</dt>
-              <dd>{row.value || '—'}</dd>
-            </div>
-          </div>
-        ))}
-      </dl>
-      {app.description && <p className="admin-detail-note admin-snapshot-description">{app.description}</p>}
-    </section>
-  );
-}
-
-function ReviewHistory({ app }) {
-  const events = app.history.slice().reverse();
-  return (
-    <section className="admin-card admin-detail-card" aria-labelledby="admin-history-title">
-      <h3 id="admin-history-title" className="admin-card-title admin-detail-heading">
-        Review History
-      </h3>
-      {events.length === 0 ? (
-        <p className="admin-detail-note">No recorded events yet.</p>
-      ) : (
-        <ol className="admin-history">
-          {events.map((event) => {
-            const meta = HISTORY[event.action] ?? { label: event.action, icon: 'info', tone: 'neutral' };
-            const detail =
-              event.action === 'clinic_application.document_uploaded'
-                ? DOCUMENT_LABELS[event.document_type] ?? event.document_type
-                : event.action === 'clinic_application.rejected' && app.status === 'rejected'
-                  ? app.review_notes
-                  : null;
-            return (
-              <li key={event.id} className="admin-history-item">
-                <span className={`admin-history-dot is-${meta.tone}`} aria-hidden="true">
-                  <Icon name={meta.icon} size={12} />
-                </span>
-                <p className="admin-history-label">{meta.label}</p>
-                <p className="admin-history-meta">
-                  {formatDateTime(event.at)}
-                  {event.actor ? ` · ${event.actor}` : ''}
-                </p>
-                {detail && <p className="admin-history-detail">{detail}</p>}
-              </li>
-            );
-          })}
         </ol>
       )}
-    </section>
+    </Card>
   );
 }
 
-function DecisionModal({ kind, app, onClose, onDone }) {
+function VerificationActions({ app, onChanged }) {
   const runSensitive = useSensitiveAction();
-  const [notes, setNotes] = useState('');
-  const isApprove = kind === 'approve';
+  const [kind, setKind] = useState(null);
+  const decision = kind ? DECISIONS[kind] : null;
+  const missing = app.missing_documents.length > 0;
   const decide = useMutation({
-    mutationFn: () =>
-      runSensitive(() => (isApprove ? approveApplication(app.id, notes.trim() || undefined) : rejectApplication(app.id, notes.trim()))),
-    onSuccess: onDone,
+    mutationFn: (notes) => runSensitive(() => decision.run(app.id, notes || undefined)),
+    onSuccess: () => {
+      setKind(null);
+      onChanged();
+    },
   });
+  const ask = (next) => {
+    decide.reset();
+    setKind(next);
+  };
 
   return (
-    <Modal title={isApprove ? `Approve ${app.clinic_name}?` : 'Request more information'} onClose={onClose}>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          decide.mutate();
-        }}
-      >
-        <p className="portal-confirm-message">
-          {isApprove
-            ? 'Approving creates the clinic and its main branch, gives the applicant clinic-admin access and notifies them. The clinic stays hidden until the owner publishes it. This cannot be undone here; a clinic can later be suspended.'
-            : 'The application goes back to the applicant with your message so they can fix it and submit again.'}
-        </p>
-        <Field
-          label={isApprove ? 'Message to the applicant (optional)' : 'What the applicant needs to fix'}
-          as="textarea"
-          required={!isApprove}
-          className="portal-spaced-top"
-          maxLength={2000}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          hint="Sent to the applicant."
-        />
-        <FormError error={decide.error} />
-        <div className="portal-form-actions">
-          <button type="button" className="btn btn-outline" onClick={onClose} disabled={decide.isPending}>
-            Cancel
+    <Card title="Verification Actions">
+      {OPEN.includes(app.status) ? (
+        <div className="admin-action-stack">
+          <button
+            type="button"
+            className="admin-action-button is-solid-success"
+            disabled={missing}
+            title={missing ? 'Required documents are missing' : undefined}
+            onClick={() => ask('approve')}
+          >
+            <Icon name="check" size={18} />
+            Approve Clinic
           </button>
-          <button type="submit" className="btn btn-primary" disabled={decide.isPending || (!isApprove && !notes.trim())}>
-            {decide.isPending ? 'Saving…' : isApprove ? 'Approve clinic' : 'Send request'}
+          <button type="button" className="admin-action-button is-danger" onClick={() => ask('reject')}>
+            <Icon name="close" size={18} />
+            Reject
+          </button>
+          <button type="button" className="admin-action-button is-warning" onClick={() => ask('request')}>
+            <Icon name="upload" size={18} />
+            Request More Documents
           </button>
         </div>
-      </form>
-    </Modal>
+      ) : (
+        <>
+          <p className={`admin-result-note ${app.status === 'approved' ? 'is-success' : 'is-warning'}`} role="status">
+            <Icon name={app.status === 'approved' ? 'checkCircle' : 'info'} size={18} />
+            {app.status === 'approved'
+              ? `Clinic verified${app.reviewed_at ? ` on ${formatShortDate(app.reviewed_at)}` : ''}.`
+              : 'Waiting for the applicant to correct it and submit again.'}
+          </p>
+          {app.review_notes && <p className="admin-muted admin-spaced-top">{app.review_notes}</p>}
+          {app.clinic_id && (
+            <a href={getAdminClinicHref(app.clinic_id)} className="admin-action-button admin-spaced-top">
+              <Icon name="building" size={18} />
+              View Clinic
+            </a>
+          )}
+        </>
+      )}
+
+      {decision && (
+        <ActionDialog
+          title={decision.title}
+          message={
+            <>
+              Are you sure you want to <strong>{decision.verb}</strong> {app.clinic_name}?{decision.detail}
+            </>
+          }
+          reasonLabel={decision.label}
+          reasonOptional={decision.optional}
+          isBusy={decide.isPending}
+          error={decide.error}
+          onConfirm={(notes) => decide.mutate(notes)}
+          onCancel={() => setKind(null)}
+        />
+      )}
+    </Card>
   );
 }
 
-function ApplicationDetail({ applicationId }) {
-  const queryClient = useQueryClient();
-  const queryKey = ['admin', 'application', applicationId];
-  const query = useQuery({ queryKey, queryFn: () => getApplication(applicationId) });
-  const [decision, setDecision] = useState(null); // 'approve' | 'request'
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin'] });
-  const startReview = useMutation({ mutationFn: () => startApplicationReview(applicationId), onSuccess: refresh });
+function WorkflowCard({ app, onChanged }) {
+  const start = useMutation({ mutationFn: () => startApplicationReview(app.id), onSuccess: onChanged });
+  const decided = ['approved', 'rejected'].includes(app.status);
 
   return (
-    <QueryState query={query} loadingLabel="Loading application…">
-      {(app) => {
-        const isOpen = OPEN.includes(app.status);
-        const missing = app.missing_documents.length > 0;
-        const history = app.history ?? [];
-        const withHistory = { ...app, history };
-        return (
-          <div className="admin-detail">
-            <header className="admin-detail-top">
-              <div>
-                <a href={ADMIN_APPLICATIONS_HREF} className="admin-back-link">
-                  <Icon name="arrowLeft" size={16} />
-                  Back to Registration Queue
-                </a>
-                <h2 className="admin-detail-title">{app.clinic_name}</h2>
-                <div className="admin-detail-meta">
-                  <span className={`admin-status-pill is-${app.status}`}>
-                    <Icon name={app.status === 'approved' ? 'checkCircle' : 'eye'} size={16} />
-                    {APPLICATION_STATUS_LABELS[app.status] ?? app.status}
-                  </span>
-                  <span>{app.submitted_at ? `Submitted on ${formatDate(app.submitted_at)}` : 'Not submitted'}</span>
-                </div>
-              </div>
-              {isOpen && (
-                <div className="admin-detail-actions">
-                  {app.status === 'pending' && (
-                    <button type="button" className="btn btn-outline" disabled={startReview.isPending} onClick={() => startReview.mutate()}>
-                      {startReview.isPending ? 'Starting…' : 'Start Review'}
-                    </button>
-                  )}
-                  <button type="button" className="btn btn-outline" onClick={() => setDecision('request')}>
-                    Request More Info
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={missing}
-                    title={missing ? 'Required documents are missing' : undefined}
-                    onClick={() => setDecision('approve')}
-                  >
-                    Approve Clinic
-                  </button>
-                </div>
-              )}
-            </header>
-            <FormError error={startReview.error} />
-
-            {app.status === 'approved' && <ApprovedPanel app={app} />}
-            {app.status === 'rejected' && (
-              <p className="admin-returned" role="status">
-                Returned to the applicant{app.reviewed_at ? ` on ${formatDateTime(app.reviewed_at)}` : ''}. Waiting for them to correct and
-                resubmit.
-              </p>
-            )}
-
-            <div className="admin-detail-grid">
-              <div className="admin-detail-main">
-                <Documents app={app} />
-                <InternalNotes app={withHistory} queryKey={queryKey} />
-              </div>
-              <div className="admin-detail-side">
-                <Snapshot app={app} />
-                <ReviewHistory app={withHistory} />
-              </div>
-            </div>
-
-            {decision && (
-              <DecisionModal
-                kind={decision}
-                app={app}
-                onClose={() => setDecision(null)}
-                onDone={() => {
-                  setDecision(null);
-                  refresh();
-                }}
-              />
-            )}
-          </div>
-        );
-      }}
-    </QueryState>
+    <Card title="Workflow Status">
+      <WorkflowSteps
+        label="Verification progress"
+        steps={[
+          { label: 'Clinic registered', done: true },
+          { label: 'Documents submitted', done: Boolean(app.submitted_at) },
+          { label: 'Under review', done: app.status === 'under_review' || decided },
+          { label: 'Verified', done: app.status === 'approved' },
+        ]}
+      />
+      {app.status === 'pending' && (
+        <button type="button" className="btn btn-outline btn-sm admin-spaced-top" disabled={start.isPending} onClick={() => start.mutate()}>
+          {start.isPending ? 'Starting…' : 'Start Review'}
+        </button>
+      )}
+      <FormError error={start.error} />
+    </Card>
   );
 }
 
 function AdminApplicationDetailPage() {
   const { applicationId } = useParams();
+  const queryClient = useQueryClient();
+  const queryKey = ['admin', 'application', applicationId];
+  const query = useQuery({ queryKey, queryFn: () => getApplication(applicationId) });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin'] });
+
   return (
-    <AdminLayout title="Clinic Verification" activeHref={ADMIN_APPLICATIONS_HREF}>
-      <ApplicationDetail applicationId={applicationId} />
+    <AdminLayout title="Verification Review" activeHref={ADMIN_APPLICATIONS_HREF}>
+      <BackLink href={ADMIN_APPLICATIONS_HREF}>Back to Verifications</BackLink>
+      <QueryState query={query} loadingLabel="Loading registration…">
+        {(app) => {
+          const status = app.documents_requested ? { label: 'More Documents Requested', tone: 'warning' } : CLINIC_STATUS[app.status] ?? CLINIC_STATUS.pending;
+          const admin = app.representative_name || app.applicant?.name;
+          return (
+            <div className="admin-detail-columns">
+              <div className="admin-stack">
+                <Card className="admin-detail-card">
+                  <div className="admin-detail-head">
+                    <div>
+                      <h2 className="admin-detail-name">{app.clinic_name}</h2>
+                      <p className="admin-detail-sub">
+                        {[admin && `Admin: ${admin}`, app.submitted_at && `Submitted: ${formatShortDate(app.submitted_at)}`].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                    <StatusTag tone={status.tone}>{status.label}</StatusTag>
+                  </div>
+                  <SubmittedDocuments app={app} />
+                </Card>
+                <ClinicDetails app={app} />
+                <NotesAndHistory app={app} queryKey={queryKey} />
+              </div>
+              <div className="admin-stack">
+                <VerificationActions app={app} onChanged={refresh} />
+                <WorkflowCard app={app} onChanged={refresh} />
+              </div>
+            </div>
+          );
+        }}
+      </QueryState>
     </AdminLayout>
   );
 }

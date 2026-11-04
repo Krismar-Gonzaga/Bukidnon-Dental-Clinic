@@ -76,9 +76,13 @@ export function toAppointment(api) {
     requestedDateTime: api.requested_starts_at ? formatDateTime(api.requested_starts_at) : '',
     hasReview: Boolean(api.has_review),
     patient: api.patient
-      ? { id: api.patient.id, name: api.patient.name, email: api.patient.email, phone: api.patient.phone, age: api.patient.age ?? null }
+      ? { id: api.patient.id, name: api.patient.name, email: api.patient.email, phone: api.patient.phone, age: api.patient.age ?? null, gender: api.patient.gender ?? null }
       : null,
     type: api.type ?? null,
+    medicalFlags: api.medical_flags ?? [],
+    frontDeskNotes: api.front_desk_notes ?? '',
+    treatmentNotes: api.treatment_notes ?? '',
+    patientLastVisitAt: api.patient_last_visit_at ?? null,
     history: (api.status_history ?? []).map((entry) => ({
       from: entry.from,
       to: entry.to,
@@ -173,6 +177,9 @@ export function toReview(api) {
     patientName: api.patient_name,
     clinicName: api.clinic_name ?? '',
     isVerifiedVisit: Boolean(api.is_verified_visit),
+    service: api.service ?? '',
+    dentist: api.dentist ?? '',
+    clinicReply: api.clinic_reply ?? '',
     status: api.status,
     date: api.date ? formatDate(`${api.date}T12:00:00+08:00`) : '',
   };

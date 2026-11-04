@@ -7,6 +7,7 @@ use App\Http\Resources\DentistResource;
 use App\Models\Appointment;
 use App\Models\Clinic;
 use App\Models\Dentist;
+use App\Notifications\PortalNotice;
 use App\Services\AuditLogger;
 use App\Support\BusinessTime;
 use Illuminate\Http\Request;
@@ -20,6 +21,8 @@ use Illuminate\Validation\Rule;
  */
 class DentistController extends Controller
 {
+    private const RECENT_APPOINTMENTS = 20;
+
     public function __construct(private readonly AuditLogger $audit)
     {
     }
@@ -45,6 +48,34 @@ class DentistController extends Controller
         ]));
     }
 
+    /** One dentist's profile for the clinic: details, figures and recent appointments. */
+    public function show(Clinic $clinic, int $dentistId)
+    {
+        $dentist = $this->find($clinic, $dentistId)->load(['user', 'specialization', 'schedules' => fn ($q) => $q->whereIn('branch_id', $clinic->branches()->pluck('id'))]);
+        $mine = fn () => $clinic->appointments()->where('dentist_id', $dentist->id);
+        $today = BusinessTime::today();
+        $membership = $clinic->memberships()->where('user_id', $dentist->user_id)->first();
+
+        return $this->ok([
+            ...(new DentistResource($dentist))->staffView()->resolve(),
+            'phone' => $membership?->phone,
+            'membership_id' => $membership?->id,
+            'joined_at' => BusinessTime::iso($membership?->created_at),
+            'appointments_today' => $mine()
+                ->whereBetween('starts_at', [BusinessTime::utc($today), BusinessTime::utc($today->endOfDay())])
+                ->whereNotIn('status', [Appointment::CANCELLED, Appointment::REJECTED])
+                ->count(),
+            'appointments_total' => $mine()->count(),
+            'appointments' => $mine()->with('serviceRate')->latest('starts_at')->limit(self::RECENT_APPOINTMENTS)->get()->map(fn (Appointment $a) => [
+                'id' => $a->id,
+                'patient' => $a->patient_name,
+                'service' => $a->serviceRate?->service_name,
+                'starts_at' => BusinessTime::iso($a->starts_at),
+                'status' => $a->status,
+            ]),
+        ]);
+    }
+
     public function update(Request $request, Clinic $clinic, int $dentistId)
     {
         $dentist = $this->find($clinic, $dentistId);
@@ -54,6 +85,11 @@ class DentistController extends Controller
             'license_number' => ['sometimes', 'nullable', 'string', 'max:50'],
             'years_experience' => ['sometimes', 'integer', 'min:0', 'max:70'],
             'qualifications' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'secondary_specialization' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'education' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'website' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'ptr_number' => ['sometimes', 'nullable', 'string', 'max:50'],
+            's2_number' => ['sometimes', 'nullable', 'string', 'max:50'],
             'bio' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
@@ -94,6 +130,9 @@ class DentistController extends Controller
         });
 
         $this->audit->record('dentist.schedule_updated', $dentist, clinicId: $clinic->id);
+        if ($dentist->user_id !== $request->user()->id) {
+            $dentist->user?->notify(new PortalNotice('schedule', 'Schedule Update', 'Your working hours were updated by the clinic administrator.', 'schedule_updates'));
+        }
 
         return $this->ok(
             (new DentistResource($dentist->load(['user', 'specialization', 'schedules' => fn ($q) => $q->whereIn('branch_id', $branchIds)])))->staffView()->resolve(),

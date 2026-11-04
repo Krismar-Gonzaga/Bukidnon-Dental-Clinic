@@ -5,7 +5,7 @@ import ClinicLayout, { useClinic } from '../../layouts/ClinicLayout';
 import Icon from '../../components/Icon';
 import { Badge, DataTable, Section } from '../../components/portal/PortalUi';
 import { QueryState } from '../../components/StatusMessage';
-import { getClinicHref, isDentistMember } from '../../config/clinicNavigation';
+import { getClinicHref, isDentistMember, isFrontDeskMember } from '../../config/clinicNavigation';
 import { getAppointmentReport, getClinicDashboard } from '../../services/clinicPortalApi';
 import { getErrorMessage } from '../../services/apiErrors';
 import { toAppointment, toReview } from '../../services/adapters';
@@ -16,7 +16,8 @@ import { alertKey, useDismissedAlerts } from '../../hooks/useDismissedAlerts';
 import { useAuth } from '../../auth/AuthContext';
 import { downloadCsv } from '../../utils/csv';
 import ClinicAdminOverview from './ClinicAdminOverview';
-import DentistOverview from './DentistOverview';
+import DentistDashboard from './dentist/DentistDashboard';
+import FrontDeskOverview from './FrontDeskOverview';
 import './ClinicDashboardPage.css';
 
 const peso = (amount, compact = false) =>
@@ -624,7 +625,8 @@ function OperationsDetails() {
 // design (it needs reports.view), other roles the operations dashboard.
 function DashboardForRole() {
   const { membership, can } = useClinic();
-  if (isDentistMember(membership)) return <DentistOverview />;
+  if (isDentistMember(membership)) return <DentistDashboard />;
+  if (isFrontDeskMember(membership)) return <FrontDeskOverview />;
   if (!can('reports.view')) return <Dashboard />;
   return (
     <ClinicAdminOverview>
@@ -634,13 +636,8 @@ function DashboardForRole() {
 }
 
 function ClinicDashboardPage() {
-  const { clinicId } = useParams();
-  const { memberships } = useAuth();
-  const membership = memberships.find((m) => String(m.clinic_id) === String(clinicId));
-  const isDentist = isDentistMember(membership);
-
   return (
-    <ClinicLayout section="dashboard" title={isDentist ? 'Overview' : 'Dashboard'} hideSearch={!isDentist} showWalkIn>
+    <ClinicLayout section="dashboard" title="Dashboard" hideSearch showWalkIn>
       <DashboardForRole />
     </ClinicLayout>
   );

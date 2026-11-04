@@ -29,6 +29,9 @@ class SendAppointmentReminders extends Command
 
         $sent = 0;
         foreach ($due as $appointment) {
+            if (! $appointment->clinic?->settingsValues()['send_reminders']) {
+                continue;
+            }
             $claimed = Appointment::whereKey($appointment->id)->whereNull('reminder_sent_at')->update(['reminder_sent_at' => now()]);
             if ($claimed) {
                 $appointment->patient->user->notify(new AppointmentReminder($appointment));

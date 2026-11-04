@@ -31,6 +31,7 @@ class RecordController extends Controller
 
         $records = PatientRecord::where('clinic_id', $clinic->id)
             ->where('patient_id', $patient->id)
+            ->readableBy($request->user()->id)
             ->when(! $request->boolean('include_superseded'), fn ($q) => $q->current())
             ->with(['dentist.user', 'author'])
             ->latest()->latest('id')
@@ -51,6 +52,8 @@ class RecordController extends Controller
         $data = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'record_type' => ['nullable', Rule::in(PatientRecord::TYPES)],
+            'kind' => ['nullable', Rule::in(['notes', 'treatments'])],
+            'patient_id' => ['nullable', 'integer'],
             'mine' => ['sometimes', 'boolean'],
         ]);
         $isDentist = $this->membership($request)->role === ClinicMembership::ROLE_DENTIST;
@@ -58,6 +61,10 @@ class RecordController extends Controller
 
         $query = PatientRecord::where('clinic_id', $clinic->id)
             ->current()
+            ->readableBy($request->user()->id)
+            ->when(($data['kind'] ?? null) === 'notes', fn ($q) => $q->whereIn('record_type', PatientRecord::NOTE_TYPES))
+            ->when(($data['kind'] ?? null) === 'treatments', fn ($q) => $q->where('record_type', 'treatment'))
+            ->when($data['patient_id'] ?? null, fn ($q, $id) => $q->where('patient_id', $id))
             ->when($isDentist, fn ($q) => $q->whereHas('patient.appointments', fn ($a) => $a
                 ->where('clinic_id', $clinic->id)->where('dentist_id', $dentistId)))
             ->when($request->boolean('mine'), fn ($q) => $q->where('created_by', $request->user()->id))
@@ -88,18 +95,41 @@ class RecordController extends Controller
         $record->appointment_id = $data['appointment_id'] ?? null;
         $record->dentist_id = $this->actingDentist($request)?->id;
         $record->created_by = $request->user()->id;
+        $record->status = $data['status'] ?? PatientRecord::FINAL;
+        // A draft is the author's working copy: it cannot be shown to the patient yet.
+        $record->is_patient_visible = $record->status === PatientRecord::FINAL && ($data['is_patient_visible'] ?? false);
         $record->save();
 
-        $this->audit->record('records.created', $record, ['patient_id' => $patient->id], $clinic->id);
+        $this->audit->record('records.created', $record, ['patient_id' => $patient->id, 'status' => $record->status], $clinic->id);
 
-        return $this->ok((new PatientRecordResource($record->load(['dentist.user', 'author'])))->resolve(), 'Record saved', 201);
+        return $this->ok((new PatientRecordResource($record->load(['dentist.user', 'author'])))->resolve(), $record->status === PatientRecord::DRAFT ? 'Draft saved' : 'Record saved', 201);
+    }
+
+    /** Keep working on a draft, or finalize it. Only its author can, and only while it is a draft. */
+    public function update(Request $request, Clinic $clinic, int $patientId, int $recordId)
+    {
+        $patient = $this->patient($request, $clinic, $patientId);
+        $record = PatientRecord::where('clinic_id', $clinic->id)->where('patient_id', $patient->id)
+            ->where('status', PatientRecord::DRAFT)
+            ->where('created_by', $request->user()->id)
+            ->findOrFail($recordId);
+        $data = $request->validate($this->rules($clinic, $patient));
+
+        $record->fill($data);
+        $record->status = $data['status'] ?? PatientRecord::DRAFT;
+        $record->is_patient_visible = $record->status === PatientRecord::FINAL && ($data['is_patient_visible'] ?? false);
+        $record->save();
+
+        $this->audit->record($record->status === PatientRecord::FINAL ? 'records.finalized' : 'records.draft_updated', $record, ['patient_id' => $patient->id], $clinic->id);
+
+        return $this->ok((new PatientRecordResource($record->load(['dentist.user', 'author'])))->resolve(), $record->status === PatientRecord::FINAL ? 'Note finalized' : 'Draft saved');
     }
 
     /** Correct a record: a new version is created and the old one superseded. */
     public function amend(Request $request, Clinic $clinic, int $patientId, int $recordId)
     {
         $patient = $this->patient($request, $clinic, $patientId);
-        $original = PatientRecord::where('clinic_id', $clinic->id)->where('patient_id', $patient->id)->current()->findOrFail($recordId);
+        $original = PatientRecord::where('clinic_id', $clinic->id)->where('patient_id', $patient->id)->current()->final()->findOrFail($recordId);
 
         $data = $request->validate([
             ...$this->rules($clinic, $patient),
@@ -150,6 +180,12 @@ class RecordController extends Controller
             'tooth_numbers' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'care_instructions' => ['nullable', 'string', 'max:5000'],
+            'diagnosis' => ['nullable', 'string', 'max:5000'],
+            'treatment_plan' => ['nullable', 'string', 'max:5000'],
+            'follow_up_recommendations' => ['nullable', 'string', 'max:5000'],
+            'materials_used' => ['nullable', 'string', 'max:500'],
+            'performed_on' => ['nullable', 'date_format:Y-m-d'],
+            'status' => ['sometimes', Rule::in([PatientRecord::DRAFT, PatientRecord::FINAL])],
             'is_patient_visible' => ['sometimes', 'boolean'],
         ];
     }

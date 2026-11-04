@@ -13,15 +13,14 @@ jest.mock('@react-navigation/native', () => ({ useNavigation: () => ({ navigate:
 const { useSensitiveAction, CANCELLED_MESSAGE, actionError } = require('../src/components/admin/AdminSecurity');
 const {
   activityText,
-  auditMetrics,
-  auditTrend,
   describeUserChange,
   documentUrl,
   exportApplicationsCsv,
   exportAuditCsv,
   MOBILE_EXPORT_ROWS,
   needsPasswordConfirmation,
-  verificationMetrics,
+  proofUrl,
+  shiftMonth,
 } = require('../src/services/admin');
 const api = require('../src/services/http').default;
 
@@ -98,33 +97,6 @@ test('activity entries read as sentences', () => {
   ).toBe('Valencia Smiles suspended by Sam Admin.');
 });
 
-test('verification cards show the live figures', () => {
-  const cards = verificationMetrics({
-    pending: 4, under_review: 2, submitted_this_week: 3, submitted_last_week: 1, missing_info: 0, overdue: 1, needs_attention: 1, returned: 0,
-    verified_today: 0, returned_today: 0, average_decision_hours: 4.2, decisions_last_30_days: 5, oldest_open_id: 7, attention_days: 3,
-    required_documents: ['business_permit'],
-  });
-  expect(cards.map((c: any) => [c.label, c.value, c.note])).toEqual([
-    ['Total pending', '04', '+3 submitted this week'],
-    ['In review', '02', 'Avg. decision: 4.2 hrs'],
-    ['Critical action', '01', 'Waiting 3+ days or missing documents'],
-    ['Verified today', '00', '5 decisions in 30 days'],
-  ]);
-  expect(cards[2].tone).toBe('danger');
-});
-
-test('audit cards compare with the previous window and show integrity', () => {
-  const summary = {
-    total_events: 120, previous_total: 100, failed_logins: 3, blocked_logins: 1, failed_login_ips: 2, critical_actions: 6,
-    integrity: { unsealed: 2, last_report: { status: 'failed', checked: 10, sealed_through_id: 10, pending: 0, problems: [], checked_at: '' } },
-  };
-  const cards = auditMetrics(summary, '24h');
-  expect(cards[0].note).toBe('+20% from the previous 24 hours');
-  expect(cards[1].note).toBe('1 blocked · from 2 IPs');
-  expect(cards[3]).toMatchObject({ value: 'Problems', tone: 'danger', note: '2 awaiting seal' });
-  expect(auditTrend({ ...summary, previous_total: null }, '24 hours')).toBe('All recorded events');
-});
-
 test('exports are fetched as text, limited for sharing, and a text 423 still asks for the password', async () => {
   const get = jest.spyOn(api, 'get').mockResolvedValueOnce({ data: '﻿ID,Time\n1,x' });
   await expect(exportAuditCsv({ range: '24h' })).resolves.toBe('ID,Time\n1,x');
@@ -133,6 +105,18 @@ test('exports are fetched as text, limited for sharing, and a text 423 still ask
   get.mockRejectedValueOnce(Object.assign(new Error('Locked'), { response: { status: 423, data: '{"code":"password_confirmation_required"}' } }));
   const error = await exportApplicationsCsv({}).catch((e: unknown) => e);
   expect(needsPasswordConfirmation(error)).toBe(true);
+  get.mockRestore();
+});
+
+test('months move across the year end', () => {
+  expect(shiftMonth('2026-01', -1)).toBe('2025-12');
+  expect(shiftMonth('2026-12', 1)).toBe('2027-01');
+});
+
+test('payment proofs open through a signed link from the API origin', async () => {
+  const get = jest.spyOn(api, 'get').mockResolvedValue({ data: { data: { url: '/api/subscription-proofs/3/download?signature=abc' } } });
+  await expect(proofUrl(3)).resolves.toMatch(/\/api\/subscription-proofs\/3\/download\?signature=abc$/);
+  expect(get).toHaveBeenCalledWith('/admin/subscription-payments/3/proof-link', expect.anything());
   get.mockRestore();
 });
 

@@ -54,8 +54,14 @@ test('fetchCurrentUser rethrows other failures', async () => {
   await expect(fetchCurrentUser()).rejects.toThrow('500');
 });
 
-test('logout resolves even when the server call fails', async () => {
+test('logout reports a failure: only the server can end the session', async () => {
   ensureCsrfCookie.mockResolvedValue();
   apiClient.post.mockRejectedValue(new Error('offline'));
+  await expect(logout()).rejects.toThrow('offline');
+});
+
+test('logout resolves when the session had already expired', async () => {
+  ensureCsrfCookie.mockResolvedValue();
+  apiClient.post.mockRejectedValue(Object.assign(new Error('HTTP 401'), { response: { status: 401 } }));
   await expect(logout()).resolves.toBeUndefined();
 });

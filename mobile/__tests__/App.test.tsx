@@ -7,6 +7,7 @@ import ReactTestRenderer from 'react-test-renderer';
 import App from '../App';
 
 jest.mock('react-native-vector-icons/Ionicons', () => 'Icon');
+jest.mock('expo-document-picker', () => ({ getDocumentAsync: jest.fn() }));
 jest.mock('@react-navigation/native', () => ({
   NavigationContainer: ({ children }: { children: React.ReactNode }) => children,
 }));

@@ -79,8 +79,8 @@ class ClinicWorkflowTest extends TestCase
 
         $this->asUser($world['dentistUser'])->getJson($this->manage($world, "/appointments/{$theirs}"))->assertNotFound();
         $this->asUser($world['dentistUser'])->postJson($this->manage($world, "/appointments/{$theirs}/complete"))->assertNotFound();
-        // Dentists cannot confirm (appointments.manage).
-        $this->asUser($world['dentistUser'])->postJson($this->manage($world, "/appointments/{$mine}/confirm"))->assertForbidden();
+        // Dentists answer requests made to them, but cancelling stays with the front desk.
+        $this->asUser($world['dentistUser'])->postJson($this->manage($world, "/appointments/{$mine}/cancel"), ['reason' => 'x'])->assertForbidden();
     }
 
     public function test_staff_of_another_clinic_cannot_reach_this_clinics_appointments(): void

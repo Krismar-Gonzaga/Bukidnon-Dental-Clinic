@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import AccountMenu from '../components/AccountMenu';
 import NotificationBell from '../components/NotificationBell';
-import { BRAND_NAME } from '../config/app';
+import { useBrandName } from '../services/platformStore';
 import { useAuth } from '../auth/AuthContext';
 import { getProfileHref } from '../auth/homeRoutes';
 import { LOGIN_HREF } from '../config/navigation';
 import './PatientLayout.css';
+import { getErrorMessage } from '../services/apiErrors';
 
 const getInitial = (name = '') => name.trim().charAt(0).toUpperCase() || '?';
 
@@ -33,7 +34,9 @@ function PortalLayout({
   sidebarExtra,
   children,
 }) {
+  const brand = useBrandName();
   const { user, signOut } = useAuth();
+  const [logoutError, setLogoutError] = useState('');
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const name = user?.name ?? '';
@@ -49,8 +52,13 @@ function PortalLayout({
   }, [isMenuOpen]);
 
   const handleLogout = async () => {
-    await signOut();
-    navigate(LOGIN_HREF, { replace: true });
+    setLogoutError('');
+    try {
+      await signOut();
+      navigate(LOGIN_HREF, { replace: true });
+    } catch (error) {
+      setLogoutError(`You are still signed in. ${getErrorMessage(error)}`);
+    }
   };
 
   return (
@@ -59,7 +67,7 @@ function PortalLayout({
       <aside id="portal-sidebar" className={`patient-sidebar${isMenuOpen ? ' is-open' : ''}`}>
         <div className="patient-sidebar-top">
           <a href="/" className="patient-sidebar-brand">
-            {BRAND_NAME}
+            {brand}
           </a>
           <div className="patient-sidebar-user">
             <span className="patient-avatar" aria-hidden="true">
@@ -95,6 +103,11 @@ function PortalLayout({
         </nav>
 
         <div className="patient-sidebar-footer">
+          {logoutError && (
+            <p className="patient-logout-error" role="alert">
+              {logoutError}
+            </p>
+          )}
           <button type="button" className="patient-logout" onClick={handleLogout}>
             <Icon name="logOut" size={20} />
             Log Out

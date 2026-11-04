@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import AccountMenu from '../components/AccountMenu';
@@ -6,7 +6,8 @@ import NotificationBell from '../components/NotificationBell';
 import ClinicGlobalSearch from '../components/portal/ClinicGlobalSearch';
 import { ConfirmDialog } from '../components/portal/PortalUi';
 import { useAuth } from '../auth/AuthContext';
-import { BRAND_NAME } from '../config/app';
+import { useUnreadNotifications } from '../hooks/useUnreadNotifications';
+import { useBrandName } from '../services/platformStore';
 import { getClinicHref } from '../config/clinicNavigation';
 import { LOGIN_HREF } from '../config/navigation';
 import { formatDate } from '../utils/dateTime';
@@ -18,7 +19,7 @@ const COLLAPSED_KEY = 'clinic-sidebar-collapsed';
 const getInitial = (name = '') => name.trim().charAt(0).toUpperCase() || '?';
 
 // A remembered convenience only: the sidebar opens expanded if storage is unavailable.
-function readCollapsed() {
+export function readCollapsed() {
   try {
     return window.localStorage.getItem(COLLAPSED_KEY) === '1';
   } catch {
@@ -26,7 +27,7 @@ function readCollapsed() {
   }
 }
 
-function saveCollapsed(collapsed) {
+export function saveCollapsed(collapsed) {
   try {
     window.localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0');
   } catch {
@@ -50,16 +51,23 @@ function TopbarSearch({ search, clinicId, can }) {
 
 // Sidebar sign out, confirmed first: a labelled link (dentist design) or the
 // icon beside the member's name (clinic admin design).
-function SignOutLink({ iconOnly = false }) {
+export function SignOutLink({ iconOnly = false, message = 'You will need to sign in again to open the clinic portal.' }) {
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleConfirm = async () => {
     setBusy(true);
-    await signOut();
-    navigate(LOGIN_HREF, { replace: true });
+    setError(null);
+    try {
+      await signOut();
+      navigate(LOGIN_HREF, { replace: true });
+    } catch (signOutError) {
+      setError(signOutError);
+      setBusy(false);
+    }
   };
 
   return (
@@ -77,9 +85,10 @@ function SignOutLink({ iconOnly = false }) {
       {asking && (
         <ConfirmDialog
           title="Sign out?"
-          message="You will need to sign in again to open the clinic portal."
+          message={message}
           confirmLabel="Sign out"
           isBusy={busy}
+          error={error}
           onConfirm={handleConfirm}
           onCancel={() => setAsking(false)}
         />
@@ -89,6 +98,8 @@ function SignOutLink({ iconOnly = false }) {
 }
 
 function NavLink({ item, isActive, collapsed }) {
+  const unread = useUnreadNotifications();
+  const badge = item.showsUnread && unread > 0 ? unread : null;
   return (
     <a
       href={item.href}
@@ -98,6 +109,12 @@ function NavLink({ item, isActive, collapsed }) {
     >
       <Icon name={item.icon} size={20} />
       <span className="clinic-nav-label">{item.label}</span>
+      {badge != null && (
+        <span className="clinic-nav-badge">
+          {badge}
+          <span className="visually-hidden"> unread</span>
+        </span>
+      )}
     </a>
   );
 }
@@ -152,14 +169,26 @@ function ClinicShell({
   children,
 }) {
   const { user } = useAuth();
+  const brand = useBrandName();
   const [collapsed, setCollapsed] = useState(readCollapsed);
+  // Phones: the sidebar slides in over the page.
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const name = user?.name ?? '';
   const notificationsHref = getClinicHref(clinicId, 'notifications');
   const settingsHref = getClinicHref(clinicId, 'settings');
-  // Account settings (password and sign-in); the clinic's own details are Clinic Profile.
-  const accountSettingsHref = getClinicHref(clinicId, 'password');
+  // The clinic's Settings page for those who may open it, otherwise their own password page.
+  const accountSettingsHref = getClinicHref(clinicId, can('clinic.settings.manage', 'clinic.permissions.manage', 'clinic.audit.view') ? 'clinic-settings' : 'password');
   const canViewSchedule = can('appointments.view_all', 'appointments.view_assigned');
-  const isCollapsed = grouped && collapsed;
+  const isCollapsed = grouped && collapsed && !drawerOpen;
+
+  useEffect(() => {
+    if (!drawerOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setDrawerOpen(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [drawerOpen]);
 
   const toggleCollapsed = () => {
     setCollapsed((current) => {
@@ -169,13 +198,14 @@ function ClinicShell({
   };
 
   return (
-    <div className={`clinic-shell${grouped ? ' is-grouped' : ''}${isCollapsed ? ' is-collapsed' : ''}`}>
+    <div className={`clinic-shell${grouped ? ' is-grouped' : ''}${isCollapsed ? ' is-collapsed' : ''}${drawerOpen ? ' is-drawer-open' : ''}`}>
+      {drawerOpen && <button type="button" className="clinic-drawer-backdrop" aria-label="Close menu" onClick={() => setDrawerOpen(false)} />}
       <aside className="clinic-sidebar">
         {grouped ? (
           <div className="clinic-sidebar-brand clinic-sidebar-logo">
             {!isCollapsed && (
               <a href={getClinicHref(clinicId)} className="clinic-sidebar-name">
-                {BRAND_NAME}
+                {brand}
               </a>
             )}
             <button
@@ -186,6 +216,9 @@ function ClinicShell({
               onClick={toggleCollapsed}
             >
               <Icon name={isCollapsed ? 'chevronRight' : 'chevronLeft'} size={18} />
+            </button>
+            <button type="button" className="clinic-drawer-close" aria-label="Close menu" onClick={() => setDrawerOpen(false)}>
+              <Icon name="close" size={20} />
             </button>
           </div>
         ) : (
@@ -250,23 +283,23 @@ function ClinicShell({
 
       <div className="clinic-main">
         <header className="clinic-topbar">
+          {grouped && (
+            <button type="button" className="clinic-menu-button" aria-label="Open menu" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}>
+              <Icon name="menu" size={22} />
+            </button>
+          )}
           {grouped ? (
             <div className="clinic-topbar-heading">
               <h1 className="clinic-topbar-title">{title}</h1>
-              <p className="clinic-topbar-subtitle">{subtitle ?? `${clinicName} · ${formatDate(new Date().toISOString())}`}</p>
+              {subtitle !== null && <p className="clinic-topbar-subtitle">{subtitle ?? `${clinicName} · ${formatDate(new Date().toISOString())}`}</p>}
             </div>
           ) : (
             <h1 className="clinic-topbar-title">{title}</h1>
           )}
           {!hideSearch && <TopbarSearch search={search} clinicId={clinicId} can={can} />}
+          <div className="clinic-topbar-page-actions">{headerActions}</div>
           <div className="clinic-topbar-actions">
-            {headerActions}
             <NotificationBell allHref={notificationsHref} isCurrentPage={activeHref === notificationsHref} />
-            {grouped && (
-              <a href={accountSettingsHref} className="clinic-topbar-icon" aria-label="Settings">
-                <Icon name="settings" size={22} />
-              </a>
-            )}
             {!grouped && canViewSchedule && (
               <a href={scheduleHref ?? getClinicHref(clinicId, 'appointments')} className="clinic-topbar-icon" aria-label="Appointment schedule">
                 <Icon name="calendar" size={22} />

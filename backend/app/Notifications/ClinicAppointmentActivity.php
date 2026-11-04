@@ -18,6 +18,15 @@ class ClinicAppointmentActivity extends AppNotification
         return 'appointment';
     }
 
+    protected function category(): ?string
+    {
+        return match ($this->event) {
+            'requested', 'reschedule_requested' => 'appointment_requests',
+            'cancelled' => 'appointment_cancellations',
+            default => null,
+        };
+    }
+
     protected function title(): string
     {
         return match ($this->event) {

@@ -5,6 +5,7 @@ import Icon from '../components/Icon';
 import ProfileField from '../components/patient/ProfileField';
 import PasswordStrengthMeter from '../components/patient/PasswordStrengthMeter';
 import SuccessCard from '../components/patient/SuccessCard';
+import { AccountSecurity } from '../components/security/AccountSecurity';
 import {
   PASSWORD_CHANGED_MESSAGE,
   PASSWORD_CHANGED_TITLE,
@@ -128,6 +129,7 @@ function ChangePasswordPage({ layout: Layout = PatientLayout, backHref = PATIENT
             </button>
           </form>
         )}
+        <AccountSecurity />
       </div>
     </Layout>
   );

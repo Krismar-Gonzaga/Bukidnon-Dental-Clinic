@@ -79,7 +79,7 @@ class AvailabilityService
             ->where('ends_at', '>', $dayStart)
             ->get(['id', 'dentist_id', 'starts_at', 'ends_at']);
 
-        $step = config('booking.slot_minutes');
+        $step = $clinic->settingsValues()['slot_minutes'];
         $duration = max(1, (int) $service->duration_minutes);
         $slots = collect();
 

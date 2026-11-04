@@ -15,6 +15,16 @@ class ReviewResource extends JsonResource
 {
     public bool $withModeration = false;
 
+    public bool $forClinic = false;
+
+    /** The clinic's own patients: full name, and which visit the review is about. */
+    public function clinicView(): static
+    {
+        $this->forClinic = true;
+
+        return $this;
+    }
+
     public function moderatorView(): static
     {
         $this->withModeration = true;
@@ -31,7 +41,11 @@ class ReviewResource extends JsonResource
             'appointment_id' => $this->appointment_id,
             'rating' => $this->rating,
             'comment' => $this->comment,
-            'patient_name' => $this->shortName($this->patient?->display_name),
+            'patient_name' => $this->forClinic ? $this->patient?->display_name : $this->shortName($this->patient?->display_name),
+            'service' => $this->when($this->forClinic, fn () => $this->appointment?->serviceRate?->service_name),
+            'dentist' => $this->when($this->forClinic, fn () => $this->appointment?->dentist?->user?->name),
+            'clinic_reply' => $this->clinic_reply,
+            'clinic_replied_at' => $this->clinic_replied_at?->toDateString(),
             'is_verified_visit' => (bool) ($this->is_verified_purchase || $this->appointment_id),
             'status' => $this->status,
             'date' => $this->created_at?->toDateString(),

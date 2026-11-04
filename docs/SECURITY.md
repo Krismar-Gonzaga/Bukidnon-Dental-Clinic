@@ -37,7 +37,11 @@ The web app can show an embedded map when `REACT_APP_GOOGLE_MAPS_EMBED_KEY` is s
 | Sign-out | Session invalidated, CSRF token rotated | Token deleted on the server; local session cleared. On any 401 the app clears the session. |
 
 - Passwords are hashed with bcrypt and must have 8+ characters including a letter and a number. System admin accounts need 12+.
-- Changing the password signs out the account's other devices.
+- Changing the password signs out the account's other devices, web and mobile. A password reset signs out all of them.
+- **Two-factor sign-in** (authenticator app) is available to every role, on web and mobile. It is optional per account. App codes work once, secrets and recovery codes are encrypted at rest, turning it off needs the password and a code, and turning it on signs out other devices.
+- **Signed-in devices**: every account can see where it is signed in and sign out of any device. Session ids and tokens are never sent to clients. The web sessions in this list need `SESSION_DRIVER=database`.
+- Password changes and two-factor changes notify the account holder; these alerts cannot be turned off.
+- A dentist's schedule changes need approval from someone with `clinic.schedules.manage`. Patients keep booking against the current hours until then, and no one can decide their own request.
 - Forgot-password answers the same whether or not the email exists.
 - Suspended accounts are refused at login and on every request (`active` middleware).
 - Registration can only create `patient` or `clinic_admin` accounts. Status and other privileged fields can't be mass-assigned.
@@ -47,13 +51,16 @@ The web app can show an embedded map when `REACT_APP_GOOGLE_MAPS_EMBED_KEY` is s
 - **Every check runs on the server.** The web and mobile apps hide buttons a user can't use, but that is convenience only.
 - Platform roles: `role:system_admin` guards `/admin/*`.
 - Clinic access comes only from an **active** `clinic_memberships` row. The `clinic.permission` middleware returns **404** to non-members, so they can't confirm a clinic's private resources exist, and **403** to members without the permission.
-- Least privilege: clinic owners and receptionists can't read clinical records, and system administrators can't either. Dentists see only patients they have appointments with.
+- Least privilege: receptionists can't read clinical records (only allergy and condition alerts, and each view is logged), and system administrators can't either. Clinic administrators can read them, and every read is logged. Dentists see only patients they have appointments with. Only dentists with a licence on file issue prescriptions and certificates.
 - Object-level checks (against IDOR): every lookup is scoped to the signed-in patient or to the clinic in the URL, so changing an ID in a request returns 404. `backend/tests/Feature` includes tests that try exactly that for appointments, records, inventory, applications, documents and notifications.
+
+**Platform settings.** Changing system settings or a clinic's plan needs the password re-confirmed and is written to the audit log with the names of the settings changed. Maintenance Mode and Session Timeout are enforced by the server, not the apps. Clinic Activity on the admin clinic page shows labels and dates only, and leaves out patient-record events.
 
 ## Data protection
 
 - **Audit log**: sign-ins (including failed and blocked ones), bookings and status changes, clinical record **views** and writes, document access, verification decisions, membership and permission changes, and suspensions go to `audit_logs`. The table is append-only (model guard plus PostgreSQL trigger).
-- **Clinical records** are amended, never overwritten or deleted. Patients see only what the clinic marks as visible, and never internal notes.
+- **Clinical records** are amended, never overwritten or deleted. A draft note can be changed until it is finalized, is visible only to its author, and never reaches the patient. Patients see only what the clinic marks as visible, and never internal notes. Prescriptions and certificates can't be changed once issued.
+- **Notifications** never contain clinical details, because they can be read on a lock screen: a new allergy says that a note exists, not what it is.
 - **Uploads** (verification documents): PDF/JPG/PNG only, checked by extension **and** detected MIME type, max 5 MB, stored under random names on the private disk. They are downloadable only through a signed link that expires after 5 minutes, issued after an ownership or admin check.
 - **Errors**: API errors use a fixed JSON format. With `APP_DEBUG=false`, 500 responses say only "Something went wrong" and no stack traces or SQL reach the client.
 - **Response headers** (API): `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store, private`, plus HSTS over HTTPS.

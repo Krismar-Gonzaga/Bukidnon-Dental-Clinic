@@ -6,6 +6,7 @@ import { PRIVACY_HREF, REGISTER_ROLES, TERMS_HREF } from '../../config/auth';
 import { LOGIN_HREF } from '../../config/navigation';
 import { register } from '../../services/authService';
 import { getErrorMessage, getFieldErrors } from '../../services/apiErrors';
+import { usePlatform } from '../../services/platformStore';
 import { useAuth } from '../../auth/AuthContext';
 import { getHomeHref } from '../../auth/homeRoutes';
 import { getPasswordRuleError } from '../../utils/passwordStrength';
@@ -46,6 +47,7 @@ function RegisterForm() {
   const navigate = useNavigate();
   const { setUser } = useAuth();
   const [role, setRole] = useState(REGISTER_ROLES[0].id);
+  const { allow_self_registration: patientsMayRegister } = usePlatform();
   const [values, setValues] = useState(INITIAL_VALUES);
   const [agreed, setAgreed] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -109,6 +111,9 @@ function RegisterForm() {
     }
   };
 
+  // The server refuses it too; this says so before anyone fills in the form.
+  const registrationClosed = !patientsMayRegister && REGISTER_ROLES.find((option) => option.id === role)?.backendRole === 'patient';
+
   return (
     <form
       className="auth-card"
@@ -116,6 +121,11 @@ function RegisterForm() {
       aria-busy={submitting}
       onSubmit={handleSubmit}
     >
+      {registrationClosed && (
+        <p className="auth-error" role="status">
+          Patient registration is closed right now. Please ask your clinic for an invitation.
+        </p>
+      )}
       <span className="auth-badge" aria-hidden="true">
         <Icon name="users" size={28} />
       </span>
@@ -260,7 +270,7 @@ function RegisterForm() {
       <button
         type="submit"
         className="btn btn-primary register-submit"
-        disabled={!agreed || submitting}
+        disabled={!agreed || submitting || registrationClosed}
       >
         Create Account
       </button>

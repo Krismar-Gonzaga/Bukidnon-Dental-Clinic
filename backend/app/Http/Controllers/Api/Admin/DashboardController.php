@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\Clinic;
 use App\Models\ClinicApplication;
 use App\Models\ReviewReport;
+use App\Models\Subscription;
+use App\Models\SubscriptionPayment;
+use App\Models\SystemAnnouncement;
 use App\Models\User;
 use App\Support\AuditPresenter;
 use App\Support\BusinessTime;
@@ -17,6 +21,12 @@ use Illuminate\Support\Collection;
 class DashboardController extends Controller
 {
     private const ACTIVITY_DAYS = 14;
+
+    private const GROWTH_MONTHS = 6;
+
+    private const PENDING_PAYMENTS_SHOWN = 5;
+
+    private const AUDIT_ITEMS = 4;
 
     /** Platform events shown in the activity feed (no sign-ins or clinic-internal actions). */
     private const FEED_ACTIONS = [
@@ -29,6 +39,13 @@ class DashboardController extends Controller
         'clinic.reactivated',
         'admin.user_updated',
         'review.moderated',
+        'clinic_application.documents_requested',
+        'subscription.payment_submitted',
+        'subscription.payment_verified',
+        'subscription.payment_rejected',
+        'subscription.plan_changed',
+        'announcement.published',
+        'settings.updated',
     ];
 
     /**
@@ -41,9 +58,10 @@ class DashboardController extends Controller
         $clinics = Clinic::query()->selectRaw(
             'COUNT(*) as total,
              SUM(CASE WHEN status = ? AND is_published = ? AND is_verified = ? THEN 1 ELSE 0 END) as listed,
+             SUM(CASE WHEN is_verified = ? THEN 1 ELSE 0 END) as verified,
              SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as suspended,
              SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as new_this_month',
-            [Clinic::STATUS_APPROVED, true, true, Clinic::STATUS_SUSPENDED, BusinessTime::utc($today->startOfMonth())],
+            [Clinic::STATUS_APPROVED, true, true, true, Clinic::STATUS_SUSPENDED, BusinessTime::utc($today->startOfMonth())],
         )->first();
         $applications = ClinicApplication::selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status');
 
@@ -51,6 +69,7 @@ class DashboardController extends Controller
             'clinics' => [
                 'total' => (int) $clinics->total,
                 'listed' => (int) $clinics->listed,
+                'verified' => (int) $clinics->verified,
                 'suspended' => (int) $clinics->suspended,
                 'new_this_month' => (int) $clinics->new_this_month,
             ],
@@ -74,7 +93,57 @@ class DashboardController extends Controller
             'security' => $this->security(),
             'activity_by_day' => $this->activityByDay($today),
             'recent_activity' => $this->recentActivity(),
+            'total_appointments' => Appointment::count(),
+            'active_subscriptions' => Subscription::whereNotNull('clinic_id')->where('renews_at', '>', now())->count(),
+            'active_announcements' => SystemAnnouncement::where('status', SystemAnnouncement::PUBLISHED)->count(),
+            'pending_payments' => $this->pendingPayments(),
+            'platform_growth' => $this->platformGrowth($today),
+            'recent_audit' => $this->recentAudit(),
         ]);
+    }
+
+    private function pendingPayments(): array
+    {
+        $pending = SubscriptionPayment::where('status', SubscriptionPayment::PENDING);
+
+        return [
+            'total' => (clone $pending)->count(),
+            'items' => $pending->with('clinic:id,name')->oldest()->limit(self::PENDING_PAYMENTS_SHOWN)->get()
+                ->map(fn (SubscriptionPayment $payment) => [
+                    'id' => $payment->id,
+                    'clinic_id' => $payment->clinic_id,
+                    'clinic_name' => $payment->clinic?->name,
+                    'submitted_at' => BusinessTime::iso($payment->created_at),
+                ])->all(),
+        ];
+    }
+
+    /** Accounts on the platform at the end of each recent month (one query). */
+    private function platformGrowth(CarbonImmutable $today): array
+    {
+        $months = collect(range(self::GROWTH_MONTHS - 1, 0))->map(fn (int $back) => $today->startOfMonth()->subMonthsNoOverflow($back));
+        $query = User::query()->toBase();
+        $months->each(fn (CarbonImmutable $month, int $index) => $query->selectRaw(
+            "SUM(CASE WHEN created_at <= ? THEN 1 ELSE 0 END) AS month_{$index}",
+            [BusinessTime::utc($month->endOfMonth())],
+        ));
+        $totals = $query->first();
+
+        return $months->map(fn (CarbonImmutable $month, int $index) => [
+            'month' => $month->format('Y-m'),
+            'label' => $month->format('M'),
+            'total' => (int) ($totals->{"month_{$index}"} ?? 0),
+        ])->all();
+    }
+
+    private function recentAudit(): array
+    {
+        $logs = AuditLog::whereIn('action', self::FEED_ACTIONS)->orderByDesc('id')->limit(self::AUDIT_ITEMS)->get();
+        $lookups = AuditPresenter::lookups($logs);
+
+        return $logs->map(fn (AuditLog $log) => AuditPresenter::present($log, $lookups))
+            ->map(fn (array $entry) => collect($entry)->only(['id', 'label', 'module', 'outcome', 'user_name', 'subject_label', 'created_at'])->all())
+            ->all();
     }
 
     private function security(): array

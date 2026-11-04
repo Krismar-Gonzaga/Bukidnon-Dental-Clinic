@@ -265,3 +265,9 @@
     padding: var(--space-5) var(--space-4);
   }
 }
+
+.patient-logout-error {
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-danger-text);
+}

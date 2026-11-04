@@ -2,12 +2,15 @@
 // figures change constantly and are not kept in the offline copy. The server
 // checks the member's permissions on every request.
 import api, { isNetworkError } from './http';
+import { API_BASE_URL } from './config';
 import { formatClockTime } from './booking';
 
 export type Membership = {
   clinic_id: number;
   clinic_name: string;
   role: 'clinic_admin' | 'dentist' | 'staff' | 'inventory_staff';
+  position_label?: string;
+  specialization?: string | null;
   permissions: string[];
 };
 
@@ -80,6 +83,9 @@ export type StaffMember = {
   status: 'active' | 'invited' | 'suspended';
   branches: string[] | null;
   on_leave_today: boolean;
+  phone?: string | null;
+  position?: string | null;
+  permissions?: string[];
 };
 
 export const CLINIC_ROLE_LABELS: Record<Membership['role'], string> = {
@@ -104,13 +110,18 @@ export const fetchStaff = async (clinicId: number): Promise<StaffMember[]> => {
   return response.data?.data ?? [];
 };
 
-export const inviteStaff = async (clinicId: number, body: { name: string; email: string; role: string }) => {
+export const inviteStaff = async (clinicId: number, body: Record<string, unknown>) => {
   const response = await api.post(`${base(clinicId)}/members`, body);
   return response.data?.message as string | undefined;
 };
 
 export const updateStaff = (clinicId: number, membershipId: number, body: { role?: string; status?: string }) =>
   api.put(`${base(clinicId)}/members/${membershipId}`, body);
+
+export const resetMemberPassword = (clinicId: number, membershipId: number) => api.post(`${base(clinicId)}/members/${membershipId}/reset-password`);
+
+/** Full address of a signed link handed out by the API (relative, valid for 5 minutes). */
+const signedUrl = async (url: string) => `${API_BASE_URL.replace(/\/api\/?$/, '')}${(await api.get(url)).data?.data?.url}`;
 
 /** ₱12,345 without relying on Intl currency support in the JS engine. */
 export const formatPeso = (amount: number) => {
@@ -150,7 +161,8 @@ export const serverMessage = (err: any, fallback: string) => {
   return firstFieldError ?? data?.message ?? fallback;
 };
 
-export type Page<T> = { items: T[]; meta: { current_page: number; last_page: number; total: number } };
+export type ReviewSummary = { count: number; average: number; breakdown: Record<string, number> };
+export type Page<T> = { items: T[]; meta: { current_page: number; last_page: number; total: number; summary?: ReviewSummary } };
 
 const getData = async <T,>(url: string, params?: Record<string, unknown>): Promise<T> => (await api.get(url, { params })).data?.data;
 const getPage = async <T,>(url: string, params?: Record<string, unknown>): Promise<Page<T>> => {
@@ -189,6 +201,14 @@ export const fetchClinicProfile = (clinicId: number) => getData<ClinicProfile>(b
 export const updateClinicProfile = (clinicId: number, body: Record<string, unknown>) => api.put(base(clinicId), body);
 export const setClinicPublished = (clinicId: number, isPublished: boolean) => api.put(`${base(clinicId)}/publish`, { is_published: isPublished });
 /** Without dates the server reports the current month. */
+export type ReportAnalytics = {
+  year: number;
+  currency: string;
+  totals: { appointments: number; confirmed: number; cancelled: number; active_days: number; revenue: number; completed_visits: number; patients: number; new_patients: number };
+  months: { month: string; total: number; confirmed: number; cancelled: number; revenue: number; completed_visits: number; new_patients: number }[];
+  treatments: { service: string; total: number; revenue: number }[];
+};
+export const fetchReportAnalytics = (clinicId: number) => getData<ReportAnalytics>(`${base(clinicId)}/reports/analytics`);
 export const fetchAppointmentReport = (clinicId: number, from?: string, to?: string) =>
   getData<AppointmentReport>(`${base(clinicId)}/reports/appointments`, from && to ? { from, to } : undefined);
 
@@ -204,7 +224,11 @@ export type ClinicAppointment = {
   reason?: string | null;
   notes?: string | null;
   cancellation_reason?: string | null;
-  patient?: { id: number; name: string; email?: string | null; phone?: string | null } | null;
+  type?: string | null;
+  medical_flags?: string[];
+  front_desk_notes?: string | null;
+  patient_last_visit_at?: string | null;
+  patient?: { id: number; name: string; email?: string | null; phone?: string | null; age?: number | null; gender?: string | null } | null;
   service?: { id: number; name: string; price?: number | null; duration_minutes?: number | null } | null;
   dentist?: { id: number; name: string } | null;
   branch?: { id: number; name: string; address?: string | null } | null;
@@ -233,31 +257,37 @@ export type AppointmentAction = {
   reason?: boolean;
   slot?: boolean;
   danger?: boolean;
+  reassign?: boolean;
 };
+
+const REASSIGN: AppointmentAction = { action: 'reassign', label: 'Reassign Dentist', needs: ['appointments.manage'], reassign: true };
 
 /** Next steps by status, as on the web portal. The server enforces the same rules. */
 export const APPOINTMENT_ACTIONS: Record<string, AppointmentAction[]> = {
   pending: [
-    { action: 'confirm', label: 'Confirm', needs: ['appointments.manage'], primary: true },
-    { action: 'reschedule', label: 'Propose another time', needs: ['appointments.manage'], slot: true },
-    { action: 'reject', label: 'Decline', needs: ['appointments.manage'], reason: true, danger: true },
+    { action: 'confirm', label: 'Confirm Appointment', needs: ['appointments.manage'], primary: true },
+    { action: 'reject', label: 'Cancel Request', needs: ['appointments.manage'], reason: true, danger: true },
+    { action: 'reschedule', label: 'Reschedule', needs: ['appointments.manage'], slot: true },
+    REASSIGN,
   ],
   confirmed: [
-    { action: 'check-in', label: 'Check in', needs: ['appointments.manage'], primary: true },
+    { action: 'check-in', label: 'Check In', needs: ['appointments.manage'], primary: true },
     { action: 'reschedule', label: 'Reschedule', needs: ['appointments.manage'], slot: true },
-    { action: 'no-show', label: 'Mark no-show', needs: ['appointments.manage', 'appointments.progress'] },
-    { action: 'cancel', label: 'Cancel', needs: ['appointments.manage'], reason: true, danger: true },
+    REASSIGN,
+    { action: 'no-show', label: 'Mark No-Show', needs: ['appointments.manage', 'appointments.progress'] },
+    { action: 'cancel', label: 'Cancel Appointment', needs: ['appointments.manage'], reason: true, danger: true },
   ],
   reschedule_requested: [
-    { action: 'approve-reschedule', label: 'Approve requested time', needs: ['appointments.manage'], primary: true },
-    { action: 'confirm', label: 'Keep original time', needs: ['appointments.manage'] },
-    { action: 'cancel', label: 'Cancel', needs: ['appointments.manage'], reason: true, danger: true },
+    { action: 'approve-reschedule', label: 'Approve Requested Time', needs: ['appointments.manage'], primary: true },
+    { action: 'confirm', label: 'Keep Original Time', needs: ['appointments.manage'] },
+    REASSIGN,
+    { action: 'cancel', label: 'Cancel Appointment', needs: ['appointments.manage'], reason: true, danger: true },
   ],
   checked_in: [
-    { action: 'start', label: 'Start visit', needs: ['appointments.manage', 'appointments.progress'], primary: true },
-    { action: 'no-show', label: 'Mark no-show', needs: ['appointments.manage', 'appointments.progress'] },
+    { action: 'start', label: 'Start Visit', needs: ['appointments.manage', 'appointments.progress'], primary: true },
+    { action: 'no-show', label: 'Mark No-Show', needs: ['appointments.manage', 'appointments.progress'] },
   ],
-  in_progress: [{ action: 'complete', label: 'Complete visit', needs: ['appointments.manage', 'appointments.progress'], primary: true }],
+  in_progress: [{ action: 'complete', label: 'Complete Visit', needs: ['appointments.manage', 'appointments.progress'], primary: true }],
 };
 
 export const actionsFor = (membership: Membership | undefined, status: string) =>
@@ -279,6 +309,32 @@ export const fetchAppointment = (clinicId: number, id: number) => getData<Clinic
 export const runAppointmentAction = (clinicId: number, id: number, action: string, body?: Record<string, unknown>) =>
   api.post(`${base(clinicId)}/appointments/${id}/${action}`, body ?? {});
 export const bookForPatient = (clinicId: number, body: Record<string, unknown>) => api.post(`${base(clinicId)}/appointments`, body);
+export type QueueEntry = { id: number; queue_number: number; patient: string; service: string | null; dentist: string | null; status: string; checked_in_at: string };
+export const fetchCheckInQueue = (clinicId: number) => getData<QueueEntry[]>(`${base(clinicId)}/appointments/queue`);
+export const saveFrontDeskNotes = (clinicId: number, id: number, notes: string | null) => api.put(`${base(clinicId)}/appointments/${id}/front-desk-notes`, { notes });
+
+export type WorkSchedule = { days: number[]; starts_at: string; ends_at: string };
+export type MyClinicDetails = { name: string; email: string; phone: string | null; address: string | null; position_label: string; clinic_name: string; status: string; work_schedule: WorkSchedule | null };
+export const fetchMyClinicDetails = (clinicId: number) => getData<MyClinicDetails>(`${base(clinicId)}/me`);
+export const updateMyClinicDetails = (clinicId: number, body: { phone?: string | null; address?: string | null }) => api.put(`${base(clinicId)}/me`, body);
+
+/** How the front desk screens show a status. */
+const FRONT_DESK_STATUS: Record<string, { label: string; tone: 'warning' | 'info' | 'success' | 'neutral' | 'danger' }> = {
+  pending: { label: 'Pending', tone: 'warning' },
+  reschedule_requested: { label: 'Reschedule Requested', tone: 'warning' },
+  confirmed: { label: 'Confirmed', tone: 'info' },
+  checked_in: { label: 'Confirmed', tone: 'info' },
+  in_progress: { label: 'Ongoing', tone: 'warning' },
+  completed: { label: 'Completed', tone: 'success' },
+  cancelled: { label: 'Cancelled', tone: 'neutral' },
+  rejected: { label: 'Rejected', tone: 'danger' },
+  no_show: { label: 'No-Show', tone: 'warning' },
+};
+export const frontDeskStatus = (status: string) => FRONT_DESK_STATUS[status] ?? { label: status, tone: 'neutral' as const };
+/** The patient has arrived: checked in, being seen, or finished. */
+export const hasCheckedIn = (status: string) => ['checked_in', 'in_progress', 'completed'].includes(status);
+
+export const reassignAppointment = (clinicId: number, id: number, dentistId: number) => api.post(`${base(clinicId)}/appointments/${id}/reassign`, { dentist_id: dentistId });
 
 // ---------------------------------------------------------------- Patients and records
 export type ClinicPatient = {
@@ -292,7 +348,24 @@ export type ClinicPatient = {
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
   has_portal_account: boolean;
+  status?: 'active' | 'inactive';
+  visits?: number;
+  last_visit_at?: string | null;
+  /** Null without records.view. */
+  conditions?: string | null;
+  medical_summary?: { blood_type: string | null; conditions: string | null; allergies: string | null } | null;
 };
+
+export type PatientReportedHealth = {
+  blood_type?: string | null;
+  allergies?: { name: string; severity?: string; reaction?: string | null }[];
+  medications?: { name: string; dosage?: string | null; purpose?: string | null }[];
+  conditions?: string[];
+  anxiety?: { level?: number | null; notes?: string | null };
+};
+
+export type PatientFile = { id: number; name: string; mime_type: string; size: number; uploaded_at: string };
+export type PickedFile = { uri: string; name: string; type: string };
 
 export type MedicalHistoryEntry = {
   id: number;
@@ -328,7 +401,7 @@ export const registerPatient = async (clinicId: number, body: Record<string, unk
 export const fetchPatient = (clinicId: number, id: number) => getData<ClinicPatient>(`${base(clinicId)}/patients/${id}`);
 export const updatePatient = (clinicId: number, id: number, body: Record<string, unknown>) => api.put(`${base(clinicId)}/patients/${id}`, body);
 export const fetchMedicalHistory = (clinicId: number, id: number) =>
-  getData<{ current: MedicalHistoryEntry | null; history: MedicalHistoryEntry[] }>(`${base(clinicId)}/patients/${id}/medical-history`);
+  getData<{ current: MedicalHistoryEntry | null; history: MedicalHistoryEntry[]; patient_reported?: PatientReportedHealth | null }>(`${base(clinicId)}/patients/${id}/medical-history`);
 export const addMedicalHistory = (clinicId: number, id: number, body: Record<string, unknown>) =>
   api.post(`${base(clinicId)}/patients/${id}/medical-history`, body);
 export const fetchRecords = (clinicId: number, id: number, includeSuperseded = false) =>
@@ -347,6 +420,14 @@ export const recordTypeLabel = (type: string) => RECORD_TYPES.find((t) => t.id =
 export const createRecord = (clinicId: number, id: number, body: Record<string, unknown>) => api.post(`${base(clinicId)}/patients/${id}/records`, body);
 export const amendRecord = (clinicId: number, patientId: number, recordId: number, body: Record<string, unknown>) =>
   api.post(`${base(clinicId)}/patients/${patientId}/records/${recordId}/amend`, body);
+
+export const fetchPatientFiles = (clinicId: number, id: number) => getData<PatientFile[]>(`${base(clinicId)}/patients/${id}/files`);
+export const uploadPatientFile = (clinicId: number, id: number, file: PickedFile) => {
+  const body = new FormData();
+  body.append('file', file as unknown as Blob);
+  return api.post(`${base(clinicId)}/patients/${id}/files`, body, { headers: { 'Content-Type': 'multipart/form-data' } });
+};
+export const patientFileUrl = (clinicId: number, id: number, fileId: number) => signedUrl(`${base(clinicId)}/patients/${id}/files/${fileId}/link`);
 
 // ---------------------------------------------------------------- Inventory
 export type InventoryBatch = {
@@ -382,6 +463,8 @@ export type InventoryItem = {
   quantity_usable: number;
   quantity_expired: number;
   is_low_stock: boolean;
+  unit_cost?: number | string | null;
+  brand?: string | null;
   batches?: InventoryBatch[];
   movements?: InventoryMovement[];
 };
@@ -391,6 +474,14 @@ export type Supplier = Option & { contact_person: string | null; phone: string |
 
 export const fetchInventoryItems = (clinicId: number, params: Record<string, unknown>) =>
   getData<InventoryItem[]>(`${base(clinicId)}/inventory/items`, params);
+/** Critical: none usable, or at most half the minimum. Low: at or under the minimum. */
+export const stockStatus = (item: Pick<InventoryItem, 'quantity_usable' | 'minimum_stock'>) => {
+  const quantity = item.quantity_usable;
+  if (quantity === 0 || (item.minimum_stock > 0 && quantity <= item.minimum_stock / 2)) return 'critical' as const;
+  return quantity <= item.minimum_stock ? ('low' as const) : ('good' as const);
+};
+export type StockMovementRow = InventoryMovement & { item?: string | null; item_name?: string | null; unit?: string | null };
+export const fetchStockHistory = (clinicId: number, page: number) => getPage<StockMovementRow>(`${base(clinicId)}/inventory/movements`, { page, per_page: 15 });
 export const fetchInventoryItem = (clinicId: number, id: number) => getData<InventoryItem>(`${base(clinicId)}/inventory/items/${id}`);
 export const createInventoryItem = async (clinicId: number, body: Record<string, unknown>): Promise<InventoryItem> =>
   (await api.post(`${base(clinicId)}/inventory/items`, body)).data?.data;
@@ -425,7 +516,9 @@ export type ServiceRate = {
   name: string;
   description: string | null;
   price: number;
+  price_max?: number | null;
   duration_minutes: number;
+  duration_max?: number | null;
   is_available: boolean;
 };
 
@@ -439,11 +532,21 @@ export type ClinicDentist = {
   specialization: string | null;
   specialization_id: number | null;
   license_number: string | null;
+  ptr_number?: string | null;
+  s2_number?: string | null;
   years_experience: number | null;
   qualifications: string | null;
   bio: string | null;
   is_active: boolean;
   schedules?: DentistSchedule[];
+  appointments_today?: number;
+};
+
+export type DentistDetail = ClinicDentist & {
+  phone?: string | null;
+  joined_at?: string | null;
+  appointments_total?: number;
+  appointments: { id: number; patient: string; service: string; starts_at: string; status: string }[];
 };
 
 export type OperatingHour = { day_of_week: number; opens_at: string; closes_at: string };
@@ -460,13 +563,16 @@ export type ScheduleBlock = { id: number; branch_id: number | null; dentist_id: 
 export const fetchServices = (clinicId: number) => getData<ServiceRate[]>(`${base(clinicId)}/services`);
 export const createService = (clinicId: number, body: Record<string, unknown>) => api.post(`${base(clinicId)}/services`, body);
 export const updateService = (clinicId: number, id: number, body: Record<string, unknown>) => api.put(`${base(clinicId)}/services/${id}`, body);
+export const archiveService = (clinicId: number, id: number) => api.delete(`${base(clinicId)}/services/${id}`);
 export const fetchDentists = (clinicId: number) => getData<ClinicDentist[]>(`${base(clinicId)}/dentists`);
+export const fetchDentist = (clinicId: number, id: number) => getData<DentistDetail>(`${base(clinicId)}/dentists/${id}`);
 export const updateDentist = (clinicId: number, id: number, body: Record<string, unknown>) => api.put(`${base(clinicId)}/dentists/${id}`, body);
 export const updateDentistSchedules = (clinicId: number, id: number, schedules: DentistSchedule[]) =>
   api.put(`${base(clinicId)}/dentists/${id}/schedules`, { schedules });
 export const fetchClinicBranches = (clinicId: number) => getData<ClinicBranch[]>(`${base(clinicId)}/branches`);
 export const createBranch = (clinicId: number, body: Record<string, unknown>) => api.post(`${base(clinicId)}/branches`, body);
 export const updateBranch = (clinicId: number, id: number, body: Record<string, unknown>) => api.put(`${base(clinicId)}/branches/${id}`, body);
+export const removeBranch = (clinicId: number, id: number) => api.delete(`${base(clinicId)}/branches/${id}`);
 export const updateBranchHours = (clinicId: number, id: number, hours: OperatingHour[]) => api.put(`${base(clinicId)}/branches/${id}/hours`, { hours });
 export const fetchHolidays = (clinicId: number) => getData<Holiday[]>(`${base(clinicId)}/holidays`);
 export const createHoliday = (clinicId: number, body: { date: string; name: string }) => api.post(`${base(clinicId)}/holidays`, body);
@@ -484,16 +590,79 @@ export type ClinicReview = {
   is_verified_visit: boolean;
   status: string;
   date: string | null;
+  service?: string | null;
+  dentist?: string | null;
+  clinic_reply?: string | null;
 };
 
 export const fetchClinicReviews = (clinicId: number, page: number) => getPage<ClinicReview>(`${base(clinicId)}/reviews`, { page });
 export const reportReview = (clinicId: number, id: number, reason: string) => api.post(`${base(clinicId)}/reviews/${id}/report`, { reason });
+export const replyToReview = (clinicId: number, id: number, reply: string) => api.post(`${base(clinicId)}/reviews/${id}/reply`, { reply });
+
+// ---------------------------------------------------------------- Settings, permissions, audit log
+export type ClinicSettings = {
+  timezone: string;
+  slot_options: number[];
+  slot_minutes: number;
+  allow_online_booking: boolean;
+  require_approval: boolean;
+  send_reminders: boolean;
+  allow_patient_cancel: boolean;
+};
+export type RolePermissions = { modules: { key: string; label: string }[]; positions: { key: string; label: string; modules: string[] }[] };
+export type ClinicAuditEntry = { id: number; created_at: string; user_name: string | null; user_role: string | null; label: string; detail: string | null; category: string | null };
+
+export const fetchClinicSettings = (clinicId: number) => getData<ClinicSettings>(`${base(clinicId)}/settings`);
+export const updateClinicSettings = (clinicId: number, body: Record<string, unknown>) => api.put(`${base(clinicId)}/settings`, body);
+export const fetchRolePermissions = (clinicId: number) => getData<RolePermissions>(`${base(clinicId)}/role-permissions`);
+export const updateRolePermissions = (clinicId: number, positions: Record<string, string[]>) => api.put(`${base(clinicId)}/role-permissions`, { positions });
+export const fetchAuditLogs = (clinicId: number, params: Record<string, unknown>) => getPage<ClinicAuditEntry>(`${base(clinicId)}/audit-logs`, params);
+export const auditExportUrl = (clinicId: number) => signedUrl(`${base(clinicId)}/audit-logs/export-link`);
+
+// ---------------------------------------------------------------- Subscription
+export type SubscriptionPayment = {
+  id: number;
+  date: string;
+  description: string;
+  amount: number;
+  method: string;
+  reference: string | null;
+  invoice_number: string | null;
+  status: 'pending' | 'verified' | 'rejected';
+  review_note: string | null;
+};
+export type ClinicSubscription = {
+  plan: { key: string; name: string; price: number; billing: string; features: string[] };
+  status: 'none' | 'active' | 'expired';
+  renews_at: string | null;
+  days_remaining: number | null;
+  has_pending_payment: boolean;
+  channels: { key: string; label: string; number_label: string; number: string | null; account_name: string | null }[];
+  payments: SubscriptionPayment[];
+};
+
+export const fetchSubscription = (clinicId: number) => getData<ClinicSubscription>(`${base(clinicId)}/subscription`);
+export const requestRenewal = (clinicId: number) => api.post(`${base(clinicId)}/subscription/renewal-request`);
+export const submitPaymentProof = (clinicId: number, { method, reference, proof }: { method: string; reference: string; proof: PickedFile }) => {
+  const body = new FormData();
+  body.append('method', method);
+  if (reference) body.append('reference', reference);
+  body.append('proof', proof as unknown as Blob);
+  return api.post(`${base(clinicId)}/subscription/payments`, body, { headers: { 'Content-Type': 'multipart/form-data' } });
+};
+export const invoiceUrl = (clinicId: number, paymentId: number) => signedUrl(`${base(clinicId)}/subscription/payments/${paymentId}/invoice-link`);
+
+// ---------------------------------------------------------------- Two-factor sign-in
+export type TwoFactorSetup = { secret: string; otpauth_url: string };
+export const startTwoFactorSetup = (password: string): Promise<TwoFactorSetup> => api.post('/two-factor/setup', { password }).then((r) => r.data?.data);
+export const confirmTwoFactor = (code: string): Promise<{ recovery_codes: string[] }> => api.post('/two-factor/confirm', { code }).then((r) => r.data?.data);
+export const disableTwoFactor = (password: string, code: string) => api.post('/two-factor/disable', { password, code });
 
 export const fetchSpecializationOptions = () => getData<Option[]>('/specializations');
 export const fetchServiceCatalog = () => getData<Option[]>('/services');
 
 // ---------------------------------------------------------------- Own account
-export const updateAccount = async (body: { name?: string; email?: string }) => (await api.put('/profile', body)).data?.data;
+export const updateAccount = async (body: { name?: string; email?: string; phone?: string }) => (await api.put('/profile', body)).data?.data;
 export const changePassword = (body: { current_password: string; new_password: string; new_password_confirmation: string }) =>
   api.post('/change-password', body);
 

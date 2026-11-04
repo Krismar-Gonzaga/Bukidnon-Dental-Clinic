@@ -49,7 +49,7 @@ export function DataTable({ columns, rows, caption, emptyText = 'Nothing to show
           {rows.map((row) => (
             <tr key={rowKey(row)}>
               {columns.map((column) => (
-                <td key={column.key}>{column.render ? column.render(row) : row[column.key]}</td>
+                <td key={column.key} data-label={column.label}>{column.render ? column.render(row) : row[column.key]}</td>
               ))}
             </tr>
           ))}

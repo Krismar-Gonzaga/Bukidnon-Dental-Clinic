@@ -13,6 +13,7 @@ import { fetchSystemHealth } from '../../services/admin';
 import { fetchUnreadCount } from '../../services/notifications';
 import { palette, radius, shadow, spacing, type } from '../../theme/tokens';
 
+const LONG_TITLE = 14;
 const DRAWER_WIDTH = Math.min(320, Dimensions.get('window').width * 0.82);
 const initial = (name?: string) => (name ?? '').trim().charAt(0).toUpperCase() || '?';
 const HEALTH = {
@@ -21,7 +22,7 @@ const HEALTH = {
   down: { label: 'Service down', color: palette.error },
 };
 
-const PUSHED: AdminRoute[] = ['AdminApplicationDetail', 'AdminNotifications', 'AdminAccount'];
+const PUSHED: AdminRoute[] = ['AdminApplicationDetail', 'AdminClinicDetail', 'AdminSubscriptionDetail', 'AdminAnnouncementForm', 'AdminNotifications', 'AdminAccount'];
 
 /** Sections replace each other (Back returns to the dashboard); detail pages stack. */
 export const useOpenAdmin = (active?: AdminRoute) => {
@@ -193,7 +194,7 @@ export function AdminScreen({ title, active, back, children }: { title: string; 
         )}
         <View style={styles.flex}>
           <Text style={styles.product}>BukidnonDental Admin</Text>
-          <Text style={[styles.title, back && styles.titleSmall]} numberOfLines={1} accessibilityRole="header">{title}</Text>
+          <Text style={[styles.title, (back || title.length > LONG_TITLE) && styles.titleSmall]} numberOfLines={1} accessibilityRole="header">{title}</Text>
         </View>
         <Bell />
         <TouchableOpacity

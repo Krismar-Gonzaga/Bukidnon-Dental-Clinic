@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { hashKey, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchCurrentUser, logout as logoutRequest } from '../services/authService';
 import { onSessionExpired } from '../services/apiClient';
 
@@ -37,9 +37,14 @@ export function AuthProvider({ children }) {
 
   const signOut = useCallback(async () => {
     await logoutRequest();
-    // Drop every cached response so the next person sees nothing of this one.
-    queryClient.clear();
+    // A session check still running must not sign this person back in.
+    await queryClient.cancelQueries({ queryKey: CURRENT_USER_KEY });
     queryClient.setQueryData(CURRENT_USER_KEY, null);
+    // Drop every other cached response so the next person sees nothing of this
+    // one. Not clear(): it would also detach the query this provider is watching,
+    // and the header would keep showing the old user until a reload.
+    const userHash = hashKey(CURRENT_USER_KEY);
+    queryClient.removeQueries({ predicate: (query) => query.queryHash !== userHash });
   }, [queryClient]);
 
   const value = useMemo(

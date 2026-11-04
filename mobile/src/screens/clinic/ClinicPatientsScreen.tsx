@@ -22,7 +22,7 @@ import {
   useRefreshOnFocus,
 } from '../../components/clinic/ClinicUi';
 import { DateField } from '../../components/clinic/DateField';
-import { can, ClinicPatient, fetchPatients, registerPatient, serverMessage } from '../../services/clinicPortal';
+import { can, ClinicPatient, fetchPatients, formatDateTime, registerPatient, serverMessage } from '../../services/clinicPortal';
 import { palette } from '../../theme/tokens';
 
 export const GENDERS = [
@@ -92,7 +92,7 @@ const ClinicPatientsScreen = ({ route }: { route?: { params?: { search?: string;
   const open = (patient: ClinicPatient) => navigation.navigate('ClinicPatientDetail', { patientId: patient.id });
 
   return (
-    <ClinicScreen title="Patients" active="ClinicPatients">
+    <ClinicScreen title="Patient Management" active="ClinicPatients">
       <FlatList
         data={list.loading ? [] : list.data?.items ?? []}
         keyExtractor={(p) => String(p.id)}
@@ -120,7 +120,14 @@ const ClinicPatientsScreen = ({ route }: { route?: { params?: { search?: string;
               <Icon name="chevron-forward" size={18} color={palette.outline} />
             </View>
             <Text style={ui.muted}>{[item.phone, item.email].filter(Boolean).join(' · ') || 'No contact details'}</Text>
-            <Badge tone={item.has_portal_account ? 'info' : 'neutral'} label={item.has_portal_account ? 'Portal account' : 'Walk-in'} />
+            <View style={ui.rowWrap}>
+              <Badge tone={item.status === 'inactive' ? 'neutral' : 'success'} label={item.status === 'inactive' ? 'Inactive' : 'Active'} />
+              {item.conditions ? <Badge tone="warning" label={item.conditions} /> : null}
+            </View>
+            <Text style={ui.small}>
+              {item.visits ?? 0} {item.visits === 1 ? 'visit' : 'visits'}
+              {item.last_visit_at ? ` · Last visit ${formatDateTime(item.last_visit_at).split(',').slice(0, 2).join(',')}` : ''}
+            </Text>
           </TouchableOpacity>
         )}
       />

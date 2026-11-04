@@ -31,5 +31,10 @@ export const fetchUnreadCount = async () => {
   return Number(response.data?.meta?.unread_count ?? 0);
 };
 
+export const fetchNotificationPreferences = async (): Promise<{ email?: boolean; categories?: Record<string, boolean> }> =>
+  (await api.get('/notification-preferences')).data?.data ?? {};
+export const updateNotificationPreferences = (preferences: { email?: boolean; categories?: Record<string, boolean> }) =>
+  api.put('/notification-preferences', preferences);
+
 export const markNotificationRead =(id: string) => api.post(`/notifications/${id}/read`);
 export const markAllNotificationsRead = () => api.post('/notifications/read-all');

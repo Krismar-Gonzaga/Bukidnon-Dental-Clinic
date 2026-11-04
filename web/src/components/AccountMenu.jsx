@@ -1,9 +1,10 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from './Icon';
 import { useAuth } from '../auth/AuthContext';
 import { LOGIN_HREF } from '../config/navigation';
 import { useDropdown } from '../hooks/useDropdown';
+import { getErrorMessage } from '../services/apiErrors';
 import './AccountMenu.css';
 
 const getInitial = (name = '') => name.trim().charAt(0).toUpperCase() || '?';
@@ -19,6 +20,8 @@ function AccountMenu({ profileHref, roleLabel, links = [], triggerLabel, onNavig
   const dropdown = useDropdown();
   const { isOpen, wrapperRef, triggerRef } = dropdown;
   const panelId = useId();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
   const name = user?.name ?? '';
 
   const close = () => {
@@ -27,9 +30,17 @@ function AccountMenu({ profileHref, roleLabel, links = [], triggerLabel, onNavig
   };
 
   const handleLogout = async () => {
-    close();
-    await signOut();
-    navigate(LOGIN_HREF, { replace: true });
+    setIsLoggingOut(true);
+    setLogoutError('');
+    try {
+      await signOut();
+      close();
+      navigate(LOGIN_HREF, { replace: true });
+    } catch (error) {
+      setLogoutError(`You are still signed in. ${getErrorMessage(error)}`);
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   if (!user) return null;
@@ -77,11 +88,16 @@ function AccountMenu({ profileHref, roleLabel, links = [], triggerLabel, onNavig
             )}
             <li className="account-menu-divider" aria-hidden="true" />
             <li>
-              <button type="button" className="account-menu-item account-menu-logout" onClick={handleLogout}>
+              <button type="button" className="account-menu-item account-menu-logout" disabled={isLoggingOut} onClick={handleLogout}>
                 <Icon name="logOut" size={18} />
-                Log Out
+                {isLoggingOut ? 'Logging out…' : 'Log Out'}
               </button>
             </li>
+            {logoutError && (
+              <li className="account-menu-error" role="alert">
+                {logoutError}
+              </li>
+            )}
           </ul>
         </div>
       )}

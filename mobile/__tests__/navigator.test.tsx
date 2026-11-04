@@ -35,8 +35,12 @@ jest.mock('@react-native-async-storage/async-storage', () => ({ getItem: jest.fn
   'clinic/ClinicInventoryItemScreen', 'clinic/ClinicServicesScreen', 'clinic/ClinicDentistsScreen',
   'clinic/ClinicBranchesScreen', 'clinic/ClinicStaffScreen', 'clinic/ClinicReviewsScreen', 'clinic/ClinicReportsScreen',
   'clinic/ClinicSettingsScreen', 'clinic/ClinicNotificationsScreen', 'clinic/ClinicAccountScreen',
-  'clinic/ClinicScheduleScreen', 'clinic/ClinicRecordsScreen',
+  'clinic/ClinicScheduleScreen', 'clinic/ClinicRecordsScreen', 'clinic/ClinicDentistProfileScreen', 'clinic/ClinicAddMemberScreens',
+  'clinic/ClinicWalkInScreen', 'clinic/ClinicSubscriptionScreens', 'clinic/ClinicAdminSettingsScreen', 'clinic/ClinicCheckInScreen', 'clinic/ClinicDentistScheduleScreen',
+  'clinic/dentist/DentistAppointments', 'clinic/dentist/DentistAppointmentDetail', 'clinic/dentist/DentalChartScreen', 'clinic/dentist/DentistPatients', 'clinic/dentist/ClinicalRecordsScreens', 'clinic/dentist/ClinicalDocumentsScreens', 'clinic/dentist/ImagingFollowUpScreens', 'clinic/dentist/DentistScheduleProfile',
   'admin/AdminDashboardScreen', 'admin/AdminApplicationsScreen', 'admin/AdminApplicationDetailScreen', 'admin/AdminClinicsScreen',
+  'admin/AdminClinicDetailScreen', 'admin/AdminSubscriptionsScreen', 'admin/AdminSubscriptionDetailScreen', 'admin/AdminReportsScreen',
+  'admin/AdminAnnouncementsScreen', 'admin/AdminAnnouncementFormScreen',
   'admin/AdminUsersScreen', 'admin/AdminReviewsScreen', 'admin/AdminAuditLogScreen', 'admin/AdminSettingsScreen',
   'admin/AdminNotificationsScreen', 'admin/AdminAccountScreen',
 ].forEach((path) => jest.doMock(`../src/screens/${path}`, () => ({ __esModule: true, default: () => null }), { virtual: true }));
@@ -71,6 +75,7 @@ test('clinic members get every clinic portal section from the web portal', () =>
     'ClinicDashboard', 'ClinicAppointments', 'ClinicAppointmentDetail', 'ClinicPatients', 'ClinicPatientDetail',
     'ClinicInventory', 'ClinicInventoryItem', 'ClinicServices', 'ClinicDentists', 'ClinicBranches', 'ClinicStaff',
     'ClinicReviews', 'ClinicReports', 'ClinicSettings', 'ClinicNotifications', 'ClinicAccount', 'ClinicSchedule', 'ClinicRecords',
+    'ClinicDentistProfile', 'ClinicAddDentist', 'ClinicAddStaff', 'ClinicWalkIn', 'ClinicSubscription', 'ClinicPaymentProof', 'ClinicAdminSettings', 'ClinicCheckIn', 'ClinicDentistSchedule',
   ].forEach((name) => expect(screens).toContain(`screen:${name}`));
 });
 
@@ -86,7 +91,7 @@ test('a patient gets the patient screens', () => {
 test('system admins get the admin portal, not the web-portal notice', () => {
   const screens = screensFor({ id: 6, name: 'Sam', role: 'system_admin', memberships: [] });
   [
-    'AdminDashboard', 'AdminApplications', 'AdminApplicationDetail', 'AdminClinics', 'AdminUsers',
+    'AdminDashboard', 'AdminApplications', 'AdminApplicationDetail', 'AdminClinics', 'AdminClinicDetail', 'AdminSubscriptions', 'AdminSubscriptionDetail', 'AdminReports', 'AdminAnnouncements', 'AdminAnnouncementForm', 'AdminUsers',
     'AdminReviews', 'AdminAuditLog', 'AdminSettings', 'AdminNotifications', 'AdminAccount',
   ].forEach((name) => expect(screens).toContain(`screen:${name}`));
   expect(screens).not.toContain('screen:StaffNotice');

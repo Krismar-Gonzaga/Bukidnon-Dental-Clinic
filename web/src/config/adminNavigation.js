@@ -1,63 +1,106 @@
 // System administrator portal.
 export const ADMIN_DASHBOARD_HREF = '/admin';
-export const ADMIN_APPLICATIONS_HREF = '/admin/applications';
 export const ADMIN_CLINICS_HREF = '/admin/clinics';
 export const ADMIN_USERS_HREF = '/admin/users';
+export const ADMIN_APPLICATIONS_HREF = '/admin/applications';
+export const ADMIN_SUBSCRIPTIONS_HREF = '/admin/subscriptions';
+export const ADMIN_REPORTS_HREF = '/admin/reports';
 export const ADMIN_REVIEWS_HREF = '/admin/reviews';
+export const ADMIN_ANNOUNCEMENTS_HREF = '/admin/announcements';
+export const ADMIN_ANNOUNCEMENT_NEW_HREF = '/admin/announcements/new';
 export const ADMIN_AUDIT_HREF = '/admin/audit-logs';
-export const ADMIN_NOTIFICATIONS_HREF = '/admin/notifications';
+export const ADMIN_SETTINGS_HREF = '/admin/settings';
 export const ADMIN_PROFILE_HREF = '/admin/profile';
 export const ADMIN_PASSWORD_HREF = '/admin/password';
-export const ADMIN_SETTINGS_HREF = '/admin/settings';
+export const ADMIN_NOTIFICATIONS_HREF = '/admin/notifications';
 
+export const getAdminClinicHref = (id) => `${ADMIN_CLINICS_HREF}/${encodeURIComponent(id)}`;
 export const getAdminApplicationHref = (id) => `${ADMIN_APPLICATIONS_HREF}/${encodeURIComponent(id)}`;
+export const getAdminSubscriptionHref = (clinicId) => `${ADMIN_SUBSCRIPTIONS_HREF}/${encodeURIComponent(clinicId)}`;
+export const getAdminAnnouncementEditHref = (id) => `${ADMIN_ANNOUNCEMENTS_HREF}/${encodeURIComponent(id)}/edit`;
 
-// Sidebar (admin portal design). Notifications, My Profile and Change
-// Password are reached from the top bar. Users and Review Moderation are not
-// in the design but keep their existing pages.
+// Sidebar, in the order of the system admin design. Review Moderation is not in
+// the design: it stays because reported reviews have nowhere else to go.
 export const ADMIN_NAV_ITEMS = [
   { label: 'Dashboard', href: ADMIN_DASHBOARD_HREF, icon: 'layoutGrid' },
-  { label: 'Registration Queue', href: ADMIN_APPLICATIONS_HREF, icon: 'userCheck' },
-  { label: 'Verification', href: ADMIN_CLINICS_HREF, icon: 'shieldCheck' },
-  { label: 'Users', href: ADMIN_USERS_HREF, icon: 'users' },
+  { label: 'Clinic Management', href: ADMIN_CLINICS_HREF, icon: 'building' },
+  { label: 'User Management', href: ADMIN_USERS_HREF, icon: 'users' },
+  { label: 'Clinic Verification', href: ADMIN_APPLICATIONS_HREF, icon: 'shield' },
+  { label: 'Subscriptions', href: ADMIN_SUBSCRIPTIONS_HREF, icon: 'creditCard' },
+  { label: 'Reports & Analytics', href: ADMIN_REPORTS_HREF, icon: 'barChart' },
   { label: 'Review Moderation', href: ADMIN_REVIEWS_HREF, icon: 'star' },
-  { label: 'Audit Logs', href: ADMIN_AUDIT_HREF, icon: 'history' },
-  { label: 'Settings', href: ADMIN_SETTINGS_HREF, icon: 'settings' },
+  { label: 'System Notifications', href: ADMIN_ANNOUNCEMENTS_HREF, icon: 'bell' },
+  { label: 'Audit Logs', href: ADMIN_AUDIT_HREF, icon: 'clipboardList' },
+  { label: 'System Settings', href: ADMIN_SETTINGS_HREF, icon: 'settings' },
+  { label: 'My Profile', href: ADMIN_PROFILE_HREF, icon: 'user' },
 ];
 
-export const APPLICATION_STATUS_LABELS = {
-  pending: 'Pending',
-  under_review: 'Reviewing',
-  approved: 'Approved',
-  rejected: 'Returned',
-};
-
-// Verification table: document status (from the API's document_status) and review priority.
-export const DOCUMENT_STATUS = {
-  verified: { label: 'Verified', tone: 'success' },
-  under_review: { label: 'Under Review', tone: 'primary' },
-  pending: { label: 'Pending', tone: 'neutral' },
-  missing_info: { label: 'Missing Info', tone: 'danger' },
-  returned: { label: 'More Info Requested', tone: 'warning' },
+// tone: success | warning | danger | info | neutral (StatusTag).
+export const CLINIC_STATUS = {
+  approved: { label: 'Verified', tone: 'success' },
   suspended: { label: 'Suspended', tone: 'danger' },
+  pending: { label: 'Pending', tone: 'warning' },
+  under_review: { label: 'Under-Review', tone: 'warning' },
+  rejected: { label: 'Rejected', tone: 'danger' },
 };
 
-export const PRIORITY_LABELS = { high: 'High', medium: 'Medium', standard: 'Standard' };
-
-// Audit log filters. Categories match the API (App\Support\AuditPresenter).
-export const AUDIT_RANGES = [
-  { value: '24h', label: 'Last 24 Hours' },
-  { value: '7d', label: 'Last 7 Days' },
-  { value: '30d', label: 'Last 30 Days' },
-  { value: 'all', label: 'All Time' },
-  { value: 'custom', label: 'Custom Dates' },
+export const CLINIC_STATUS_FILTERS = [
+  { value: '', label: 'All' },
+  { value: 'approved', label: 'Verified' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'under_review', label: 'Under-Review' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'suspended', label: 'Suspended' },
 ];
 
+export const SUBSCRIPTION_STATUS = {
+  active: { label: 'Active', tone: 'success' },
+  pending_payment: { label: 'Pending-Payment', tone: 'warning' },
+  grace: { label: 'In Grace Period', tone: 'warning' },
+  expired: { label: 'Expired', tone: 'danger' },
+  none: { label: 'No Payment Yet', tone: 'neutral' },
+};
+
+export const PAYMENT_STATUS = {
+  pending: { label: 'Submitted', tone: 'warning' },
+  verified: { label: 'Verified', tone: 'success' },
+  rejected: { label: 'Rejected', tone: 'danger' },
+};
+
+export const NO_PAYMENT_STATUS = { label: 'None', tone: 'neutral' };
+
+// Labels of the verification documents in the system admin design.
+export const VERIFICATION_DOCUMENT_LABELS = {
+  business_permit: 'Business Permit',
+  doh_license: 'DOH License to Operate',
+  prc_id: 'PRC License',
+  bir_registration: 'BIR Registration',
+  other: 'Other Supporting Document',
+};
+
+export const ANNOUNCEMENT_AUDIENCES = [
+  { value: 'all', label: 'All Users' },
+  { value: 'patients', label: 'Patients' },
+  { value: 'dentists', label: 'Dentists' },
+  { value: 'staff', label: 'Clinic Staff' },
+  { value: 'clinic_admins', label: 'Clinic Admins' },
+];
+
+export const ANNOUNCEMENT_STATUS = {
+  published: { label: 'Published', tone: 'success' },
+  draft: { label: 'Draft', tone: 'warning' },
+  archived: { label: 'Archived', tone: 'neutral' },
+};
+
+// Audit log filter. Categories match the API (App\Support\AuditPresenter).
 export const AUDIT_CATEGORIES = [
   { value: 'security', label: 'Security / Sign-in' },
   { value: 'verification', label: 'Clinic Verification' },
   { value: 'clinics', label: 'Clinic Management' },
-  { value: 'accounts', label: 'Account Administration' },
+  { value: 'accounts', label: 'User Management' },
+  { value: 'subscription', label: 'Subscriptions' },
+  { value: 'notifications', label: 'System Notifications' },
+  { value: 'settings', label: 'System Settings' },
   { value: 'records', label: 'Patient Records' },
   { value: 'appointments', label: 'Appointments' },
   { value: 'reviews', label: 'Reviews' },
@@ -65,9 +108,10 @@ export const AUDIT_CATEGORIES = [
 ];
 
 export const AUDIT_OUTCOMES = {
-  success: { label: 'Success', tone: 'success' },
-  failed: { label: 'Failed', tone: 'danger' },
-  blocked: { label: 'Blocked', tone: 'danger' },
+  success: { label: 'success', tone: 'success' },
+  pending: { label: 'pending', tone: 'warning' },
+  failed: { label: 'failed', tone: 'danger' },
+  blocked: { label: 'blocked', tone: 'danger' },
 };
 
 export const USER_ROLE_LABELS = {
@@ -76,4 +120,13 @@ export const USER_ROLE_LABELS = {
   dentist: 'Dentist',
   staff: 'Clinic Staff',
   system_admin: 'System Admin',
+};
+
+// Pill color of each account type on User Management.
+export const USER_ROLE_TONES = {
+  patient: 'info',
+  clinic_admin: 'warning',
+  dentist: 'teal',
+  staff: 'success',
+  system_admin: 'primary',
 };

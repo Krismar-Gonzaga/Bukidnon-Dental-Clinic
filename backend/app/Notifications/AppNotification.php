@@ -38,10 +38,20 @@ abstract class AppNotification extends Notification implements ShouldQueue
         return null;
     }
 
+    /** The preference that can turn this notification off, if any. */
+    protected function category(): ?string
+    {
+        return null;
+    }
+
     public function via(object $notifiable): array
     {
         $channels = ['database'];
         $preferences = $notifiable->notification_preferences ?? [];
+
+        if (($category = $this->category()) && ($preferences['categories'][$category] ?? true) === false) {
+            return [];
+        }
 
         if (($preferences['email'] ?? true) && ! empty($notifiable->email)) {
             $channels[] = 'mail';

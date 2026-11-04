@@ -5,6 +5,7 @@ import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react
 import { ClinicScreen } from '../../components/clinic/ClinicChrome';
 import { useClinicPortal } from '../../components/clinic/ClinicPortalContext';
 import { Badge, Button, Card, EmptyState, Field, FormError, LoadState, SelectField, Sheet, Toggle, ui, useLoader } from '../../components/clinic/ClinicUi';
+import { ClinicProfileTabs, NoteBox } from '../../components/clinic/ClinicAdminKit';
 import { DateField } from '../../components/clinic/DateField';
 import { hoursAreValid, WeeklyHours, WeeklyHoursEditor } from '../../components/clinic/WeeklyHoursEditor';
 import {
@@ -22,6 +23,7 @@ import {
   fetchScheduleBlocks,
   formatDateTime,
   OperatingHour,
+  removeBranch,
   serverMessage,
   toClinicIso,
   updateBranch,
@@ -240,6 +242,9 @@ const ClinicBranchesScreen = ({ route }: Props) => {
   const branches = useLoader(() => fetchClinicBranches(clinicId), [clinicId], 'Branches could not be loaded.');
   const focusId = route?.params?.branchId;
   // "Add New Branch" from the drawer opens the form straight away.
+  const [removing, setRemoving] = useState<ClinicBranch | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ type: 'branch' | 'hours'; branch: ClinicBranch | null } | null>(() =>
     route?.params?.new && canBranches ? { type: 'branch', branch: null } : null,
   );
@@ -247,16 +252,32 @@ const ClinicBranchesScreen = ({ route }: Props) => {
     setSheet(null);
     branches.sync();
   };
+  const confirmRemove = async () => {
+    if (!removing) return;
+    setRemoveBusy(true);
+    setRemoveError(null);
+    try {
+      await removeBranch(clinicId, removing.id);
+      setRemoving(null);
+      branches.sync();
+    } catch (err) {
+      setRemoveError(serverMessage(err, 'The branch could not be removed.'));
+    } finally {
+      setRemoveBusy(false);
+    }
+  };
 
   return (
-    <ClinicScreen title="Branches & Hours" active="ClinicBranches">
+    <ClinicScreen title="Clinic Profile" active="ClinicBranches">
       <ScrollView
         contentContainerStyle={ui.content}
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={branches.refreshing} onRefresh={branches.refresh} colors={[palette.primary]} />}
       >
+        <ClinicProfileTabs active="ClinicBranches" />
         <Card
-          title="Branches & opening hours"
+          title="Branches"
+          subtitle={branches.data ? `${branches.data.length} ${branches.data.length === 1 ? 'branch' : 'branches'} registered under this account.` : undefined}
           action={canBranches ? <Button small variant="tonal" icon="add" label="Add branch" onPress={() => setSheet({ type: 'branch', branch: null })} /> : undefined}
         >
           <LoadState loading={branches.loading} error={branches.data ? null : branches.error} onRetry={branches.reload} />
@@ -265,16 +286,29 @@ const ClinicBranchesScreen = ({ route }: Props) => {
             <View key={b.id} style={[ui.listItem, b.id === focusId && styles.focus]}>
               <View style={ui.between}>
                 <Text style={[ui.title, ui.flex]}>{b.name}</Text>
-                {b.is_main ? <Badge tone="info" label="Main" /> : null}
-                <Badge tone={b.is_active ? 'success' : 'neutral'} label={b.is_active ? 'Open' : 'Inactive'} />
+                {b.is_main ? <Badge tone="info" label="Main Branch" /> : null}
+                {!b.is_active ? <Badge tone="neutral" label="Inactive" /> : null}
               </View>
               <Text style={ui.muted}>
                 {b.address}, {b.city}
               </Text>
+              {b.contact_number ? <Text style={ui.small}>{b.contact_number}</Text> : null}
               <Text style={ui.small}>{summarizeHours(b.operating_hours) || 'Closed — no opening hours set'}</Text>
               <View style={ui.rowWrap}>
                 {canBranches && <Button small variant="outline" icon="create-outline" label="Edit" onPress={() => setSheet({ type: 'branch', branch: b })} />}
                 {canSchedules && <Button small variant="outline" icon="time-outline" label="Hours" onPress={() => setSheet({ type: 'hours', branch: b })} />}
+                {canBranches && !b.is_main && (
+                  <Button
+                    small
+                    variant="danger"
+                    icon="trash-outline"
+                    label="Remove"
+                    onPress={() => {
+                      setRemoveError(null);
+                      setRemoving(b);
+                    }}
+                  />
+                )}
               </View>
             </View>
           ))}
@@ -283,6 +317,13 @@ const ClinicBranchesScreen = ({ route }: Props) => {
         <ClosedDates clinicId={clinicId} canManage={canSchedules} />
       </ScrollView>
 
+      {removing && (
+        <Sheet title={`Remove ${removing.name}?`} onClose={() => setRemoving(null)}>
+          <NoteBox>Patients can no longer book at this branch. A branch with upcoming appointments cannot be removed.</NoteBox>
+          <FormError message={removeError} />
+          <Button label="Remove" variant="danger" style={ui.spacedTop} busy={removeBusy} onPress={confirmRemove} />
+        </Sheet>
+      )}
       {sheet?.type === 'branch' && <BranchSheet clinicId={clinicId} branch={sheet.branch} onClose={() => setSheet(null)} onSaved={done} />}
       {sheet?.type === 'hours' && sheet.branch && <HoursSheet clinicId={clinicId} branch={sheet.branch} onClose={() => setSheet(null)} onSaved={done} />}
     </ClinicScreen>

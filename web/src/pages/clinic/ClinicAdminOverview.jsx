@@ -4,13 +4,12 @@ import { useClinic } from '../../layouts/ClinicLayout';
 import Icon from '../../components/Icon';
 import { BarChart, LineChart } from '../../components/clinic/ClinicCharts';
 import { AppointmentDecision, StatTile } from '../../components/clinic/ClinicUi';
-import WalkInAction from '../../components/portal/WalkInAction';
 import { ErrorState, LoadingState } from '../../components/StatusMessage';
 import { getClinicHref } from '../../config/clinicNavigation';
 import { useAuth } from '../../auth/AuthContext';
 import { getAppointmentCalendar, getClinicAppointments, getClinicInsights } from '../../services/clinicPortalApi';
 import { businessMinutes, businessTodayKey, dateFromKey, formatCompactDateTime, formatRelative } from '../../utils/dateTime';
-import { InviteModal } from './ClinicStaffPage';
+import { InviteByEmailModal } from '../../components/clinic/ClinicAdminUi';
 import './ClinicAdminOverview.css';
 
 // Clinic admin dashboard (clinic admin design). Every figure comes from the
@@ -43,6 +42,7 @@ function revenueChange({ this_month: current, last_month: previous }) {
 
 function Hero({ insights, can, clinicId }) {
   const { user } = useAuth();
+  const { clinicName } = useClinic();
   const [isInviting, setIsInviting] = useState(false);
   const appointments = insights?.today.appointments;
   const pending = insights?.today.pending_requests;
@@ -65,10 +65,10 @@ function Hero({ insights, can, clinicId }) {
       </div>
       <div className="clinic-hero-actions">
         {can('appointments.manage') && (
-          <WalkInAction clinicId={clinicId} can={can} className="clinic-hero-button is-solid">
+          <a href={`${getClinicHref(clinicId, 'appointments')}/walk-in`} className="clinic-hero-button is-solid">
             <Icon name="calendarBlank" size={18} />
             Walk-in Appointment
-          </WalkInAction>
+          </a>
         )}
         {can('clinic.staff.manage') && (
           <button type="button" className="clinic-hero-button" onClick={() => setIsInviting(true)}>
@@ -77,7 +77,7 @@ function Hero({ insights, can, clinicId }) {
           </button>
         )}
       </div>
-      {isInviting && <InviteModal title="Invite dentist" defaultRole="dentist" onClose={() => setIsInviting(false)} />}
+      {isInviting && <InviteByEmailModal clinicId={clinicId} clinicName={clinicName} role="dentist" title="Invite Dentist by Email" onClose={() => setIsInviting(false)} />}
     </section>
   );
 }
@@ -361,14 +361,16 @@ function QuickActions({ clinicId, can }) {
       </h2>
       <div className="clinic-quick-grid">
         {can('appointments.manage') && (
-          <WalkInAction clinicId={clinicId} can={can} className="clinic-quick">
+          <a href={`${getClinicHref(clinicId, 'appointments')}/walk-in`} className="clinic-quick">
             <Icon name="calendarBlank" size={24} />
             Walk-in Appt
-          </WalkInAction>
+          </a>
         )}
         {can('patients.manage') && tile(`${getClinicHref(clinicId, 'patients')}?register=1`, 'userPlus', 'Add Patient')}
-        {can('inventory.manage') && tile(`${getClinicHref(clinicId, 'inventory')}?new=1`, 'clipboardList', 'Add Inventory')}
+        {can('inventory.manage') && tile(`${getClinicHref(clinicId, 'inventory')}?new=1`, 'package', 'Add Inventory')}
         {can('reports.view') && tile(getClinicHref(clinicId, 'reports'), 'barChart', 'View Reports')}
+        {can('clinic.staff.manage') && tile(`${getClinicHref(clinicId, 'dentists')}/new`, 'stethoscope', 'Invite Dentist')}
+        {can('clinic.settings.manage') && tile(getClinicHref(clinicId, 'clinic-settings'), 'settings', 'Settings')}
       </div>
     </section>
   );

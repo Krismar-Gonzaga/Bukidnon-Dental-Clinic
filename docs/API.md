@@ -163,14 +163,16 @@ Access comes from the user's **active membership** in that clinic. Each role gra
 | clinic.view | ✓ | ✓ | ✓ | ✓ |
 | clinic.profile / branches / services / dentists / schedules / staff manage | ✓ | | | |
 | appointments.view_all, appointments.manage | ✓ | | ✓ | |
-| appointments.view_assigned, appointments.progress | | ✓ | | |
+| appointments.view_assigned, appointments.progress, appointments.review_assigned | | ✓ | | |
+| documents.issue (prescriptions and certificates) | | ✓ | | |
 | patients.view | ✓ | ✓ | ✓ | |
 | patients.manage | ✓ | | ✓ | |
-| records.view, records.write | | ✓ | | |
+| patients.medical_alerts | | | ✓ | |
+| records.view, records.write | ✓ | ✓ | | |
 | inventory.view, inventory.manage | ✓ | | | ✓ |
 | feedback.view, reports.view | ✓ | | | |
 
-The clinic owner deliberately **cannot read clinical records**. Dentists see only patients they have appointments with.
+Clinic administrators can read clinical records, and every view is written to the audit log. Clinic staff never can. Dentists see only patients they have appointments with.
 
 | Area | Endpoints |
 |---|---|
@@ -220,6 +222,40 @@ Requires `users.role = system_admin` (created with `php artisan app:create-syste
 
 **Audit integrity.** `audit_logs` is append-only: the model refuses updates and deletes, and on PostgreSQL a trigger refuses them too, except setting `hash`/`prev_hash` once on an unsealed row. `audit:seal` (every 5 minutes, and before each check) seals entries older than 30 seconds in id order: each stores an HMAC-SHA-256, keyed from `APP_KEY`, of its columns and the previous entry's hash. `audit:verify` or the integrity endpoint re-computes the chain and reports edited entries, gaps (deleted entries), removed newest entries (checked against the head kept in the application cache) and unsealed entries inside the chain. Rotating `APP_KEY` breaks verification of entries sealed before the rotation.
 
+## System admin portal
+
+Everything here needs the `system_admin` role. Routes marked † also need the password re-confirmed. Figures are aggregates; none carries patient-level data.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/platform` | Public: `platform_name`, `support_email`, `maintenance_mode`, `allow_self_registration` |
+| GET | `/admin/clinics/directory` | Clinics plus registrations not yet approved (`kind`: `clinic` or `application`), with admin and plan. Filters: `status`, `search` |
+| GET | `/admin/clinics/{clinic}` | Plan, since, renewal, subscription status, verification link and recent activity (labels and dates only) |
+| POST | `/admin/clinic-applications/{id}/request-documents` † | Back to the applicant for more documents (`notes` required) |
+| GET | `/admin/subscriptions[/{clinic}]` | One row per clinic: plan, amount, due date, `status` (`active`, `pending_payment`, `grace`, `expired`, `none`), `payment_status`. The detail adds the latest proof, payment history and plans |
+| PUT | `/admin/subscriptions/{clinic}/plan` † | Change the plan (`plan`). Applies from the next payment; the due date does not move |
+| GET | `/admin/subscription-payments/{payment}/proof-link` | 5-minute signed link for the phone (recorded) |
+| GET | `/admin/reports` | Overview charts and the Clinics, Users and Subscriptions reports for `month` (YYYY-MM) against the month before |
+| GET | `/admin/reports/export` | CSV of one `section`, or all of them. Recorded |
+| GET, POST | `/admin/announcements` | List; create (`title`, `content`, `audience`, optional `publish`) |
+| GET, PUT | `/admin/announcements/{id}` | Read; edit a draft (409 once published) |
+| POST | `/admin/announcements/{id}/publish`, `/archive` | Publish notifies the audience (`all`, `patients`, `dentists`, `staff`, `clinic_admins`) in the app and by email, unless they turned `system_announcements` off |
+| GET, PUT † | `/admin/settings` | Platform settings (see below) and the plans on offer |
+
+`GET /admin/audit-logs` also takes `search` (action words, a person, a clinic) and returns `module`. `outcome` can be `pending`.
+
+**What each setting does**
+
+- `maintenance_mode`: every API call answers 503 `{ "code": "maintenance" }` except for system administrators, and sign-in, sign-out, `/session` and `/platform`.
+- `allow_self_registration`: off refuses `POST /register` for patients (403). Clinic owners can still register to apply.
+- `session_timeout_minutes` (5 to 1,440, default 30): idle lifetime of every web session, and of app tokens for everyone except patients.
+- `require_verification`: off approves a registration automatically when it is submitted.
+- `required_documents`: which of the four documents a registration must include (at least one).
+- `payment_grace_days` (0 to 90, default 7): days past the due date a subscription counts as in its grace period before it counts as expired. It changes the status shown; nothing locks a clinic out.
+- `platform_name` and `support_email`: the name on the web app and in emails, and where the contact form goes.
+
+Scheduled job: `admin:send-system-alerts` (every 15 minutes) alerts administrators when the health checks get worse, once per change.
+
 ## Scheduled jobs
 
 Defined in `backend/routes/console.php`. They need `php artisan schedule:run` every minute (cron) or `schedule:work`.
@@ -227,6 +263,96 @@ Defined in `backend/routes/console.php`. They need `php artisan schedule:run` ev
 | Command | When | What |
 |---|---|---|
 | `appointments:send-reminders` | every 15 min | Reminds patients `BOOKING_REMINDER_HOURS_BEFORE` (default 24) hours ahead, once per appointment |
+| `dentists:send-digest` | daily 07:00 | Tells each dentist how many visits they have today, and about follow-ups due within 3 days (each follow-up once) |
+| `appointments:send-check-in-alerts` | every 5 min | Tells the clinic's front desk when a confirmed patient is `BOOKING_CHECK_IN_ALERT_MINUTES` (default 20) past their start time and not checked in, once per appointment |
 | `inventory:send-alerts` | daily 07:00 Manila | Low stock, near-expiry and expired batches, to members with `inventory.manage` |
 | `sanctum:prune-expired` | daily | Deletes expired tokens |
 | `audit:seal` | every 5 min | Adds new audit entries to the tamper-evident hash chain (`audit:verify` re-checks it) |
+
+## Clinic administration modules
+
+All paths are under `/api/manage/clinics/{clinic}` unless they start with `/api/`. Each one checks the clinic permission shown; clinical data needs `records.view` or `records.write`, and reads are written to the audit log.
+
+| Method and path | Permission | Purpose |
+| --- | --- | --- |
+| `GET, PUT /settings` | `clinic.settings.manage` | Slot length and booking switches |
+| `GET, PUT /role-permissions` | `clinic.permissions.manage` | Modules each staff position can open |
+| `GET /audit-logs`, `GET /audit-logs/export` | `clinic.audit.view` | This clinic's audit log and CSV export |
+| `GET /audit-logs/export-link` | `clinic.audit.view` | 5-minute signed link to the CSV, for the mobile app |
+| `GET /subscription` | `subscription.manage` | Plan, renewal, payment channels and billing history |
+| `POST /subscription/payments` | `subscription.manage` | Upload proof: `method`, `proof` (jpg, png or pdf, 5 MB), optional `reference`. 409 while one is pending |
+| `POST /subscription/renewal-request` | `subscription.manage` | Tell system administrators the clinic wants to renew |
+| `GET /subscription/payments/{id}/invoice`, `/invoice-link` | `subscription.manage` | Invoice PDF of a verified payment, or a 5-minute signed link to it |
+| `GET, POST /patients/{id}/files` | `records.view`, `records.write` | List or upload (`file`: pdf, jpg, png or webp, 10 MB) |
+| `GET /patients/{id}/files/{fileId}`, `/link` | `records.view` | Download, or a 5-minute signed link. Both are logged |
+| `POST /reviews/{id}/reply` | `feedback.respond` | Public clinic reply (`reply`) |
+| `GET /dentists/{id}` | `clinic.dentists.manage` or `clinic.schedules.manage` | Dentist profile with stats and recent appointments |
+| `POST /members/{id}/reset-password` | `clinic.staff.manage` | Emails a reset link; never returns a password |
+| `DELETE /services/{id}` | `clinic.services.manage` | Archives the service; past appointments keep it |
+| `DELETE /branches/{id}` | `clinic.branches.manage` | 409 for the main branch or one with upcoming appointments |
+| `POST /appointments/{id}/reassign` | `appointments.manage` | Same time, another dentist of this clinic (`dentist_id`) |
+
+Signed in as any user:
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET, PUT /api/notification-preferences` | `email` and `categories` switches. A category missing from the saved value counts as on |
+| `GET /api/two-factor` | `enabled`, `confirmed_at`, `recovery_codes_left`. Never the secret |
+| `POST /api/two-factor/setup` | `password`; returns `secret`, `otpauth_url` and `qr_svg` |
+| `POST /api/two-factor/confirm` | `code`; turns it on, signs out other devices and returns `recovery_codes` once |
+| `POST /api/two-factor/disable` | `password` and `code` (an app code or a recovery code) |
+| `POST /api/two-factor/recovery-codes` | `password`; new codes replace the old ones, returned once |
+| `GET /api/sessions` | Where this account is signed in: `id` (opaque), `type` (`web` or `app`), `device`, `ip_address`, `last_active_at`, `current` |
+| `DELETE /api/sessions/{id}` | Sign out of one device. 422 for the current one, 404 for anything not on this account |
+| `POST /api/sessions/sign-out-others` | `password`; signs out everything except this device |
+
+`POST /api/login` accepts `two_factor_code` and, from the app, `device_name` (a label for the devices list). It answers **423** when the account needs a code and 422 (`errors.two_factor_code`) when the code is wrong or an app code was already used.
+
+System administrators (`/api/admin`): `GET /subscription-payments?status=`, `GET /subscription-payments/{id}/proof`, and `POST /subscription-payments/{id}/verify` or `/reject` (`note`). Verify and reject need a recent password confirmation.
+
+## Dentist portal
+
+Under `/manage/clinics/{clinic}`. A dentist only reaches patients who have an appointment with them; anything else is 404. Reads of clinical data are logged.
+
+| Method and path | Permission | Purpose |
+| --- | --- | --- |
+| `GET /dentist/overview` | appointments.view_assigned | Today, counts, pending requests, upcoming patients, follow-ups due, this week's totals |
+| `GET /dentist/schedule` | appointments.view_assigned | Current days and hours, this week, `pending_change`, `last_decision` |
+| `POST /dentist/schedule/changes` | appointments.view_assigned | Propose `days`, `starts_at`, `ends_at`, optional `note`, `branch_id`. **Nothing changes until approved.** One open request per dentist (409 otherwise). 422 if a day is already worked at another branch |
+| `DELETE /dentist/schedule/changes/{id}` | appointments.view_assigned | Withdraw an undecided request |
+| `GET /schedule-changes` | clinic.schedules.manage | Requests to decide; `status` (default pending), `dentist_id`. Each has `current` and `outside_hours` |
+| `POST /schedule-changes/{id}/approve` | clinic.schedules.manage | Applies the hours at that branch. Other branches keep theirs and booked visits are not moved |
+| `POST /schedule-changes/{id}/reject` | clinic.schedules.manage | `reason` is required and goes to the dentist |
+| `POST /dentist/schedule/request-change` | appointments.view_assigned | `message`; goes to the clinic admins |
+| `GET, PUT /dentist/profile` | appointments.view_assigned | Their own details. Licence numbers and email are ignored here: the clinic admin sets licence numbers through `PUT /dentists/{id}` |
+| `POST /appointments/{id}/confirm`, `/reject` | appointments.manage or appointments.review_assigned | Dentists answer requests made to them |
+| `POST /appointments/{id}/start` | appointments.manage or appointments.progress | A dentist can also start a confirmed visit on its own day; check-in and start are both recorded |
+| `PUT /appointments/{id}/treatment-notes` | records.write | `notes`. Returned only to those with records.view |
+| `GET /patients/{id}/dental-chart` | records.view | 32 teeth with `status`, `notes`, `charted`; `summary`; `last_updated_at`. A tooth not yet charted reads as healthy with `charted: false` |
+| `PUT /patients/{id}/dental-chart/{tooth}` | records.write | `status`: healthy, caries, filled, crown, missing, planned; `notes` |
+| `GET, PUT /patients/{id}/checklist` | records.view / records.write | Pre-procedure checklist. Every item starts unticked |
+| `GET /records?kind=notes` or `kind=treatments` | records.view | The two record pages; also `patient_id` |
+| `POST /patients/{id}/records` | records.write | Also takes `diagnosis`, `treatment_plan`, `follow_up_recommendations`, `materials_used`, `performed_on`, `status` (`draft` or `final`, default final) |
+| `PUT /patients/{id}/records/{recordId}` | records.write | Change or finalize a draft. Author only. Final records still use `/amend` |
+| `GET /prescriptions` | records.view | A dentist sees the ones they issued |
+| `POST /prescriptions` | documents.issue | `patient_id`, `medication`, `dosage`, `frequency`, `duration`, `instructions`. 422 without a licence on file. Never edited afterwards |
+| `GET /prescriptions/{id}/print-link` | records.view | A 5-minute signed link to the printable page |
+| `POST /certificates/preview` | documents.issue | `patient_id`, `type` (medical, clearance, treatment), `purpose`. Issues nothing |
+| `POST /certificates` | documents.issue | Issues it and returns a signed print `url`. 422 without a licence on file |
+| `GET /files` | records.view | Files across the member's patients; `patient_id`, `category` |
+| `GET, POST /follow-ups`, `PUT /follow-ups/{id}` | records.view / records.write | `purpose`, `due_on`, `priority` (routine, high), `status` (scheduled, confirmed, completed, cancelled), `notes`. The list's `meta.summary` has `total`, `high_priority`, `confirmed` |
+
+## Front desk (clinic staff)
+
+All paths are under `/api/manage/clinics/{clinic}`.
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET /appointments/queue` | `appointments.view_all` | Today's checked-in and ongoing patients: `id`, `queue_number`, `patient`, `service`, `dentist`, `status`, `checked_in_at`. Numbers follow check-in order, so they stay the same as people are served |
+| `PUT /appointments/{id}/front-desk-notes` | `appointments.manage` | `notes`, scheduling notes only. Saved as `front_desk_notes` on the appointment |
+| `GET /me` | `clinic.view` | The signed-in member's details at this clinic: `name`, `email`, `phone`, `address`, `position_label`, `clinic_name`, `status`, `work_schedule` |
+| `PUT /me` | `clinic.view` | `phone`, `address` only. Name and email change through `/api/profile` |
+
+`PUT /members/{membership}` also accepts `work_schedule` (`days`: 0 to 6, `starts_at`, `ends_at`), set by the clinic admin. The staff member can only read it.
+
+`GET /appointments/{id}` adds `patient_last_visit_at`. Its `medical_flags` are returned to members with `records.view` or `patients.medical_alerts`. With `patients.medical_alerts` alone, a member sees only the allergy and condition lines, never clinical notes, and each read is written to the audit log as `records.alerts_viewed`.

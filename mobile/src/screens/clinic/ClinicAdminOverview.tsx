@@ -4,9 +4,9 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useNavigation } from '@react-navigation/native';
 import { useOpenSection } from '../../components/clinic/ClinicChrome';
 import { Button, Field, FormError, Sheet, useLoader, useRefreshOnFocus } from '../../components/clinic/ClinicUi';
-import { WalkInSheet } from '../../components/clinic/WalkInSheet';
 import { useAuth } from '../../context/AuthContext';
 import { can, ClinicAppointment, fetchAppointments, formatCount, formatDateTime, formatPeso, Membership, runAppointmentAction, serverMessage } from '../../services/clinicPortal';
 import {
@@ -313,16 +313,14 @@ function Activity({ activity }: { activity: ClinicActivity[] }) {
 export function ClinicAdminOverview({ membership, reloadKey }: { membership: Membership; reloadKey: number }) {
   const { user } = useAuth();
   const open = useOpenSection('ClinicDashboard');
+  const navigation = useNavigation<any>();
   const clinicId = membership.clinic_id;
-  const [walkIn, setWalkIn] = useState(false);
-  const [localKey, setLocalKey] = useState(0);
-  const key = reloadKey + localKey;
+  const key = reloadKey;
   const insightsLoader = useLoader(() => fetchClinicInsights(clinicId), [clinicId, key], 'The dashboard figures could not be loaded.');
   useRefreshOnFocus(insightsLoader.sync);
   const insights = insightsLoader.data;
   const canWalkIn = can(membership, 'appointments.manage');
   const change = insights ? revenueChange(insights.revenue.this_month, insights.revenue.last_month) : null;
-  const refreshAll = () => setLocalKey((n) => n + 1);
 
   return (
     <View style={styles.root}>
@@ -341,13 +339,13 @@ export function ClinicAdminOverview({ membership, reloadKey }: { membership: Mem
         </Text>
         <View style={styles.heroActions}>
           {canWalkIn && (
-            <TouchableOpacity style={[styles.heroButton, styles.heroButtonSolid]} onPress={() => setWalkIn(true)} accessibilityRole="button">
+            <TouchableOpacity style={[styles.heroButton, styles.heroButtonSolid]} onPress={() => navigation.navigate('ClinicWalkIn')} accessibilityRole="button">
               <Icon name="calendar-outline" size={18} color={palette.primary} />
               <Text style={styles.heroButtonSolidText}>Walk-in Appointment</Text>
             </TouchableOpacity>
           )}
           {can(membership, 'clinic.staff.manage') && (
-            <TouchableOpacity style={styles.heroButton} onPress={() => open('ClinicStaff', { inviteRole: 'dentist' })} accessibilityRole="button">
+            <TouchableOpacity style={styles.heroButton} onPress={() => navigation.navigate('ClinicAddDentist')} accessibilityRole="button">
               <Icon name="person-add-outline" size={18} color={palette.onPrimary} />
               <Text style={styles.heroButtonText}>Invite Dentist</Text>
             </TouchableOpacity>
@@ -383,7 +381,7 @@ export function ClinicAdminOverview({ membership, reloadKey }: { membership: Mem
         <Text style={styles.cardTitle}>Quick Actions</Text>
         <View style={styles.quickGrid}>
           {canWalkIn && (
-            <TouchableOpacity style={styles.quick} onPress={() => setWalkIn(true)} accessibilityRole="button">
+            <TouchableOpacity style={styles.quick} onPress={() => navigation.navigate('ClinicWalkIn')} accessibilityRole="button">
               <Icon name="calendar-outline" size={24} color={palette.primary} />
               <Text style={styles.quickText}>Walk-in Appt</Text>
             </TouchableOpacity>
@@ -406,10 +404,21 @@ export function ClinicAdminOverview({ membership, reloadKey }: { membership: Mem
               <Text style={styles.quickText}>View Reports</Text>
             </TouchableOpacity>
           )}
+          {can(membership, 'clinic.staff.manage') && (
+            <TouchableOpacity style={styles.quick} onPress={() => navigation.navigate('ClinicAddDentist')} accessibilityRole="button">
+              <Icon name="medkit-outline" size={24} color={palette.primary} />
+              <Text style={styles.quickText}>Invite Dentist</Text>
+            </TouchableOpacity>
+          )}
+          {can(membership, 'clinic.settings.manage') && (
+            <TouchableOpacity style={styles.quick} onPress={() => open('ClinicAdminSettings')} accessibilityRole="button">
+              <Icon name="settings-outline" size={24} color={palette.primary} />
+              <Text style={styles.quickText}>Settings</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {walkIn && <WalkInSheet clinicId={clinicId} canRegister={can(membership, 'patients.manage')} onClose={() => setWalkIn(false)} onBooked={refreshAll} />}
     </View>
   );
 }

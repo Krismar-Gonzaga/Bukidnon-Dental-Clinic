@@ -20,9 +20,12 @@ export const getApplication = (id) => getData(`/admin/clinic-applications/${id}`
 export const startApplicationReview = (id) => send('post', `/admin/clinic-applications/${id}/start-review`);
 export const approveApplication = (id, notes) => send('post', `/admin/clinic-applications/${id}/approve`, { notes });
 export const rejectApplication = (id, notes) => send('post', `/admin/clinic-applications/${id}/reject`, { notes });
+export const requestApplicationDocuments = (id, notes) => send('post', `/admin/clinic-applications/${id}/request-documents`, { notes });
 export const addApplicationNote = (id, note) => send('post', `/admin/clinic-applications/${id}/notes`, { note });
 
 export const getAdminClinics = (params) => getPage('/admin/clinics', params);
+export const getClinicDirectory = (params) => getPage('/admin/clinics/directory', params);
+export const getAdminClinic = (id) => getData(`/admin/clinics/${id}`);
 export const suspendClinic = (id, reason) => send('post', `/admin/clinics/${id}/suspend`, { reason });
 export const reactivateClinic = (id) => send('post', `/admin/clinics/${id}/reactivate`);
 
@@ -64,6 +67,20 @@ async function downloadCsv(url, params, baseName) {
   setTimeout(() => URL.revokeObjectURL(href), 1000);
 }
 
+export const getReports = (params) => getData('/admin/reports', params);
+export const exportReportCsv = (params) => downloadCsv('/admin/reports/export', params, 'platform-report');
+
+export const getAnnouncements = (params) => getPage('/admin/announcements', params);
+export const getAnnouncement = (id) => getData(`/admin/announcements/${id}`);
+export const createAnnouncement = (body) => send('post', '/admin/announcements', body);
+export const updateAnnouncement = (id, body) => send('put', `/admin/announcements/${id}`, body);
+export const publishAnnouncement = (id) => send('post', `/admin/announcements/${id}/publish`);
+export const archiveAnnouncement = (id) => send('post', `/admin/announcements/${id}/archive`);
+
+export const getPlatformSettings = () => getData('/admin/settings');
+// High impact: asks for the password again. Resolves to the saved settings.
+export const updatePlatformSettings = async (body) => (await send('put', '/admin/settings', body)).data;
+
 export const getModerationQueue = (params) => getPage('/admin/reviews', params);
 export const moderateReview = (id, status, note) => send('post', `/admin/reviews/${id}/moderate`, { status, note });
 
@@ -100,4 +117,32 @@ export async function openApplicationDocument(scope, applicationId, documentId, 
     tab?.close();
     throw error;
   }
+}
+
+// Subscriptions and payment proofs
+export const getAdminSubscriptions = (params) => getPage('/admin/subscriptions', params);
+export const getAdminSubscription = (clinicId) => getData(`/admin/subscriptions/${clinicId}`);
+export const changeSubscriptionPlan = (clinicId, plan) => send('put', `/admin/subscriptions/${clinicId}/plan`, { plan });
+export const getSubscriptionPayments = (params) => getPage('/admin/subscription-payments', params);
+export const verifySubscriptionPayment = (id) => apiClient.post(`/admin/subscription-payments/${id}/verify`);
+export const rejectSubscriptionPayment = (id, note) => apiClient.post(`/admin/subscription-payments/${id}/reject`, { note });
+// Saves the proof, through the signed-in session.
+export async function downloadPaymentProof(id, baseName) {
+  const { data } = await apiClient.get(`/admin/subscription-payments/${id}/proof`, { responseType: 'blob' });
+  const extension = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg' }[data.type] ?? 'bin';
+  const href = URL.createObjectURL(data);
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = `${baseName}.${extension}`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 1000);
+}
+// Opens the proof in a new tab through the signed-in session.
+export async function openPaymentProof(id) {
+  const { data } = await apiClient.get(`/admin/subscription-payments/${id}/proof`, { responseType: 'blob' });
+  const href = window.URL.createObjectURL(data);
+  window.open(href, '_blank', 'noopener');
+  window.setTimeout(() => window.URL.revokeObjectURL(href), 60 * 1000);
 }

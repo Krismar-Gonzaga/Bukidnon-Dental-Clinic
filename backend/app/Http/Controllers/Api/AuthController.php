@@ -11,7 +11,11 @@ use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Requests\Auth\UpdateProfileRequest;
 use App\Models\Patient;
 use App\Models\User;
+use App\Notifications\PortalNotice;
 use App\Services\AuditLogger;
+use App\Services\TwoFactorVerifier;
+use App\Support\UserSessions;
+use App\Support\PlatformSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,13 +26,20 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
-    public function __construct(private readonly AuditLogger $audit)
-    {
+    public function __construct(
+        private readonly AuditLogger $audit,
+        private readonly TwoFactorVerifier $twoFactor,
+    ) {
     }
 
     public function register(RegisterRequest $request): JsonResponse
     {
         $role = $request->input('role', 'patient');
+
+        // Clinic owners still register to apply; only patient sign-up can be closed.
+        if ($role === 'patient' && ! PlatformSettings::get('allow_self_registration')) {
+            return $this->fail('Patient registration is closed right now. Please ask your clinic for an invitation.', 403);
+        }
 
         $user = DB::transaction(function () use ($request, $role) {
             $user = new User($request->only('name', 'email', 'password'));
@@ -66,6 +77,19 @@ class AuthController extends Controller
             $this->audit->record('auth.login_blocked', $user, actor: $user);
 
             return $this->fail('This account is suspended.', 403);
+        }
+
+        // The password was right: only now is it safe to say a code is needed.
+        if ($user->two_factor_enabled) {
+            $code = trim((string) $request->input('two_factor_code'));
+            if ($code === '') {
+                return $this->fail('Enter the code from your authenticator app.', 423);
+            }
+            if (! $this->twoFactor->passes($user, $code)) {
+                $this->audit->record('auth.two_factor_failed', $user, actor: $user);
+
+                return $this->fail('That code is not correct.', 422, ['two_factor_code' => ['That code is not correct.']]);
+            }
         }
 
         $this->audit->record('auth.login', $user, actor: $user);
@@ -122,6 +146,10 @@ class AuthController extends Controller
 
         DB::transaction(function () use ($request, $user) {
             $user->update($request->only('name', 'email'));
+            // Patients keep their phone on the patient profile.
+            if (! $user->patient && $request->has('phone')) {
+                $user->forceFill(['phone' => $request->input('phone')])->save();
+            }
             $user->patient?->update($request->only('phone', 'address'));
         });
 
@@ -134,14 +162,12 @@ class AuthController extends Controller
         $user->update(['password' => $request->new_password]);
 
         // Sign out every other device; keep the session that made the change.
-        $token = $user->currentAccessToken();
-        $user->tokens()
-            ->when($token instanceof PersonalAccessToken, fn ($q) => $q->whereKeyNot($token->getKey()))
-            ->delete();
+        UserSessions::revokeOthers($user, $request);
         if ($request->hasSession()) {
             $request->session()->regenerate();
         }
         $this->audit->record('auth.password_changed', $user);
+        $user->notify(new PortalNotice('security', 'Password changed', 'Your password was changed and other devices were signed out. If this was not you, reset your password now.'));
 
         return $this->ok(message: 'Password changed successfully');
     }
@@ -175,7 +201,7 @@ class AuthController extends Controller
             ],
             function (User $user, string $password) {
                 $user->update(['password' => $password]);
-                $user->tokens()->delete();
+                UserSessions::revokeAll($user);
             }
         );
 
@@ -206,21 +232,31 @@ class AuthController extends Controller
 
         return [
             'user' => $this->userData($user),
-            'token' => $user->createToken('auth_token')->plainTextToken,
+            'token' => $user->createToken($this->deviceName($request))->plainTextToken,
             'role' => $user->role,
         ];
+    }
+
+    /** What the "signed-in devices" list calls this phone. Label only; not trusted for anything. */
+    private function deviceName(Request $request): string
+    {
+        $named = trim(strip_tags((string) $request->input('device_name')));
+
+        return mb_substr($named !== '' ? $named : UserSessions::describeAgent($request->userAgent()), 0, 100);
     }
 
     private function userData(User $user): array
     {
         $memberships = $user->clinicMemberships()
             ->active()
-            ->with('clinic:id,name')
+            ->with('clinic:id,name,settings')
             ->get()
             ->map(fn ($membership) => [
                 'clinic_id' => $membership->clinic_id,
                 'clinic_name' => $membership->clinic?->name,
                 'role' => $membership->role,
+                'position_label' => $membership->positionLabel(),
+                'specialization' => $membership->role === 'dentist' ? $user->dentist?->specialization?->name : null,
                 'permissions' => $membership->permissions(),
             ]);
 

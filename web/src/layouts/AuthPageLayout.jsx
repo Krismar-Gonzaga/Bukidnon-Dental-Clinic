@@ -1,5 +1,6 @@
 import Icon from '../components/Icon';
-import { BRAND_NAME, BRAND_TAGLINE } from '../config/app';
+import { BRAND_TAGLINE } from '../config/app';
+import { useBrandName } from '../services/platformStore';
 import './AuthPageLayout.css';
 
 const HOME_HREF = '/';
@@ -7,6 +8,7 @@ const HOME_HREF = '/';
 // Standalone frame for sign-in and registration: no full site header or
 // footer, as in the Figma designs. Adds a way back home and brand context.
 function AuthPageLayout({ children }) {
+  const brand = useBrandName();
   return (
     <div className="auth-page">
       <header className="auth-page-bar">
@@ -18,7 +20,7 @@ function AuthPageLayout({ children }) {
 
       <main className="auth-page-main">
         <div className="auth-page-brand">
-          <p className="auth-page-wordmark">{BRAND_NAME}</p>
+          <p className="auth-page-wordmark">{brand}</p>
           <p className="auth-page-tagline">{BRAND_TAGLINE}</p>
         </div>
         {children}

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import LinkInterceptor from './components/LinkInterceptor';
 import SiteFooter from './components/SiteFooter';
@@ -50,24 +51,57 @@ import ClinicReviewsPage from './pages/clinic/ClinicReviewsPage';
 import ClinicReportsPage from './pages/clinic/ClinicReportsPage';
 import ClinicSettingsPage from './pages/clinic/ClinicSettingsPage';
 import ClinicNotificationsPage from './pages/clinic/ClinicNotificationsPage';
+import ClinicWalkInPage from './pages/clinic/ClinicWalkInPage';
+import ClinicCheckInPage from './pages/clinic/ClinicCheckInPage';
+import ClinicDentistSchedulePage from './pages/clinic/ClinicDentistSchedulePage';
+import FrontDeskProfilePage from './pages/clinic/FrontDeskProfilePage';
+import ClinicDentistProfilePage from './pages/clinic/ClinicDentistProfilePage';
+import ClinicAddDentistPage from './pages/clinic/ClinicAddDentistPage';
+import ClinicAddStaffPage from './pages/clinic/ClinicAddStaffPage';
+import ClinicSubscriptionPage from './pages/clinic/ClinicSubscriptionPage';
+import ClinicPaymentProofPage from './pages/clinic/ClinicPaymentProofPage';
+import ClinicAdminSettingsPage from './pages/clinic/ClinicAdminSettingsPage';
+import DentistAppointments from './pages/clinic/dentist/DentistAppointments';
+import DentistAppointmentDetail from './pages/clinic/dentist/DentistAppointmentDetail';
+import DentistPatients from './pages/clinic/dentist/DentistPatients';
+import DentistPatientProfile from './pages/clinic/dentist/DentistPatientProfile';
+import DentalChartPage from './pages/clinic/dentist/DentalChartPage';
+import ClinicalNotesPage, { ClinicalNoteFormPage } from './pages/clinic/dentist/ClinicalNotesPage';
+import TreatmentRecordsPage, { TreatmentRecordFormPage } from './pages/clinic/dentist/TreatmentRecordsPage';
+import PrescriptionsPage, { PrescriptionFormPage } from './pages/clinic/dentist/PrescriptionsPage';
+import DentalCertificatesPage from './pages/clinic/dentist/DentalCertificatesPage';
+import ImagingPage from './pages/clinic/dentist/ImagingPage';
+import FollowUpsPage from './pages/clinic/dentist/FollowUpsPage';
+import DentistSchedulePage from './pages/clinic/dentist/DentistSchedulePage';
+import MyDentistProfilePage from './pages/clinic/dentist/DentistProfilePage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import AdminApplicationsPage from './pages/admin/AdminApplicationsPage';
 import AdminApplicationDetailPage from './pages/admin/AdminApplicationDetailPage';
 import AdminClinicsPage from './pages/admin/AdminClinicsPage';
+import AdminClinicDetailPage from './pages/admin/AdminClinicDetailPage';
+import AdminSubscriptionDetailPage from './pages/admin/AdminSubscriptionDetailPage';
+import AdminReportsPage from './pages/admin/AdminReportsPage';
+import AdminAnnouncementsPage from './pages/admin/AdminAnnouncementsPage';
+import AdminAnnouncementFormPage from './pages/admin/AdminAnnouncementFormPage';
+import AdminProfilePage from './pages/admin/AdminProfilePage';
+import MaintenancePage from './pages/MaintenancePage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminReviewsPage from './pages/admin/AdminReviewsPage';
+import AdminSubscriptionsPage from './pages/admin/AdminSubscriptionsPage';
 import AdminAuditLogPage from './pages/admin/AdminAuditLogPage';
 import AdminNotificationsPage from './pages/admin/AdminNotificationsPage';
 import AdminSettingsPage from './pages/admin/AdminSettingsPage';
 import ClinicLayout from './layouts/ClinicLayout';
-import AdminLayout from './layouts/AdminLayout';
 import ClinicApplicantLayout from './layouts/ClinicApplicantLayout';
 import {
   CLINIC_APPLICANT_PASSWORD_HREF,
   CLINIC_APPLICANT_PROFILE_HREF,
-  getClinicHref,
+  getClinicHref, isDentistMember, isFrontDeskMember,
 } from './config/clinicNavigation';
-import { ADMIN_PASSWORD_HREF, ADMIN_PROFILE_HREF } from './config/adminNavigation';
+import { ADMIN_ANNOUNCEMENT_NEW_HREF, ADMIN_ANNOUNCEMENTS_HREF, ADMIN_PASSWORD_HREF, ADMIN_PROFILE_HREF, ADMIN_REPORTS_HREF } from './config/adminNavigation';
+import { useAuth } from './auth/AuthContext';
+import { loadPlatform } from './services/platformApi';
+import { usePlatform } from './services/platformStore';
 import { getPatientClinicHref, PATIENT_FIND_CLINICS_HREF } from './config/patientNavigation';
 
 // Pages that take a route parameter as a prop (plus any fixed props).
@@ -101,10 +135,23 @@ const ClinicPasswordPage = () => {
   );
 };
 
+// A page dentists see in their own design, and everyone else in the clinic admin one.
+const ForDentist = ({ dentist: Dentist, other: Other }) => {
+  const { clinicId } = useParams();
+  const { memberships } = useAuth();
+  const membership = memberships.find((m) => String(m.clinic_id) === String(clinicId));
+  return isDentistMember(membership) ? <Dentist /> : <Other />;
+};
+
 const ClinicProfileLayout = (props) => <ClinicLayout section="profile" {...props} />;
 
 const ClinicProfilePage = () => {
   const { clinicId } = useParams();
+  const { memberships } = useAuth();
+  // Clinic staff get the front desk profile: details, schedule, security, preferences.
+  const membership = memberships.find((m) => String(m.clinic_id) === String(clinicId));
+  if (isFrontDeskMember(membership)) return <FrontDeskProfilePage />;
+  if (isDentistMember(membership)) return <MyDentistProfilePage />;
   return (
     <AccountProfilePage
       layout={ClinicProfileLayout}
@@ -124,6 +171,13 @@ const admin = (element) => <RequireAuth allow={isSystemAdmin}>{element}</Require
  */
 function App() {
   const { pathname } = useLocation();
+  const { user, isLoading } = useAuth();
+  const { maintenance_mode: maintenance } = usePlatform();
+
+  useEffect(() => {
+    loadPlatform();
+  }, []);
+
   // The guest site header and footer are for public pages only:
   // - the patient, clinic and system admin portals have their own sidebar and
   //   top bar (PatientLayout / ClinicShell / PortalLayout);
@@ -135,6 +189,16 @@ function App() {
   const activeHref = pathname.startsWith('/clinics/') || pathname.startsWith('/patient/clinics')
     ? '/clinics'
     : pathname;
+
+  // System administrators keep working so they can turn it off; the sign-in page stays open for them.
+  if (maintenance && !isLoading && user?.role !== 'system_admin' && pathname !== '/login') {
+    return (
+      <>
+        <LinkInterceptor />
+        <MaintenancePage />
+      </>
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -213,22 +277,43 @@ function App() {
         <Route path="/clinic" element={<RequireAuth allow={(u) => hasClinicAccess(u) || u.role !== 'patient'}><ClinicHomePage /></RequireAuth>} />
         <Route path="/clinic/:clinicId" element={clinic(<ClinicDashboardPage />)} />
         <Route path="/clinic/:clinicId/dashboard" element={clinic(<ClinicDashboardPage />)} />
-        <Route path="/clinic/:clinicId/appointments" element={clinic(<ClinicAppointmentsPage />)} />
+        <Route path="/clinic/:clinicId/appointments" element={clinic(<ForDentist dentist={DentistAppointments} other={ClinicAppointmentsPage} />)} />
         <Route path="/clinic/:clinicId/schedule" element={clinic(<ClinicSchedulePage />)} />
         <Route path="/clinic/:clinicId/records" element={clinic(<ClinicRecordsPage />)} />
-        <Route path="/clinic/:clinicId/appointments/:appointmentId" element={clinic(<ClinicAppointmentDetailPage />)} />
-        <Route path="/clinic/:clinicId/patients" element={clinic(<ClinicPatientsPage />)} />
-        <Route path="/clinic/:clinicId/patients/:patientId" element={clinic(<ClinicPatientDetailPage />)} />
+        <Route path="/clinic/:clinicId/appointments/walk-in" element={clinic(<ClinicWalkInPage />)} />
+        <Route path="/clinic/:clinicId/appointments/new" element={clinic(<ClinicWalkInPage scheduled />)} />
+        <Route path="/clinic/:clinicId/check-in" element={clinic(<ClinicCheckInPage />)} />
+        <Route path="/clinic/:clinicId/dentist-schedule" element={clinic(<ClinicDentistSchedulePage />)} />
+        <Route path="/clinic/:clinicId/appointments/:appointmentId" element={clinic(<ForDentist dentist={DentistAppointmentDetail} other={ClinicAppointmentDetailPage} />)} />
+        <Route path="/clinic/:clinicId/patients" element={clinic(<ForDentist dentist={DentistPatients} other={ClinicPatientsPage} />)} />
+        <Route path="/clinic/:clinicId/patients/:patientId" element={clinic(<ForDentist dentist={DentistPatientProfile} other={ClinicPatientDetailPage} />)} />
+        <Route path="/clinic/:clinicId/dental-chart" element={clinic(<DentalChartPage />)} />
+        <Route path="/clinic/:clinicId/clinical-notes" element={clinic(<ClinicalNotesPage />)} />
+        <Route path="/clinic/:clinicId/clinical-notes/new" element={clinic(<ClinicalNoteFormPage />)} />
+        <Route path="/clinic/:clinicId/treatment-records" element={clinic(<TreatmentRecordsPage />)} />
+        <Route path="/clinic/:clinicId/treatment-records/new" element={clinic(<TreatmentRecordFormPage />)} />
+        <Route path="/clinic/:clinicId/prescriptions" element={clinic(<PrescriptionsPage />)} />
+        <Route path="/clinic/:clinicId/prescriptions/new" element={clinic(<PrescriptionFormPage />)} />
+        <Route path="/clinic/:clinicId/certificates" element={clinic(<DentalCertificatesPage />)} />
+        <Route path="/clinic/:clinicId/imaging" element={clinic(<ImagingPage />)} />
+        <Route path="/clinic/:clinicId/follow-ups" element={clinic(<FollowUpsPage />)} />
+        <Route path="/clinic/:clinicId/my-schedule" element={clinic(<DentistSchedulePage />)} />
         <Route path="/clinic/:clinicId/inventory" element={clinic(<ClinicInventoryPage />)} />
         <Route path="/clinic/:clinicId/inventory/:itemId" element={clinic(<ClinicInventoryItemPage />)} />
         <Route path="/clinic/:clinicId/services" element={clinic(<ClinicServicesPage />)} />
         <Route path="/clinic/:clinicId/dentists" element={clinic(<ClinicDentistsPage />)} />
+        <Route path="/clinic/:clinicId/dentists/new" element={clinic(<ClinicAddDentistPage />)} />
+        <Route path="/clinic/:clinicId/dentists/:dentistId" element={clinic(<ClinicDentistProfilePage />)} />
         <Route path="/clinic/:clinicId/branches" element={clinic(<ClinicBranchesPage />)} />
         <Route path="/clinic/:clinicId/staff" element={clinic(<ClinicStaffPage />)} />
+        <Route path="/clinic/:clinicId/staff/new" element={clinic(<ClinicAddStaffPage />)} />
         <Route path="/clinic/:clinicId/reviews" element={clinic(<ClinicReviewsPage />)} />
         <Route path="/clinic/:clinicId/reports" element={clinic(<ClinicReportsPage />)} />
         <Route path="/clinic/:clinicId/settings" element={clinic(<ClinicSettingsPage />)} />
         <Route path="/clinic/:clinicId/notifications" element={clinic(<ClinicNotificationsPage />)} />
+        <Route path="/clinic/:clinicId/subscription" element={clinic(<ClinicSubscriptionPage />)} />
+        <Route path="/clinic/:clinicId/subscription/payment" element={clinic(<ClinicPaymentProofPage />)} />
+        <Route path="/clinic/:clinicId/clinic-settings" element={clinic(<ClinicAdminSettingsPage />)} />
         <Route path="/clinic/:clinicId/password" element={clinic(<ClinicPasswordPage />)} />
         <Route path="/clinic/:clinicId/profile" element={clinic(<ClinicProfilePage />)} />
 
@@ -237,19 +322,20 @@ function App() {
         <Route path="/admin/applications" element={admin(<AdminApplicationsPage />)} />
         <Route path="/admin/applications/:applicationId" element={admin(<AdminApplicationDetailPage />)} />
         <Route path="/admin/clinics" element={admin(<AdminClinicsPage />)} />
+        <Route path="/admin/clinics/:clinicId" element={admin(<AdminClinicDetailPage />)} />
         <Route path="/admin/users" element={admin(<AdminUsersPage />)} />
         <Route path="/admin/reviews" element={admin(<AdminReviewsPage />)} />
+        <Route path="/admin/subscriptions" element={admin(<AdminSubscriptionsPage />)} />
+        <Route path="/admin/subscriptions/:clinicId" element={admin(<AdminSubscriptionDetailPage />)} />
+        <Route path={ADMIN_REPORTS_HREF} element={admin(<AdminReportsPage />)} />
+        <Route path={ADMIN_ANNOUNCEMENTS_HREF} element={admin(<AdminAnnouncementsPage />)} />
+        <Route path={ADMIN_ANNOUNCEMENT_NEW_HREF} element={admin(<AdminAnnouncementFormPage />)} />
+        <Route path="/admin/announcements/:announcementId/edit" element={admin(<AdminAnnouncementFormPage />)} />
         <Route path="/admin/audit-logs" element={admin(<AdminAuditLogPage />)} />
         <Route path="/admin/notifications" element={admin(<AdminNotificationsPage />)} />
         <Route path="/admin/settings" element={admin(<AdminSettingsPage />)} />
-        <Route
-          path={ADMIN_PROFILE_HREF}
-          element={admin(<AccountProfilePage layout={AdminLayout} activeHref={ADMIN_PROFILE_HREF} passwordHref={ADMIN_PASSWORD_HREF} />)}
-        />
-        <Route
-          path={ADMIN_PASSWORD_HREF}
-          element={admin(<ChangePasswordPage layout={AdminLayout} backHref={ADMIN_PROFILE_HREF} activeHref={ADMIN_PASSWORD_HREF} />)}
-        />
+        <Route path={ADMIN_PROFILE_HREF} element={admin(<AdminProfilePage />)} />
+        <Route path={ADMIN_PASSWORD_HREF} element={<Navigate to={`${ADMIN_PROFILE_HREF}?tab=security`} replace />} />
 
         <Route path="*" element={<NotFoundPage />} />
         </Routes>

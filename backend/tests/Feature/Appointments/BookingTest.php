@@ -44,7 +44,8 @@ class BookingTest extends TestCase
 
         Notification::assertSentTo($patient, AppointmentUpdated::class);
         Notification::assertSentTo($world['staff'], ClinicAppointmentActivity::class);
-        Notification::assertNotSentTo($world['dentistUser'], ClinicAppointmentActivity::class);
+        // The dentist whose patient it is hears about it too; other dentists do not.
+        Notification::assertSentTo($world['dentistUser'], ClinicAppointmentActivity::class);
     }
 
     public function test_same_dentist_slot_cannot_be_booked_twice(): void

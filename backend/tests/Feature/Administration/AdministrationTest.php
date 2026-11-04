@@ -69,7 +69,7 @@ class AdministrationTest extends TestCase
 
         $data = $this->asUser($sysadmin)->getJson('/api/admin/dashboard')->assertOk()->json('data');
         $this->assertSame(
-            ['clinics', 'applications', 'queue', 'users', 'open_review_reports', 'security', 'activity_by_day', 'recent_activity'],
+            ['clinics', 'applications', 'queue', 'users', 'open_review_reports', 'security', 'activity_by_day', 'recent_activity', 'total_appointments', 'active_subscriptions', 'active_announcements', 'pending_payments', 'platform_growth', 'recent_audit'],
             array_keys($data),
         );
         $this->assertCount(14, $data['activity_by_day']);

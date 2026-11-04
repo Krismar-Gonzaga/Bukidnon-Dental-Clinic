@@ -55,6 +55,14 @@
   box-shadow: var(--shadow-sm);
 }
 
+.admin-overline {
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--clinic-on-surface-variant);
+}
+
 .admin-metric .admin-overline {
   margin: 0 0 var(--space-1);
 }

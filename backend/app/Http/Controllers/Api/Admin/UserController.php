@@ -33,6 +33,7 @@ class UserController extends Controller
             ->when($request->filled('role'), fn ($q) => $q->where('role', $request->role))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
             ->withCount(['clinicMemberships' => fn ($q) => $q->active()])
+            ->with(['clinicMemberships' => fn ($q) => $q->active()->with('clinic:id,name')])
             ->orderBy('name')
             ->paginate($this->perPage($request, 25));
 
@@ -74,7 +75,10 @@ class UserController extends Controller
             'reason' => $data['reason'] ?? null,
         ]));
 
-        return $this->ok($this->present($user->loadCount(['clinicMemberships' => fn ($q) => $q->active()])), 'User updated');
+        $user->loadCount(['clinicMemberships' => fn ($q) => $q->active()])
+            ->load(['clinicMemberships' => fn ($q) => $q->active()->with('clinic:id,name')]);
+
+        return $this->ok($this->present($user), 'User updated');
     }
 
     private function present(User $u): array
@@ -86,6 +90,7 @@ class UserController extends Controller
             'role' => $u->role,
             'status' => $u->status,
             'clinic_memberships' => $u->clinic_memberships_count,
+            'clinic_name' => $u->clinicMemberships->first()?->clinic?->name,
             'created_at' => BusinessTime::iso($u->created_at),
             'suspended_at' => BusinessTime::iso($u->suspended_at),
         ];

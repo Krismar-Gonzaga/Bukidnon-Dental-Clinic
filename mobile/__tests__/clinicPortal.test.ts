@@ -26,3 +26,21 @@ test('permission checks use the membership from sign-in', () => {
   expect(can(admin, 'records.view')).toBe(false);
   expect(can(undefined, 'clinic.staff.manage')).toBe(false);
 });
+
+test('stock status follows the web rule: critical at half the minimum or less', () => {
+  const { stockStatus } = require('../src/services/clinicPortal');
+  expect(stockStatus({ quantity_usable: 0, minimum_stock: 0 })).toBe('critical');
+  expect(stockStatus({ quantity_usable: 5, minimum_stock: 10 })).toBe('critical');
+  expect(stockStatus({ quantity_usable: 6, minimum_stock: 10 })).toBe('low');
+  expect(stockStatus({ quantity_usable: 11, minimum_stock: 10 })).toBe('good');
+});
+
+test('the front desk reads a status the way the design shows it', () => {
+  const { frontDeskStatus, hasCheckedIn } = require('../src/services/clinicPortal');
+  expect(frontDeskStatus('in_progress')).toEqual({ label: 'Ongoing', tone: 'warning' });
+  expect(frontDeskStatus('no_show').label).toBe('No-Show');
+  expect(frontDeskStatus('something_new')).toEqual({ label: 'something_new', tone: 'neutral' });
+  expect(hasCheckedIn('checked_in')).toBe(true);
+  expect(hasCheckedIn('in_progress')).toBe(true);
+  expect(hasCheckedIn('confirmed')).toBe(false);
+});

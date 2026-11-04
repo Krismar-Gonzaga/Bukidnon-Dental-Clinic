@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ClinicLayout, { useClinic, useClinicAccess } from '../../layouts/ClinicLayout';
-import { ClinicProfileTabs } from '../../components/clinic/ClinicUi';
-import { Badge, Checkbox, DataTable, Field, FormError, Modal, Section } from '../../components/portal/PortalUi';
+import Icon from '../../components/Icon';
+import { Card } from '../../components/clinic/ClinicAdminUi';
+import { ClinicProfileTabs, Pill } from '../../components/clinic/ClinicUi';
+import { Checkbox, ConfirmDialog, DataTable, Field, FormError, Modal, Section } from '../../components/portal/PortalUi';
 import WeeklyHoursEditor from '../../components/portal/WeeklyHoursEditor';
 import { QueryState } from '../../components/StatusMessage';
 import {
@@ -16,11 +18,13 @@ import {
   getClinicDentists,
   getHolidays,
   getScheduleBlocks,
+  removeBranch,
   updateBranch,
   updateBranchHours,
 } from '../../services/clinicPortalApi';
 import { summarizeHours } from '../../services/adapters';
 import { formatDateTime } from '../../utils/dateTime';
+import '../../components/clinic/ClinicAdminUi.css';
 
 function BranchModal({ branch, onClose }) {
   const { clinicId } = useClinic();
@@ -111,40 +115,101 @@ function Branches() {
   const [modal, setModal] = useState(() =>
     searchParams.get('new') === '1' && can('clinic.branches.manage') ? { type: 'branch' } : null
   );
+  const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ['clinic', clinicId, 'branches'], queryFn: () => getBranches(clinicId) });
+  const remove = useMutation({
+    mutationFn: () => removeBranch(clinicId, modal.branch.id),
+    onSuccess: () => {
+      setModal(null);
+      queryClient.invalidateQueries({ queryKey: ['clinic', clinicId, 'branches'] });
+    },
+  });
+  const count = query.data?.length;
 
   return (
-    <Section
-      title="Branches & opening hours"
-      actions={can('clinic.branches.manage') && <button type="button" className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'branch' })}>Add branch</button>}
-    >
-      <QueryState query={query} loadingLabel="Loading branches…">
-        {(branches) => (
-          <DataTable
-            caption="Branches"
-            rows={branches}
-            columns={[
-              { key: 'name', label: 'Branch', render: (b) => <>{b.name} {b.is_main && <Badge tone="info">Main</Badge>}</> },
-              { key: 'address', label: 'Address', render: (b) => `${b.address}, ${b.city}` },
-              { key: 'hours', label: 'Hours', render: (b) => summarizeHours(b.operating_hours) || 'Closed' },
-              { key: 'state', label: 'Status', render: (b) => <Badge tone={b.is_active ? 'success' : 'neutral'}>{b.is_active ? 'Open' : 'Inactive'}</Badge> },
-              {
-                key: 'actions',
-                label: '',
-                render: (b) => (
-                  <div className="portal-actions">
-                    {can('clinic.branches.manage') && <button type="button" className="btn btn-outline btn-sm" onClick={() => setModal({ type: 'branch', branch: b })}>Edit</button>}
-                    {can('clinic.schedules.manage') && <button type="button" className="btn btn-outline btn-sm" onClick={() => setModal({ type: 'hours', branch: b })}>Hours</button>}
-                  </div>
-                ),
-              },
-            ]}
-          />
+    <div>
+      <div className="clinic-page-intro">
+        <p className="clinic-admin-card-sub">{count == null ? 'Loading branches…' : `${count} ${count === 1 ? 'branch' : 'branches'} registered under this account.`}</p>
+        {can('clinic.branches.manage') && (
+          <button type="button" className="btn btn-primary clinic-header-button" onClick={() => setModal({ type: 'branch' })}>
+            <Icon name="plus" size={18} />
+            Add Branch
+          </button>
         )}
+      </div>
+      <QueryState query={query} loadingLabel="Loading branches…">
+        {(branches) =>
+          branches.map((branch) => (
+            <Card key={branch.id} className="clinic-branch-card">
+              <div className="clinic-branch">
+                <span className="clinic-form-head-icon">
+                  <Icon name="building" size={22} />
+                </span>
+                <div className="clinic-branch-body">
+                  <h2 className="clinic-branch-title">
+                    {branch.name} {branch.is_main && <Pill tone="info">Main Branch</Pill>} {!branch.is_active && <Pill tone="neutral">Inactive</Pill>}
+                  </h2>
+                  <ul className="clinic-identity-list">
+                    <li>
+                      <Icon name="mapPin" size={16} />
+                      {branch.address}, {branch.city}
+                    </li>
+                    {branch.contact_number && (
+                      <li>
+                        <Icon name="phone" size={16} />
+                        {branch.contact_number}
+                      </li>
+                    )}
+                    <li>
+                      <Icon name="clock" size={16} />
+                      {summarizeHours(branch.operating_hours) || 'Closed'}
+                    </li>
+                  </ul>
+                </div>
+                <div className="clinic-header-actions">
+                  {can('clinic.branches.manage') && (
+                    <button type="button" className="clinic-mini-button" onClick={() => setModal({ type: 'branch', branch })}>
+                      Edit
+                    </button>
+                  )}
+                  {can('clinic.schedules.manage') && (
+                    <button type="button" className="clinic-mini-button" onClick={() => setModal({ type: 'hours', branch })}>
+                      Hours
+                    </button>
+                  )}
+                  {can('clinic.branches.manage') && !branch.is_main && (
+                    <button
+                      type="button"
+                      className="clinic-mini-button is-danger"
+                      onClick={() => {
+                        remove.reset();
+                        setModal({ type: 'remove', branch });
+                      }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))
+        }
       </QueryState>
       {modal?.type === 'branch' && <BranchModal branch={modal.branch} onClose={() => setModal(null)} />}
       {modal?.type === 'hours' && <HoursModal branch={modal.branch} onClose={() => setModal(null)} />}
-    </Section>
+      {modal?.type === 'remove' && (
+        <ConfirmDialog
+          title={`Remove ${modal.branch.name}?`}
+          message="Patients can no longer book at this branch. A branch with upcoming appointments cannot be removed."
+          confirmLabel="Remove"
+          danger
+          isBusy={remove.isPending}
+          error={remove.error}
+          onConfirm={() => remove.mutate()}
+          onCancel={() => setModal(null)}
+        />
+      )}
+    </div>
   );
 }
 
@@ -237,7 +302,7 @@ function ClosedDates() {
 function ClinicBranchesPage() {
   const { clinicId, can } = useClinicAccess();
   return (
-    <ClinicLayout section="branches" title="Clinic Profile" subtitle="Branches & Hours" requires={['clinic.branches.manage', 'clinic.schedules.manage']}>
+    <ClinicLayout section="branches" title="Clinic Profile" subtitle="Manage your clinic information" requires={['clinic.branches.manage', 'clinic.schedules.manage']} hideSearch>
       <ClinicProfileTabs clinicId={clinicId} can={can} active="branches" />
       <div className="portal-stack">
         <Branches />

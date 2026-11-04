@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\PlatformSettings;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,7 +22,10 @@ class ClinicApplication extends Model
     public const APPROVED = 'approved';
     public const REJECTED = 'rejected';
 
-    /** Documents an application must include before it can be submitted. */
+    /**
+     * The documents applicants can be asked for. Which of them are required is a platform
+     * setting (see requiredDocuments()): all of them until an administrator changes that.
+     */
     public const REQUIRED_DOCUMENTS = ['business_permit', 'doh_license', 'prc_id', 'bir_registration'];
 
     public const DOCUMENT_TYPES = [...self::REQUIRED_DOCUMENTS, 'other'];
@@ -45,7 +49,13 @@ class ClinicApplication extends Model
         'longitude' => 'float',
         'submitted_at' => 'datetime',
         'reviewed_at' => 'datetime',
+        'documents_requested_at' => 'datetime',
     ];
+
+    public static function requiredDocuments(): array
+    {
+        return array_values(array_intersect(self::REQUIRED_DOCUMENTS, (array) PlatformSettings::get('required_documents')));
+    }
 
     public function isEditableByApplicant(): bool
     {
@@ -59,7 +69,7 @@ class ClinicApplication extends Model
             ? $this->documents->pluck('document_type')->all()
             : $this->documents()->pluck('document_type')->all();
 
-        return array_values(array_diff(self::REQUIRED_DOCUMENTS, $present));
+        return array_values(array_diff(self::requiredDocuments(), $present));
     }
 
     public function applicant(): BelongsTo

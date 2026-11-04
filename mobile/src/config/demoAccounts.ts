@@ -12,7 +12,7 @@ export const DEMO_ACCOUNTS: DemoAccount[] = __DEV__
       { label: 'Patient', email: 'demo.patient@example.test' },
       { label: 'Clinic Admin', email: 'demo.clinic-admin@example.test' },
       { label: 'Dentist', email: 'demo.dentist@example.test' },
-      { label: 'Receptionist', email: 'demo.staff@example.test' },
+      { label: 'Clinic Staff', email: 'demo.staff@example.test' },
       { label: 'Inventory Staff', email: 'demo.inventory@example.test' },
       { label: 'System Admin', email: 'demo.system-admin@example.test' },
     ].map((account) => ({ ...account, password: 'DemoPass2026' }))

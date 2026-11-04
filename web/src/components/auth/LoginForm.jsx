@@ -22,6 +22,9 @@ function LoginForm() {
   const { setUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  // Shown after the API answers 423: this account needs an authenticator code.
+  const [needsCode, setNeedsCode] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
   const [notice, setNotice] = useState({ text: '', isError: false });
   const [submitting, setSubmitting] = useState(false);
 
@@ -37,11 +40,16 @@ function LoginForm() {
     setNotice({ text: '', isError: false });
 
     try {
-      const user = await login({ email, password });
+      const user = await login({ email, password, twoFactorCode: needsCode ? twoFactorCode.trim() : undefined });
       setUser(user);
       navigate(safeNextPath(searchParams.get('next')) ?? getHomeHref(user), { replace: true });
     } catch (error) {
-      setNotice({ text: getErrorMessage(error), isError: true });
+      if (error.response?.status === 423) {
+        setNeedsCode(true);
+        setNotice({ text: 'Enter the 6-digit code from your authenticator app, or a recovery code.', isError: false });
+      } else {
+        setNotice({ text: getErrorMessage(error), isError: true });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -81,6 +89,20 @@ function LoginForm() {
         onChange={(event) => setPassword(event.target.value)}
         required
       />
+
+      {needsCode && (
+        <AuthField
+          id="login-two-factor"
+          label="Authentication Code"
+          icon="shieldCheck"
+          type="text"
+          placeholder="123456"
+          autoComplete="one-time-code"
+          value={twoFactorCode}
+          onChange={(event) => setTwoFactorCode(event.target.value)}
+          required
+        />
+      )}
 
       <a href={FORGOT_PASSWORD_HREF} className="login-form-forgot">
         Forgot password?

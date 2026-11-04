@@ -8,12 +8,15 @@ use App\Models\Appointment;
 use App\Models\Clinic;
 use App\Models\Patient;
 use App\Models\PatientMedicalHistory;
+use App\Models\User;
+use App\Notifications\PortalNotice;
 use App\Services\AuditLogger;
 use App\Support\BusinessTime;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 
 /**
  * Patients registered with this clinic. Dentists only see patients who
@@ -61,8 +64,26 @@ class PatientController extends Controller
                 ->orWhereHas('user', fn ($u) => $u->whereRaw('LOWER(name) LIKE ?', [$term])->orWhereRaw('LOWER(email) LIKE ?', [$term])));
         }
 
-        return $this->paginated($query->paginate($this->perPage($request, 20)), fn ($p) => [
+        $page = $query->paginate($this->perPage($request, 20));
+        $membership = $request->attributes->get('clinicMembership');
+        // Conditions are clinical data: only for those who may read records, and every read is logged.
+        $histories = $membership->grants('records.view')
+            ? PatientMedicalHistory::where('clinic_id', $clinic->id)
+                ->whereIn('patient_id', collect($page->items())->pluck('id'))
+                ->orderBy('created_at')->orderBy('id')
+                ->get(['patient_id', 'conditions', 'allergies'])
+                ->keyBy('patient_id')
+            : null;
+        $conditions = $histories?->map->conditions;
+        $allergies = $histories?->map->allergies;
+        if ($conditions !== null && $page->count() > 0) {
+            $this->audit->record('records.summary_viewed', metadata: ['patients' => $page->count()], clinicId: $clinic->id);
+        }
+
+        return $this->paginated($page, fn ($p) => [
             ...(new PatientResource($p))->resolve(),
+            'conditions' => $conditions === null ? null : ($conditions[$p->id] ?? null),
+            'allergies' => $allergies === null ? null : ($allergies[$p->id] ?? null),
             'visits' => (int) $p->visits,
             'last_visit_at' => $p->last_visit_at ? BusinessTime::iso(CarbonImmutable::parse($p->last_visit_at, 'UTC')) : null,
             'status' => ($p->pivot->created_at >= $cutoff || ($p->last_booked_at && CarbonImmutable::parse($p->last_booked_at, 'UTC') >= $cutoff)) ? 'active' : 'inactive',
@@ -92,8 +113,21 @@ class PatientController extends Controller
     {
         $patient = $this->visible($request, $clinic)->with('user')->findOrFail($patientId);
         $this->audit->record('patient.viewed', $patient, clinicId: $clinic->id);
+        $membership = $request->attributes->get('clinicMembership');
+        $completed = $patient->appointments()->where('clinic_id', $clinic->id)->where('status', Appointment::COMPLETED);
+        $cutoff = now()->subMonths(self::ACTIVE_MONTHS);
+        $isActive = $clinic->patients()->whereKey($patient->id)->where('clinic_patients.created_at', '>=', $cutoff)->exists()
+            || $patient->appointments()->where('clinic_id', $clinic->id)
+                ->whereNotIn('status', [Appointment::CANCELLED, Appointment::REJECTED])
+                ->where('starts_at', '>=', $cutoff)->exists();
 
-        return $this->ok((new PatientResource($patient))->resolve());
+        return $this->ok([
+            ...(new PatientResource($patient))->resolve(),
+            'status' => $isActive ? 'active' : 'inactive',
+            'visits' => (clone $completed)->count(),
+            'last_visit_at' => BusinessTime::iso((clone $completed)->max('starts_at') ? CarbonImmutable::parse((clone $completed)->max('starts_at'), 'UTC') : null),
+            'medical_summary' => $membership->grants('records.view') ? $patient->medicalSummaryAt($clinic) : null,
+        ]);
     }
 
     /**
@@ -160,6 +194,8 @@ class PatientController extends Controller
             'notes' => ['nullable', 'string', 'max:4000'],
         ]);
 
+        $previous = PatientMedicalHistory::where('patient_id', $patient->id)->where('clinic_id', $clinic->id)->latest('created_at')->latest('id')->first();
+
         $entry = new PatientMedicalHistory($data);
         $entry->patient_id = $patient->id;
         $entry->clinic_id = $clinic->id;
@@ -167,8 +203,37 @@ class PatientController extends Controller
         $entry->save();
 
         $this->audit->record('records.medical_history_added', $patient, clinicId: $clinic->id);
+        $this->flagChangesToDentists($request, $clinic, $patient, $previous, $entry);
 
         return $this->ok(['id' => $entry->id], 'Medical history updated', 201);
+    }
+
+    /**
+     * A new allergy or condition matters to whoever treats the patient next. Says that it
+     * changed, not what it is: notifications can be read on a lock screen.
+     */
+    private function flagChangesToDentists(Request $request, Clinic $clinic, Patient $patient, ?PatientMedicalHistory $previous, PatientMedicalHistory $entry): void
+    {
+        $changed = array_keys(array_filter([
+            'allergy' => $entry->allergies && $entry->allergies !== $previous?->allergies,
+            'medical' => $entry->conditions && $entry->conditions !== $previous?->conditions,
+        ]));
+        if (! $changed) {
+            return;
+        }
+
+        $dentists = User::whereKeyNot($request->user()->id)
+            ->where('status', User::STATUS_ACTIVE)
+            ->whereHas('dentist.appointments', fn ($q) => $q->where('clinic_id', $clinic->id)->where('patient_id', $patient->id))
+            ->get();
+
+        Notification::send($dentists, new PortalNotice(
+            'patient',
+            'Patient Medical Flag',
+            "{$patient->display_name} has a new ".implode(' and ', $changed).' note. Review before the next procedure.',
+            'patient_flags',
+            ['type' => 'clinic_patient', 'id' => $patient->id, 'clinic_id' => $clinic->id],
+        ));
     }
 
     private function visible(Request $request, Clinic $clinic): BelongsToMany
@@ -193,6 +258,7 @@ class PatientController extends Controller
             'gender' => ['sometimes', 'nullable', 'in:male,female,other'],
             'emergency_contact_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'emergency_contact_phone' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'blood_type' => ['sometimes', 'nullable', 'in:A+,A-,B+,B-,AB+,AB-,O+,O-'],
         ];
     }
 }

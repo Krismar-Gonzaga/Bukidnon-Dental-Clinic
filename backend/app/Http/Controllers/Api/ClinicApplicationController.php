@@ -40,6 +40,7 @@ class ClinicApplicationController extends Controller
         $application->save();
 
         $this->audit->record('clinic_application.created', $application);
+        $this->applications->announceNewRegistration($application);
 
         return $this->ok((new ClinicApplicationResource($application->load('documents')))->resolve(), 'Application saved as draft', 201);
     }

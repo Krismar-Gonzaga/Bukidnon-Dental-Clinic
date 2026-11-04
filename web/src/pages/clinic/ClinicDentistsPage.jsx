@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ClinicLayout, { useClinic, useClinicAccess } from '../../layouts/ClinicLayout';
 import Icon from '../../components/Icon';
+import { InviteByEmailModal } from '../../components/clinic/ClinicAdminUi';
 import { FilterSelect, InitialsTile, Pill, SearchInput } from '../../components/clinic/ClinicUi';
+import ScheduleApprovals from '../../components/clinic/ScheduleApprovals';
 import { Checkbox, ConfirmDialog, Field, FormError, Modal } from '../../components/portal/PortalUi';
 import WeeklyHoursEditor from '../../components/portal/WeeklyHoursEditor';
 import { QueryState } from '../../components/StatusMessage';
@@ -13,17 +15,19 @@ import {
   updateDentist,
   updateDentistSchedules,
 } from '../../services/clinicPortalApi';
-import { businessTodayKey, dateFromKey, formatClockTime, WEEKDAY_SHORT } from '../../utils/dateTime';
-import { InviteModal } from './ClinicStaffPage';
+import { getClinicHref } from '../../config/clinicNavigation';
+import { businessTodayKey, dateFromKey, formatClockTime } from '../../utils/dateTime';
 import './ClinicDentistsPage.css';
 
-function ProfileModal({ dentist, onClose }) {
+export function ProfileModal({ dentist, onClose }) {
   const { clinicId } = useClinic();
   const queryClient = useQueryClient();
   const specializations = useQuery({ queryKey: ['specializations'], queryFn: getSpecializationOptions, staleTime: 10 * 60 * 1000 });
   const [form, setForm] = useState({
     specialization_id: dentist.specialization_id ? String(dentist.specialization_id) : '',
     license_number: dentist.license_number ?? '',
+    ptr_number: dentist.ptr_number ?? '',
+    s2_number: dentist.s2_number ?? '',
     years_experience: String(dentist.years_experience ?? 0),
     qualifications: dentist.qualifications ?? '',
     bio: dentist.bio ?? '',
@@ -37,7 +41,7 @@ function ProfileModal({ dentist, onClose }) {
         years_experience: Number(form.years_experience),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clinic', clinicId, 'dentists'] });
+      queryClient.invalidateQueries({ queryKey: ['clinic', clinicId] });
       onClose();
     },
   });
@@ -54,6 +58,8 @@ function ProfileModal({ dentist, onClose }) {
             {...bind('specialization_id')}
           />
           <Field label="PRC license number" {...bind('license_number')} />
+          <Field label="PTR number" maxLength={50} {...bind('ptr_number')} />
+          <Field label="S2 number" maxLength={50} {...bind('s2_number')} />
           <Field label="Years of experience" type="number" min="0" max="70" {...bind('years_experience')} />
           <Field label="Qualifications" as="textarea" className="is-wide" {...bind('qualifications')} />
           <Field label="Public bio" as="textarea" className="is-wide" {...bind('bio')} />
@@ -71,7 +77,7 @@ function ProfileModal({ dentist, onClose }) {
   );
 }
 
-function ScheduleModal({ dentist, branches, onClose }) {
+export function ScheduleModal({ dentist, branches, onClose }) {
   const { clinicId } = useClinic();
   const queryClient = useQueryClient();
   const [branchId, setBranchId] = useState(String(branches[0]?.id ?? ''));
@@ -94,7 +100,7 @@ function ScheduleModal({ dentist, branches, onClose }) {
         )
       ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clinic', clinicId, 'dentists'] });
+      queryClient.invalidateQueries({ queryKey: ['clinic', clinicId] });
       onClose();
     },
   });
@@ -138,50 +144,7 @@ const hoursToday = (schedules = []) => {
   return `${formatClockTime(start)} – ${formatClockTime(end)}`;
 };
 
-const scheduleLines = (schedules, branches) =>
-  branches
-    .map((branch) => {
-      const days = schedules.filter((entry) => entry.branch_id === branch.id).sort((a, b) => a.day_of_week - b.day_of_week);
-      if (days.length === 0) return null;
-      return `${branch.name}: ${days.map((d) => `${WEEKDAY_SHORT[d.day_of_week]} ${formatClockTime(d.starts_at)}–${formatClockTime(d.ends_at)}`).join(', ')}`;
-    })
-    .filter(Boolean);
-
-function ViewModal({ dentist, branches, canSchedule, onEditSchedule, onClose }) {
-  const lines = scheduleLines(dentist.schedules ?? [], branches);
-  return (
-    <Modal title={dentist.name} onClose={onClose}>
-      <dl className="portal-details">
-        <dt>Email</dt>
-        <dd>{dentist.email ?? '—'}</dd>
-        <dt>Specialization</dt>
-        <dd>{dentist.specialization ?? 'General Dentist'}</dd>
-        <dt>PRC license</dt>
-        <dd>{dentist.license_number || '—'}</dd>
-        <dt>Experience</dt>
-        <dd>{dentist.years_experience} years</dd>
-        <dt>Qualifications</dt>
-        <dd>{dentist.qualifications || '—'}</dd>
-        <dt>Public bio</dt>
-        <dd>{dentist.bio || '—'}</dd>
-        <dt>Weekly hours</dt>
-        <dd>{lines.length > 0 ? lines.map((line) => <div key={line}>{line}</div>) : 'No schedule: patients cannot book this dentist yet.'}</dd>
-      </dl>
-      <div className="portal-form-actions">
-        {canSchedule && (
-          <button type="button" className="btn btn-outline" disabled={branches.length === 0} onClick={onEditSchedule}>
-            Edit schedule
-          </button>
-        )}
-        <button type="button" className="btn btn-primary" onClick={onClose}>
-          Done
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
-function DentistCard({ dentist, canEdit, onView, onEdit, onToggle }) {
+function DentistCard({ dentist, canEdit, profileHref, onEdit, onToggle }) {
   return (
     <li className="clinic-dentist-card">
       <InitialsTile name={dentist.name} id={dentist.id} />
@@ -204,9 +167,9 @@ function DentistCard({ dentist, canEdit, onView, onEdit, onToggle }) {
           </span>
         </p>
         <div className="clinic-dentist-actions">
-          <button type="button" className="clinic-mini-button is-primary clinic-dentist-view" onClick={onView} aria-label={`View profile of ${dentist.name}`}>
+          <a href={profileHref} className="clinic-mini-button is-primary clinic-dentist-view" aria-label={`View profile of ${dentist.name}`}>
             View Profile
-          </button>
+          </a>
           {canEdit && (
             <>
               <button type="button" className="clinic-dentist-edit" onClick={onEdit} aria-label={`Edit ${dentist.name}`}>
@@ -255,6 +218,7 @@ function Dentists({ query, search, setSearch }) {
 
   return (
     <>
+      {can('clinic.schedules.manage') && <ScheduleApprovals clinicId={clinicId} />}
       <div className="clinic-toolbar">
         <SearchInput label="Search dentists" placeholder="Search dentists..." value={search} onChange={setSearch} />
         <FilterSelect label="Specialization" value={specialty} onChange={setSpecialty} options={[{ value: '', label: 'All specializations' }, ...specialties.map((value) => ({ value, label: value }))]} />
@@ -280,7 +244,7 @@ function Dentists({ query, search, setSearch }) {
                   key={dentist.id}
                   dentist={dentist}
                   canEdit={can('clinic.dentists.manage')}
-                  onView={() => setModal({ type: 'view', dentist })}
+                  profileHref={`${getClinicHref(clinicId, 'dentists')}/${dentist.id}`}
                   onEdit={() => setModal({ type: 'profile', dentist })}
                   onToggle={() => {
                     toggle.reset();
@@ -292,15 +256,6 @@ function Dentists({ query, search, setSearch }) {
           )
         }
       </QueryState>
-      {modal?.type === 'view' && (
-        <ViewModal
-          dentist={modal.dentist}
-          branches={branches.data ?? []}
-          canSchedule={can('clinic.schedules.manage')}
-          onEditSchedule={() => setModal({ type: 'schedule', dentist: modal.dentist })}
-          onClose={() => setModal(null)}
-        />
-      )}
       {modal?.type === 'profile' && <ProfileModal dentist={modal.dentist} onClose={() => setModal(null)} />}
       {modal?.type === 'schedule' && <ScheduleModal dentist={modal.dentist} branches={branches.data ?? []} onClose={() => setModal(null)} />}
       {toggling && (
@@ -324,9 +279,10 @@ function Dentists({ query, search, setSearch }) {
 }
 
 function ClinicDentistsPage() {
-  const { clinicId, can } = useClinicAccess();
+  const { clinicId, membership, can } = useClinicAccess();
+  const clinicName = membership?.clinic_name;
   const [search, setSearch] = useState('');
-  const [inviting, setInviting] = useState(null);
+  const [inviting, setInviting] = useState(false);
   const allowed = can('clinic.dentists.manage', 'clinic.schedules.manage');
   const query = useQuery({ queryKey: ['clinic', clinicId, 'dentists'], queryFn: () => getClinicDentists(clinicId), enabled: allowed });
   const total = query.data?.length;
@@ -341,20 +297,20 @@ function ClinicDentistsPage() {
       headerActions={
         can('clinic.staff.manage') && (
           <>
-            <button type="button" className="btn btn-outline clinic-header-button" onClick={() => setInviting('Invite dentist by email')}>
+            <button type="button" className="btn btn-outline clinic-header-button" onClick={() => setInviting(true)}>
               <Icon name="mail" size={18} />
               Invite by Email
             </button>
-            <button type="button" className="btn btn-primary clinic-header-button" onClick={() => setInviting('Add dentist')}>
+            <a href={`${getClinicHref(clinicId, 'dentists')}/new`} className="btn btn-primary clinic-header-button">
               <Icon name="userPlus" size={18} />
               Add Dentist
-            </button>
+            </a>
           </>
         )
       }
     >
       <Dentists query={query} search={search} setSearch={setSearch} />
-      {inviting && <InviteModal title={inviting} defaultRole="dentist" onClose={() => setInviting(null)} />}
+      {inviting && <InviteByEmailModal clinicId={clinicId} clinicName={clinicName} role="dentist" title="Invite Dentist by Email" onClose={() => setInviting(false)} />}
     </ClinicLayout>
   );
 }

@@ -7,16 +7,18 @@ import { Linking, RefreshControl, ScrollView, StyleSheet, Text, View } from 'rea
 import Icon from 'react-native-vector-icons/Ionicons';
 import { AdminScreen, useOpenAdmin } from '../../components/admin/AdminChrome';
 import { actionError, PasswordPrompt, useSensitiveAction } from '../../components/admin/AdminSecurity';
+import { WorkflowSteps } from '../../components/admin/AdminWidgets';
 import { Badge, Button, Card, Field, FormError, InfoRow, LoadState, Sheet, ui, useLoader } from '../../components/clinic/ClinicUi';
 import {
   addApplicationNote,
-  APPLICATION_STATUS_LABELS,
   approveApplication,
+  CLINIC_STATUS,
   ClinicApplication,
   documentUrl,
   DOCUMENT_LABELS,
   fetchApplication,
   HistoryEntry,
+  requestDocuments,
   returnApplication,
   startReview,
 } from '../../services/admin';
@@ -30,9 +32,38 @@ const HISTORY_LABELS: Record<string, string> = {
   'clinic_application.document_accessed': 'Document opened',
   'clinic_application.note_added': 'Internal note added',
   'clinic_application.approved': 'Clinic approved',
-  'clinic_application.rejected': 'Returned to the applicant',
+  'clinic_application.rejected': 'Rejected',
+  'clinic_application.documents_requested': 'More documents requested',
 };
-const TONES: Record<string, 'warning' | 'info' | 'success' | 'neutral'> = { pending: 'warning', under_review: 'info', approved: 'success', rejected: 'neutral' };
+
+export type DecisionKind = 'approve' | 'return' | 'request';
+
+const DECISIONS: Record<DecisionKind, { title: string; detail: string; label: string; button: string; optional: boolean; fallback: string }> = {
+  approve: {
+    title: 'Approve Clinic',
+    detail: 'Approving creates the clinic and its main branch, gives the applicant clinic-admin access and notifies them. The clinic stays hidden until the owner publishes it.',
+    label: 'Message to the applicant (optional)',
+    button: 'Approve Clinic',
+    optional: true,
+    fallback: 'The clinic could not be approved.',
+  },
+  return: {
+    title: 'Reject Clinic',
+    detail: 'The applicant is told why and can correct it and submit again.',
+    label: 'Reason (sent to the applicant)',
+    button: 'Reject',
+    optional: false,
+    fallback: 'The registration could not be rejected.',
+  },
+  request: {
+    title: 'Request More Documents',
+    detail: 'The registration goes back to the applicant to add what is missing.',
+    label: 'What the applicant needs to send',
+    button: 'Request Documents',
+    optional: false,
+    fallback: 'The request could not be sent.',
+  },
+};
 
 const fileSize = (bytes?: number | null) => (!bytes ? '' : bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 
@@ -118,35 +149,34 @@ function Notes({ app, onSaved }: { app: ClinicApplication; onSaved: (history: Hi
   );
 }
 
-function DecisionSheet({ app, kind, onClose, onDone }: { app: ClinicApplication; kind: 'approve' | 'return'; onClose: () => void; onDone: () => void }) {
+export function DecisionSheet({ app, kind, onClose, onDone }: { app: Pick<ClinicApplication, 'id' | 'clinic_name'>; kind: DecisionKind; onClose: () => void; onDone: () => void }) {
   const sensitive = useSensitiveAction();
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const approve = kind === 'approve';
+  const decision = DECISIONS[kind];
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await sensitive.run<unknown>(() => (approve ? approveApplication(app.id, notes.trim() || undefined) : returnApplication(app.id, notes.trim())));
+      await sensitive.run<unknown>(() =>
+        kind === 'approve' ? approveApplication(app.id, notes.trim() || undefined) : kind === 'return' ? returnApplication(app.id, notes.trim()) : requestDocuments(app.id, notes.trim()),
+      );
       onDone();
     } catch (err) {
-      setError(actionError(err, 'The decision could not be saved.'));
+      setError(actionError(err, decision.fallback));
       setBusy(false);
     }
   };
 
   return (
-    <Sheet title={approve ? `Approve ${app.clinic_name}?` : 'Request more information'} onClose={busy ? () => undefined : onClose}>
-      <Text style={ui.muted}>
-        {approve
-          ? 'Approving creates the clinic and its main branch, gives the applicant clinic-admin access and notifies them. The clinic stays hidden until the owner publishes it.'
-          : 'The application goes back to the applicant with your message so they can fix it and submit again.'}
-      </Text>
+    <Sheet title={decision.title} onClose={busy ? () => undefined : onClose}>
+      <Text style={ui.title}>{app.clinic_name}</Text>
+      <Text style={ui.muted}>{decision.detail}</Text>
       <Field
-        label={approve ? 'Message to the applicant (optional)' : 'What the applicant needs to fix'}
-        required={!approve}
+        label={decision.label}
+        required={!decision.optional}
         multiline
         maxLength={2000}
         hint="Sent to the applicant."
@@ -157,10 +187,11 @@ function DecisionSheet({ app, kind, onClose, onDone }: { app: ClinicApplication;
       <PasswordPrompt sensitive={sensitive} inline />
       {!sensitive.asking && (
         <Button
-          label={approve ? 'Approve clinic' : 'Send request'}
+          label={decision.button}
           style={ui.spacedTop}
           busy={busy}
-          disabled={!approve && !notes.trim()}
+          variant={kind === 'return' ? 'danger' : 'primary'}
+          disabled={!decision.optional && !notes.trim()}
           onPress={submit}
         />
       )}
@@ -172,7 +203,7 @@ const AdminApplicationDetailScreen = ({ route }: { route: { params: { applicatio
   const { applicationId } = route.params;
   const open = useOpenAdmin('AdminApplicationDetail');
   const app = useLoader(() => fetchApplication(applicationId), [applicationId], 'This application could not be loaded.');
-  const [decision, setDecision] = useState<'approve' | 'return' | null>(null);
+  const [decision, setDecision] = useState<DecisionKind | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const a = app.data;
@@ -191,7 +222,7 @@ const AdminApplicationDetailScreen = ({ route }: { route: { params: { applicatio
   };
 
   return (
-    <AdminScreen title="Clinic Verification" active="AdminApplicationDetail" back>
+    <AdminScreen title="Verification Review" active="AdminApplicationDetail" back>
       <ScrollView contentContainerStyle={ui.content} refreshControl={<RefreshControl refreshing={app.refreshing} onRefresh={app.refresh} />}>
         {!a ? (
           <LoadState loading={app.loading} error={app.error} onRetry={app.reload} />
@@ -200,7 +231,7 @@ const AdminApplicationDetailScreen = ({ route }: { route: { params: { applicatio
             <View style={styles.header}>
               <Text style={styles.title} accessibilityRole="header">{a.clinic_name}</Text>
               <View style={ui.rowWrap}>
-                <Badge tone={TONES[a.status]} label={APPLICATION_STATUS_LABELS[a.status] ?? a.status} />
+                <Badge tone={a.documents_requested ? 'warning' : CLINIC_STATUS[a.status]?.tone} label={a.documents_requested ? 'More Documents Requested' : CLINIC_STATUS[a.status]?.label ?? a.status} />
                 <Text style={ui.small}>{a.submitted_at ? `Submitted ${formatDateTime(a.submitted_at)}` : 'Not submitted'}</Text>
               </View>
             </View>
@@ -215,27 +246,39 @@ const AdminApplicationDetailScreen = ({ route }: { route: { params: { applicatio
                     clinic-admin access; the clinic stays hidden until they publish it.
                   </Text>
                   <View style={[ui.rowWrap, styles.spaced]}>
-                    <Button small variant="outline" label="Back to queue" onPress={() => open('AdminApplications')} />
-                    <Button small label="View in Verification" onPress={() => open('AdminClinics', { search: a.clinic_name })} />
+                    <Button small variant="outline" label="Back to Verifications" onPress={() => open('AdminApplications')} />
+                    {a.clinic_id ? <Button small label="View Clinic" onPress={() => open('AdminClinicDetail', { clinicId: a.clinic_id })} /> : null}
                   </View>
                 </View>
               </View>
             )}
             {a.status === 'rejected' && (
               <Text style={styles.returned}>
-                Returned to the applicant{a.reviewed_at ? ` on ${formatDateTime(a.reviewed_at)}` : ''}. Waiting for them to correct and resubmit.
+                {a.documents_requested ? 'More documents requested' : 'Rejected'}{a.reviewed_at ? ` on ${formatDateTime(a.reviewed_at)}` : ''}. Waiting for the applicant to correct it and submit again.
+                {a.review_notes ? `\n${a.review_notes}` : ''}
               </Text>
             )}
 
             {['pending', 'under_review'].includes(a.status) && (
               <View style={ui.rowWrap}>
                 {a.status === 'pending' && <Button small variant="outline" label="Start Review" busy={starting} onPress={begin} />}
-                <Button small variant="outline" label="Request More Info" onPress={() => setDecision('return')} />
                 <Button small label="Approve Clinic" disabled={a.missing_documents.length > 0} onPress={() => setDecision('approve')} />
+                <Button small variant="danger" label="Reject" onPress={() => setDecision('return')} />
+                <Button small variant="outline" label="Request More Documents" onPress={() => setDecision('request')} />
               </View>
             )}
             <FormError message={error} />
 
+            <Card title="Workflow Status">
+              <WorkflowSteps
+                steps={[
+                  { label: 'Clinic registered', done: true },
+                  { label: 'Documents submitted', done: Boolean(a.submitted_at) },
+                  { label: 'Under review', done: a.status !== 'pending' },
+                  { label: 'Verified', done: a.status === 'approved' },
+                ]}
+              />
+            </Card>
             <Documents app={a} />
             <Notes app={a} onSaved={(history) => app.setData({ ...a, history })} />
 

@@ -28,6 +28,8 @@ const AdminNotificationsScreen = () => {
     markRead(n);
     if (n.resource?.type === 'clinic_application' && n.resource.id) {
       navigation.navigate('AdminApplicationDetail', { applicationId: n.resource.id });
+    } else if (n.resource?.type === 'subscription_payment' && n.resource.clinic_id) {
+      navigation.navigate('AdminSubscriptionDetail', { clinicId: n.resource.clinic_id });
     }
   };
 

@@ -5,6 +5,8 @@ namespace App\Support;
 use App\Models\AuditLog;
 use App\Models\Clinic;
 use App\Models\ClinicApplication;
+use App\Models\SubscriptionPayment;
+use App\Models\SystemAnnouncement;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -24,15 +26,19 @@ class AuditPresenter
         'clinics' => ['Clinic management', ['clinic.', 'branch.', 'service.', 'dentist.', 'schedule.', 'membership.', 'inventory.']],
         'accounts' => ['Account administration', ['admin.user_updated', 'admin.system_admin_created']],
         'records' => ['Patient records', ['records.', 'patient.']],
+        'subscription' => ['Subscription', ['subscription.']],
         'appointments' => ['Appointments', ['appointment.']],
         'reviews' => ['Reviews', ['review.']],
         'audit' => ['Audit log', ['audit.']],
+        'notifications' => ['System notifications', ['announcement.']],
+        'settings' => ['System settings', ['settings.', 'report.']],
     ];
 
     /** High-impact administrative actions (the "Critical Actions" count). */
     public const CRITICAL_ACTIONS = [
         'clinic_application.approved',
         'clinic_application.rejected',
+        'clinic_application.documents_requested',
         'clinic_application.exported',
         'clinic.suspended',
         'clinic.reactivated',
@@ -41,12 +47,16 @@ class AuditPresenter
         'review.moderated',
         'records.amended',
         'audit.exported',
+        'subscription.plan_changed',
+        'settings.updated',
+        'announcement.published',
     ];
 
     private const OUTCOMES = [
         'auth.login_failed' => 'failed',
         'admin.password_confirm_failed' => 'failed',
         'auth.login_blocked' => 'blocked',
+        'subscription.payment_submitted' => 'pending',
     ];
 
     private const LABELS = [
@@ -70,6 +80,7 @@ class AuditPresenter
         'clinic_application.note_added' => 'Internal note added',
         'clinic_application.approved' => 'Approved clinic registration',
         'clinic_application.rejected' => 'Returned clinic registration',
+        'clinic_application.documents_requested' => 'Requested more documents',
         'clinic_application.exported' => 'Exported registrations (CSV)',
         'clinic.suspended' => 'Suspended clinic',
         'clinic.reactivated' => 'Reactivated clinic',
@@ -108,8 +119,58 @@ class AuditPresenter
         'schedule.holiday_added' => 'Holiday added',
         'schedule.holiday_removed' => 'Holiday removed',
         'contact.message_received' => 'Contact form message received',
+        'auth.two_factor_enabled' => 'Turned on two-factor sign-in',
+        'auth.two_factor_disabled' => 'Turned off two-factor sign-in',
+        'auth.two_factor_failed' => 'Failed two-factor sign-in',
+        'auth.two_factor_recovery_used' => 'Used a two-factor recovery code',
+        'clinic.settings_updated' => 'Updated clinic settings',
+        'clinic.permissions_updated' => 'Updated role permissions',
+        'membership.password_reset_sent' => 'Sent a staff password reset link',
+        'records.file_uploaded' => 'Uploaded a patient file',
+        'records.file_downloaded' => 'Downloaded a patient file',
+        'records.summary_viewed' => 'Viewed patient medical summaries',
+        'records.finalized' => 'Finalized a clinical note',
+        'records.draft_updated' => 'Updated a draft clinical note',
+        'records.visit_notes_updated' => 'Updated treatment notes on a visit',
+        'records.visit_notes_listed' => 'Listed appointments with treatment notes',
+        'records.chart_viewed' => 'Viewed a dental chart',
+        'records.chart_updated' => 'Updated a dental chart',
+        'records.checklist_updated' => 'Updated a pre-procedure checklist',
+        'records.prescriptions_listed' => 'Listed prescriptions',
+        'records.prescription_issued' => 'Issued a prescription',
+        'records.prescription_printed' => 'Printed a prescription',
+        'records.certificate_issued' => 'Issued a dental certificate',
+        'records.follow_up_created' => 'Scheduled a follow-up',
+        'records.follow_up_updated' => 'Updated a follow-up',
+        'records.files_listed' => 'Listed patient files',
+        'dentist.schedule_change_requested' => 'Requested a schedule change',
+        'dentist.schedule_change_submitted' => 'Sent a schedule change for approval',
+        'dentist.schedule_change_cancelled' => 'Cancelled a schedule change request',
+        'dentist.schedule_change_approved' => 'Approved a schedule change',
+        'dentist.schedule_change_rejected' => 'Declined a schedule change',
+        'auth.session_revoked' => 'Signed out of a device',
+        'auth.other_sessions_revoked' => 'Signed out of all other devices',
+        'auth.two_factor_codes_regenerated' => 'Created new two-factor recovery codes',
+        'records.alerts_viewed' => 'Viewed patient medical alerts',
+        'appointment.front_desk_notes_updated' => 'Updated front-desk notes',
+        'membership.contact_updated' => 'Updated own contact details',
+        'review.replied' => 'Replied to a review',
+        'service.removed' => 'Removed a service',
+        'branch.removed' => 'Removed a branch',
+        'subscription.payment_submitted' => 'Submitted proof of payment',
+        'subscription.payment_verified' => 'Verified a subscription payment',
+        'subscription.payment_rejected' => 'Rejected a subscription payment',
+        'subscription.renewal_requested' => 'Requested a subscription renewal',
         'patient.health_profile_updated' => 'Patient updated their health profile',
         'patient.consents_changed' => 'Patient changed their consents',
+        'subscription.proof_opened' => 'Opened a payment proof',
+        'subscription.plan_changed' => 'Changed a clinic\'s plan',
+        'announcement.created' => 'Created an announcement',
+        'announcement.updated' => 'Updated an announcement',
+        'announcement.published' => 'Published an announcement',
+        'announcement.archived' => 'Archived an announcement',
+        'settings.updated' => 'Updated system settings',
+        'report.exported' => 'Exported a report (CSV)',
         'audit.exported' => 'Exported audit log (CSV)',
         'audit.integrity_checked' => 'Ran audit integrity check',
     ];
@@ -166,8 +227,29 @@ class AuditPresenter
                 'ClinicApplication' => $names(ClinicApplication::class, 'clinic_name', $ids('ClinicApplication')),
                 'Clinic' => $names(Clinic::class, 'name', $ids('Clinic')),
                 'User' => $users->map->name,
+                'SubscriptionPayment' => self::paymentClinicNames($ids('SubscriptionPayment')),
+                'SystemAnnouncement' => $names(SystemAnnouncement::class, 'title', $ids('SystemAnnouncement')),
             ],
         ];
+    }
+
+    /** Audit entries for a payment show the clinic it came from. */
+    private static function paymentClinicNames(Collection $paymentIds): Collection
+    {
+        if ($paymentIds->isEmpty()) {
+            return collect();
+        }
+
+        return SubscriptionPayment::with('clinic:id,name')->whereIn('id', $paymentIds)->get(['id', 'clinic_id'])
+            ->mapWithKeys(fn (SubscriptionPayment $payment) => [$payment->id => $payment->clinic?->name]);
+    }
+
+    /** Action codes whose readable label contains the words typed in the search box. */
+    public static function actionsMatching(string $term): array
+    {
+        $term = mb_strtolower($term);
+
+        return array_keys(array_filter(self::LABELS, fn (string $label) => str_contains(mb_strtolower($label), $term)));
     }
 
     public static function present(AuditLog $log, array $lookups): array
@@ -180,6 +262,7 @@ class AuditPresenter
             'action' => $log->action,
             'label' => self::label($log->action),
             'category' => self::category($log->action),
+            'module' => self::CATEGORIES[self::category($log->action)][0] ?? null,
             'outcome' => self::outcome($log->action),
             'user_id' => $log->user_id,
             'user_name' => $actor?->name,

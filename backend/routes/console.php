@@ -31,4 +31,7 @@ Schedule::command('sanctum:prune-expired --hours=24')->daily();
 // Run `php artisan schedule:work` (development) or a cron calling
 // `php artisan schedule:run` every minute (production) for these.
 Schedule::command('appointments:send-reminders')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('appointments:send-check-in-alerts')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('dentists:send-digest')->dailyAt('07:00')->timezone(config('booking.timezone'));
+Schedule::command('admin:send-system-alerts')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('inventory:send-alerts')->dailyAt('07:00')->timezone(config('booking.timezone'));

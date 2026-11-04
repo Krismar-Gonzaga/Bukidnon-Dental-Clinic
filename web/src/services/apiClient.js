@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, API_ORIGIN } from '../config/api';
+import { setPlatform } from './platformStore';
 
 // Shared HTTP client for the Laravel API.
 //
@@ -44,6 +45,10 @@ apiClient.interceptors.response.use(undefined, async (error) => {
   if (response?.status === 419 && config && !config.csrfRetried) {
     await ensureCsrfCookie({ refresh: true });
     return apiClient({ ...config, csrfRetried: true });
+  }
+
+  if (response?.status === 503 && response.data?.code === 'maintenance') {
+    setPlatform({ maintenance_mode: true });
   }
 
   if (response?.status === 401 && !config?.skipSessionExpiry) {

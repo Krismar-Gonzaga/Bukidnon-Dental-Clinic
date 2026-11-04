@@ -25,7 +25,7 @@ test('saves name and email and links to Change password', async () => {
   renderPage();
 
   expect(screen.getByRole('heading', { level: 1, name: 'My Profile' })).toBeInTheDocument();
-  expect(screen.getByText('System Admin')).toBeInTheDocument();
+  expect(screen.getByText('System Admin', { selector: 'dd' })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Change password' })).toHaveAttribute('href', '/admin/password');
 
   fireEvent.change(screen.getByLabelText(/Full name/), { target: { value: 'Samantha Admin' } });

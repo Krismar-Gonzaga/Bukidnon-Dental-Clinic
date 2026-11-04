@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Icon from './Icon';
 import AccountMenu from './AccountMenu';
-import { BRAND_NAME } from '../config/app';
+import { useBrandName } from '../services/platformStore';
 import {
   LOGIN_HREF,
   MAIN_NAV_ITEMS,
@@ -15,6 +15,7 @@ import './SiteHeader.css';
 // avatar menu (Dashboard, My Profile, Log Out) replaces them.
 // Below the desktop breakpoint, nav and actions collapse into a menu panel.
 function SiteHeader({ activeHref = '/' }) {
+  const brand = useBrandName();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user } = useAuth();
 
@@ -34,7 +35,7 @@ function SiteHeader({ activeHref = '/' }) {
     <header className="site-header">
       <div className="site-header-inner">
         <a href="/" className="site-header-brand">
-          {BRAND_NAME}
+          {brand}
         </a>
 
         <button

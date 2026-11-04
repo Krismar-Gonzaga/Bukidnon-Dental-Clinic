@@ -20,6 +20,16 @@ class InventoryAlert extends AppNotification
         return 'inventory';
     }
 
+    /** Stock and expiry share one daily digest, sent if the person still wants either. */
+    public function via(object $notifiable): array
+    {
+        $categories = $notifiable->notification_preferences['categories'] ?? [];
+        $wantsStock = $this->lowStock > 0 && (($categories['inventory_low_stock'] ?? true) || ($categories['inventory_critical'] ?? true));
+        $wantsExpiry = ($this->nearExpiry + $this->expired) > 0 && ($categories['inventory_expiry'] ?? true);
+
+        return $wantsStock || $wantsExpiry ? parent::via($notifiable) : [];
+    }
+
     protected function title(): string
     {
         return 'Inventory needs review';

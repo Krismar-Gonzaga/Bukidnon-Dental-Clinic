@@ -45,6 +45,22 @@ class BranchController extends Controller
      * Replace the weekly hours. Days not listed are closed.
      * Body: { hours: [{ day_of_week: 1, opens_at: "08:00", closes_at: "17:00" }, ...] }
      */
+    /** Past appointments still point at the branch, so it is closed rather than deleted. */
+    public function destroy(Clinic $clinic, ClinicBranch $branch)
+    {
+        if ($branch->is_main) {
+            return $this->fail('The main branch cannot be removed.', 409);
+        }
+        if ($clinic->appointments()->where('branch_id', $branch->id)->active()->where('starts_at', '>=', now())->exists()) {
+            return $this->fail('This branch still has upcoming appointments. Move or cancel them first.', 409);
+        }
+
+        $branch->forceFill(['is_active' => false])->save();
+        $this->audit->record('branch.removed', $branch, clinicId: $clinic->id);
+
+        return $this->ok(message: 'Branch removed');
+    }
+
     public function updateHours(Request $request, Clinic $clinic, ClinicBranch $branch)
     {
         $data = $request->validate([

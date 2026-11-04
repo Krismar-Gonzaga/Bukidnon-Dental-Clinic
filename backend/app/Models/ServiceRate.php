@@ -20,11 +20,16 @@ class ServiceRate extends Model
         'currency',
         'duration_minutes',
         'is_available',
+        'price_max',
+        'duration_max',
     ];
 
     protected $casts = [
         'is_available' => 'boolean',
         'price' => 'decimal:2',
+        'price_max' => 'decimal:2',
+        'duration_max' => 'integer',
+        'archived_at' => 'datetime',
         'duration_minutes' => 'integer',
     ];
 

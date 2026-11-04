@@ -18,11 +18,13 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useNavigation } from '@react-navigation/native';
 import { ClinicScreen } from '../../components/clinic/ClinicChrome';
+import { InviteSheet, positionLabel } from '../../components/clinic/ClinicAdminKit';
 import { useClinicPortal } from '../../components/clinic/ClinicPortalContext';
 import { useAuth } from '../../context/AuthContext';
 import { isNetworkError } from '../../services/api';
-import { CLINIC_ROLE_LABELS, fetchStaff, inviteStaff, Membership, StaffMember, updateStaff } from '../../services/clinicPortal';
+import { CLINIC_ROLE_LABELS, fetchStaff, Membership, resetMemberPassword, StaffMember, updateStaff } from '../../services/clinicPortal';
 import { palette, radius, shadow, spacing, type } from '../../theme/tokens';
 
 const ROLES = Object.keys(CLINIC_ROLE_LABELS) as Membership['role'][];
@@ -98,6 +100,26 @@ function ManageSheet({ member, clinicId, onClose, onSaved }: { member: StaffMemb
     }
   };
 
+  const resetPassword = () => {
+    Alert.alert('Reset Password', `A password reset link will be sent to ${member.email}. ${member.name} will be asked to set a new password.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Send Reset Link',
+        onPress: async () => {
+          setBusy(true);
+          try {
+            await resetMemberPassword(clinicId, member.id);
+            Alert.alert('Reset link sent', `${member.name} will receive it by email.`);
+          } catch (err) {
+            Alert.alert('Not sent', serverMessage(err, 'Please try again.'));
+          } finally {
+            setBusy(false);
+          }
+        },
+      },
+    ]);
+  };
+
   const toggleAccess = () => {
     const suspending = member.status === 'active';
     Alert.alert(
@@ -116,7 +138,7 @@ function ManageSheet({ member, clinicId, onClose, onSaved }: { member: StaffMemb
       <Text style={[styles.muted, styles.spacedSm]}>Works at: {branchLabel(member)}</Text>
       <Text style={styles.fieldLabel}>Role</Text>
       <RoleOptions value={role} onChange={setRole} />
-      <Text style={styles.hint}>Roles decide what each person can see. Receptionists cannot read clinical records.</Text>
+      <Text style={styles.hint}>Roles decide what each person can see. Only dentists and clinic administrators can read clinical records, and every view is logged.</Text>
       <TouchableOpacity
         style={[styles.primaryButton, (busy || role === member.role) && styles.disabled]}
         disabled={busy || role === member.role}
@@ -124,6 +146,9 @@ function ManageSheet({ member, clinicId, onClose, onSaved }: { member: StaffMemb
         accessibilityRole="button"
       >
         {busy ? <ActivityIndicator color={palette.onPrimary} /> : <Text style={styles.primaryButtonText}>Save role</Text>}
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.outlineButton} disabled={busy} onPress={resetPassword} accessibilityRole="button">
+        <Text style={styles.outlineButtonText}>Reset password</Text>
       </TouchableOpacity>
       {member.status !== 'invited' && (
         <TouchableOpacity style={styles.outlineButton} disabled={busy} onPress={toggleAccess} accessibilityRole="button">
@@ -136,58 +161,10 @@ function ManageSheet({ member, clinicId, onClose, onSaved }: { member: StaffMemb
   );
 }
 
-function InviteSheet({ clinicId, defaultRole = 'staff', onClose, onSaved }: { clinicId: number; defaultRole?: Membership['role']; onClose: () => void; onSaved: () => void }) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState<Membership['role']>(defaultRole);
-  const [busy, setBusy] = useState(false);
-
-  const submit = async () => {
-    if (!name.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
-      Alert.alert('Check the form', 'Enter a name and a valid email address.');
-      return;
-    }
-    setBusy(true);
-    try {
-      const message = await inviteStaff(clinicId, { name: name.trim(), email: email.trim(), role });
-      onSaved();
-      onClose();
-      Alert.alert('Staff added', message ?? 'Invitation sent.');
-    } catch (err) {
-      Alert.alert('Not added', serverMessage(err, 'Please check the details and try again.'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Sheet title="Add staff member" onClose={onClose}>
-      <Text style={styles.fieldLabel}>Full name</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Juan Dela Cruz" placeholderTextColor={palette.outline} autoComplete="name" />
-      <Text style={styles.fieldLabel}>Email</Text>
-      <TextInput
-        style={styles.input}
-        value={email}
-        onChangeText={setEmail}
-        placeholder="name@example.com"
-        placeholderTextColor={palette.outline}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoComplete="email"
-      />
-      <Text style={styles.fieldLabel}>Role</Text>
-      <RoleOptions value={role} onChange={setRole} />
-      <Text style={styles.hint}>New people get an email to set their password. Existing accounts must accept the invitation.</Text>
-      <TouchableOpacity style={[styles.primaryButton, busy && styles.disabled]} disabled={busy} onPress={submit} accessibilityRole="button">
-        {busy ? <ActivityIndicator color={palette.onPrimary} /> : <Text style={styles.primaryButtonText}>Add staff</Text>}
-      </TouchableOpacity>
-    </Sheet>
-  );
-}
-
 const ClinicStaffScreen = ({ route }: { route?: { params?: { search?: string; inviteRole?: Membership['role'] } } }) => {
   const { user } = useAuth();
   const { membership } = useClinicPortal();
+  const navigation = useNavigation<any>();
   const clinicId = membership?.clinic_id;
   const [members, setMembers] = useState<StaffMember[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -253,7 +230,13 @@ const ClinicStaffScreen = ({ route }: { route?: { params?: { search?: string; in
           <Text style={styles.sectionTitle}>Personnel List</Text>
           <Text style={styles.muted}>Manage roles and access.</Text>
         </View>
+      </View>
+      <View style={styles.headerButtons}>
         <TouchableOpacity style={styles.tonalButton} onPress={() => setInviting(true)} accessibilityRole="button">
+          <Icon name="mail-outline" size={18} color={palette.primary} />
+          <Text style={styles.tonalButtonText}>Invite by Email</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.tonalButton} onPress={() => navigation.navigate('ClinicAddStaff')} accessibilityRole="button">
           <Icon name="person-add-outline" size={18} color={palette.primary} />
           <Text style={styles.tonalButtonText}>Add Staff</Text>
         </TouchableOpacity>
@@ -326,7 +309,7 @@ const ClinicStaffScreen = ({ route }: { route?: { params?: { search?: string; in
                   )}
                 </View>
                 <View style={styles.memberMeta}>
-                  <Text style={[styles.roleChip, m.role === 'dentist' && styles.roleChipDentist]}>{CLINIC_ROLE_LABELS[m.role] ?? m.role}</Text>
+                  <Text style={[styles.roleChip, m.role === 'dentist' && styles.roleChipDentist]}>{positionLabel(m.position) ?? CLINIC_ROLE_LABELS[m.role] ?? m.role}</Text>
                   <View style={styles.statusRow}>
                     <View style={[styles.dot, { backgroundColor: STATUS_COLORS[m.status] }]} />
                     <Text style={[styles.statusText, { color: STATUS_COLORS[m.status] }]}>{STATUS_LABELS[m.status] ?? m.status}</Text>
@@ -342,12 +325,13 @@ const ClinicStaffScreen = ({ route }: { route?: { params?: { search?: string; in
         />
       )}
       {managing && clinicId && <ManageSheet member={managing} clinicId={clinicId} onClose={() => setManaging(null)} onSaved={load} />}
-      {inviting && clinicId && <InviteSheet clinicId={clinicId} defaultRole={route?.params?.inviteRole} onClose={() => setInviting(false)} onSaved={load} />}
+      {inviting && clinicId && <InviteSheet clinicId={clinicId} clinicName={membership?.clinic_name} role={route?.params?.inviteRole === 'dentist' ? 'dentist' : 'staff'} title="Invite by Email" onClose={() => setInviting(false)} onSent={load} />}
     </ClinicScreen>
   );
 };
 
 const styles = StyleSheet.create({
+  headerButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.base },
   container: { flex: 1, backgroundColor: palette.surface },
   flex: { flex: 1 },
   content: { padding: spacing.md, paddingBottom: spacing.xl, gap: spacing.sm },

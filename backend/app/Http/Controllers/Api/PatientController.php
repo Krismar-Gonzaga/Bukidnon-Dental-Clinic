@@ -153,6 +153,7 @@ class PatientController extends Controller
 
         $records = PatientRecord::where('patient_id', $patient->id)
             ->current()
+            ->final()
             ->where('is_patient_visible', true)
             ->with(['clinic:id,name', 'dentist.user'])
             ->latest()

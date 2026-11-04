@@ -6,7 +6,6 @@ import ClinicInventoryItemPage from './ClinicInventoryItemPage';
 import ClinicStaffPage from './ClinicStaffPage';
 import ClinicLayout from '../../layouts/ClinicLayout';
 import * as api from '../../services/clinicPortalApi';
-import { requestPasswordReset } from '../../services/authService';
 import { getNotifications } from '../../services/notificationApi';
 import { clinicUser, renderWithProviders } from '../../testUtils';
 import { apiAppointment, appointment, emptyNotifications } from '../../testFixtures';
@@ -39,6 +38,7 @@ const renderClinicPage = (element, permissions, role, { route = '/clinic/7/dashb
   renderWithProviders(element, { user: clinicUser(permissions, role), route, path });
 
 test('navigation only shows sections the member is allowed to use', async () => {
+  api.getClinicAppointments.mockResolvedValue({ appointments: [], meta: { total: 0 } });
   renderClinicPage(<ClinicDashboardPage />, STAFF, 'staff');
   const nav = screen.getByRole('navigation', { name: 'Clinic' });
 
@@ -46,8 +46,8 @@ test('navigation only shows sections the member is allowed to use', async () => 
   expect(within(nav).getByRole('link', { name: 'Patients' })).toBeInTheDocument();
   expect(within(nav).queryByRole('link', { name: 'Inventory' })).not.toBeInTheDocument();
   expect(within(nav).queryByRole('link', { name: 'Staff' })).not.toBeInTheDocument();
-  expect(screen.getByText(/Receptionist \/ Staff · Valencia Smiles/)).toBeInTheDocument();
-  expect(await screen.findByText('Pending requests')).toBeInTheDocument();
+  expect(screen.getAllByText('Front Desk Staff').length).toBeGreaterThan(0);
+  expect(await screen.findByText('Pending Confirmation')).toBeInTheDocument();
 });
 
 test('a clinic the user is not a member of redirects away', () => {
@@ -71,13 +71,13 @@ test('receptionist sees confirm/decline for a pending request; decline needs a r
   api.appointmentAction.mockResolvedValue({});
   renderClinicPage(<ClinicAppointmentDetailPage />, STAFF, 'staff', detailRoute);
 
-  expect(await screen.findByRole('button', { name: 'Confirm' })).toBeInTheDocument();
-  expect(screen.getByText('Juan Dela Cruz')).toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: /clinical records/ })).not.toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Confirm Appointment' })).toBeInTheDocument();
+  expect(screen.getAllByText('Juan Dela Cruz').length).toBeGreaterThan(0);
+  expect(screen.queryByRole('heading', { name: 'Patient Medical Flags' })).not.toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Decline' }));
-  const dialog = screen.getByRole('dialog', { name: 'Decline' });
-  const submit = within(dialog).getByRole('button', { name: 'Decline' });
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel Request' }));
+  const dialog = screen.getByRole('dialog', { name: 'Cancel Request' });
+  const submit = within(dialog).getByRole('button', { name: 'Yes, Cancel' });
   expect(submit).toBeDisabled();
   fireEvent.change(within(dialog).getByLabelText(/Reason/), { target: { value: 'Fully booked' } });
   fireEvent.click(submit);
@@ -89,7 +89,7 @@ test('a dentist can only progress an appointment, not confirm it', async () => {
   api.getClinicAppointment.mockResolvedValue(appointment({ status: 'checked_in' }));
   renderClinicPage(<ClinicAppointmentDetailPage />, DENTIST, 'dentist', detailRoute);
 
-  expect(await screen.findByRole('button', { name: 'Start visit' })).toBeInTheDocument();
+  expect((await screen.findAllByRole('button', { name: 'Start Visit' })).length).toBeGreaterThan(0);
   expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument();
 
   api.getClinicAppointment.mockResolvedValue(appointment({ status: 'pending' }));
@@ -106,6 +106,7 @@ test('dentist adds a clinical record and corrects it with a reason', async () =>
   api.amendRecord.mockResolvedValue({});
   renderClinicPage(<ClinicPatientDetailPage />, DENTIST, 'dentist', { route: '/clinic/7/patients/3', path: '/clinic/:clinicId/patients/:patientId' });
 
+  fireEvent.click(await screen.findByRole('button', { name: 'Dental Records' }));
   expect(await screen.findByText('Mild gingivitis')).toBeInTheDocument();
   expect(screen.getByText(/Viewing is logged/)).toBeInTheDocument();
 
@@ -128,9 +129,10 @@ test('a receptionist sees patient details but no clinical sections', async () =>
   api.getClinicAppointments.mockResolvedValue({ appointments: [], meta: {} });
   renderClinicPage(<ClinicPatientDetailPage />, STAFF, 'staff', { route: '/clinic/7/patients/3', path: '/clinic/:clinicId/patients/:patientId' });
 
-  expect(await screen.findByRole('heading', { name: 'Juan Dela Cruz' })).toBeInTheDocument();
-  expect(screen.queryByRole('heading', { name: 'Clinical records' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('heading', { name: 'Medical history' })).not.toBeInTheDocument();
+  expect((await screen.findAllByRole('heading', { name: 'Juan Dela Cruz' })).length).toBeGreaterThan(0);
+  expect(screen.queryByRole('button', { name: 'Dental Records' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Files' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Conditions')).not.toBeInTheDocument();
   expect(api.getPatientRecords).not.toHaveBeenCalled();
 });
 
@@ -154,26 +156,24 @@ test('recording a disposal requires a batch and a reason', async () => {
   await waitFor(() => expect(api.recordMovement).toHaveBeenCalledWith('7', 4, { type: 'disposal', quantity: 2, reason: 'Expired', batch_id: 21 }));
 });
 
-test('clinic admin invites a staff member', async () => {
+test('clinic admin invites a staff member by email and sees the confirmation', async () => {
   api.getMembers.mockResolvedValue([{ id: 1, user_id: 2, name: 'Ana Reyes', email: 'ana@example.com', role: 'clinic_admin', status: 'active' }]);
-  api.inviteMember.mockResolvedValue({ message: 'Account created. They will receive an email to set their password.' });
-  api.getBranches.mockResolvedValue([]);
+  api.inviteMember.mockResolvedValue({ message: 'Invited.' });
   renderClinicPage(<ClinicStaffPage />, ADMIN, 'clinic_admin', { route: '/clinic/7/staff', path: '/clinic/:clinicId/staff' });
 
   // Admins cannot change their own role or access here.
   // (The signed-in admin is also "Ana Reyes" in the sidebar, so wait for the table.)
   expect(await screen.findByText('You')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Edit Ana Reyes' })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Add Staff' })).toHaveAttribute('href', '/clinic/7/staff/new');
 
-  fireEvent.click(screen.getByRole('button', { name: 'Add Staff' }));
-  const dialog = screen.getByRole('dialog', { name: 'Add staff member' });
-  fireEvent.change(within(dialog).getByLabelText('Full name'), { target: { value: 'Rosa Lim' } });
-  fireEvent.change(within(dialog).getByLabelText('Email'), { target: { value: 'rosa@example.com' } });
-  fireEvent.change(within(dialog).getByLabelText('Role'), { target: { value: 'dentist' } });
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Invite by Email' }));
+  const dialog = screen.getByRole('dialog', { name: 'Invite by Email' });
+  fireEvent.change(within(dialog).getByLabelText('Email address'), { target: { value: 'rosa@example.com' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Send Invitation' }));
 
-  expect(await screen.findByText(/receive an email to set their password/)).toBeInTheDocument();
-  expect(api.inviteMember).toHaveBeenCalledWith('7', { name: 'Rosa Lim', email: 'rosa@example.com', role: 'dentist' });
+  expect(await within(dialog).findByRole('heading', { name: 'Invitation Sent!' })).toBeInTheDocument();
+  expect(api.inviteMember).toHaveBeenCalledWith('7', { email: 'rosa@example.com', role: 'staff', position: 'receptionist' });
 });
 
 // Keep the fixture import used for clarity in failure output.
@@ -186,7 +186,7 @@ test('staff table leaves out dentists, filters by role, edits, deactivates and r
     { id: 5, user_id: 9, name: 'Dr. Ben Cruz', email: 'ben@example.com', role: 'dentist', status: 'active', branches: ['Main Branch'] },
   ]);
   api.updateMember.mockResolvedValue({});
-  requestPasswordReset.mockResolvedValue({});
+  api.resetMemberPassword.mockResolvedValue({});
   renderClinicPage(<ClinicStaffPage />, ADMIN, 'clinic_admin', { route: '/clinic/7/staff', path: '/clinic/:clinicId/staff' });
 
   const row = (await screen.findByText('Sofia Lim')).closest('tr');
@@ -203,7 +203,7 @@ test('staff table leaves out dentists, filters by role, edits, deactivates and r
   const edit = screen.getByRole('dialog', { name: 'Edit Sofia Lim' });
   fireEvent.change(within(edit).getByLabelText(/Work phone/), { target: { value: '0999' } });
   fireEvent.click(within(edit).getByRole('button', { name: 'Save' }));
-  await waitFor(() => expect(api.updateMember).toHaveBeenCalledWith('7', 4, { role: 'staff', phone: '0999' }));
+  await waitFor(() => expect(api.updateMember).toHaveBeenCalledWith('7', 4, { role: 'staff', phone: '0999', work_schedule: null }));
 
   fireEvent.click(await screen.findByRole('button', { name: 'Deactivate Sofia Lim' }));
   expect(api.updateMember).toHaveBeenCalledTimes(1); // asks first
@@ -211,8 +211,8 @@ test('staff table leaves out dentists, filters by role, edits, deactivates and r
   await waitFor(() => expect(api.updateMember).toHaveBeenLastCalledWith('7', 4, { status: 'suspended' }));
 
   fireEvent.click(await screen.findByRole('button', { name: 'Send Sofia Lim a password reset link' }));
-  fireEvent.click(within(screen.getByRole('dialog', { name: 'Reset password for Sofia Lim?' })).getByRole('button', { name: 'Send reset link' }));
-  await waitFor(() => expect(requestPasswordReset).toHaveBeenCalledWith('sofia@example.com'));
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Reset Password' })).getByRole('button', { name: 'Send Reset Link' }));
+  await waitFor(() => expect(api.resetMemberPassword).toHaveBeenCalledWith('7', 4));
 });
 
 const INSIGHTS = {
@@ -244,10 +244,10 @@ test('clinic admin dashboard: greeting, figures, approvals, calendar and quick a
 
   // Sidebar groups from the design; Services and Branches moved to Clinic Profile tabs.
   const nav = screen.getByRole('navigation', { name: 'Clinic' });
-  ['Clinic', 'Team', 'Operations', 'Business'].forEach((group) => expect(within(nav).getByText(group)).toBeInTheDocument());
+  ['Clinic', 'Team', 'Operations', 'Business', 'System'].forEach((group) => expect(within(nav).getByText(group)).toBeInTheDocument());
   expect(within(nav).getByRole('link', { name: 'Clinic Profile' })).toHaveAttribute('href', '/clinic/7/settings');
   expect(within(nav).queryByRole('link', { name: 'Services & Prices' })).not.toBeInTheDocument();
-  ['System', 'Notifications', 'Settings'].forEach((name) => expect(within(nav).queryByText(name)).not.toBeInTheDocument());
+  expect(within(nav).getByRole('link', { name: 'Notifications' })).toHaveAttribute('href', '/clinic/7/notifications');
   expect(screen.queryByLabelText('Search patients, branches, or staff')).not.toBeInTheDocument();
 
   expect(await screen.findByText('Today\'s Appointments')).toBeInTheDocument();
@@ -276,35 +276,12 @@ test('clinic admin dashboard: greeting, figures, approvals, calendar and quick a
   await waitFor(() => expect(api.appointmentAction).toHaveBeenCalledWith('7', '31', 'reject', { reason: 'Fully booked' }));
 });
 
-test('walk-in: registers a new patient, picks a slot and books it as a walk-in', async () => {
+test('the dashboard walk-in button opens the walk-in page', async () => {
   mockAdminDashboard();
   api.getClinicDashboard.mockResolvedValue({ alerts: [] });
-  api.getClinicDentists.mockResolvedValue([{ id: 2, name: 'Dr. Ben Cruz', is_active: true }]);
-  api.getClinicServices.mockResolvedValue([{ id: 4, name: 'Dental Cleaning', duration_minutes: 30, is_available: true }]);
-  api.registerPatient.mockResolvedValue({ data: { id: 77 } });
-  api.bookForPatient.mockResolvedValue({ data: { id: 90, starts_at: '2026-11-02T15:00:00+08:00', patient: { name: 'Jose Reyes' } } });
-  mockSlotPicker.confirm = { branchId: 1, startsAt: '2026-11-02 15:00' };
   renderClinicPage(<ClinicDashboardPage />, [...ADMIN, 'patients.manage'], 'clinic_admin');
 
-  fireEvent.click(screen.getByRole('button', { name: 'Walk-in' }));
-  const dialog = screen.getByRole('dialog', { name: 'Walk-in appointment' });
-  expect(within(dialog).getByRole('button', { name: 'Choose time' })).toBeDisabled();
-  fireEvent.click(within(dialog).getByRole('button', { name: 'New patient' }));
-  fireEvent.change(within(dialog).getByLabelText(/Full name/), { target: { value: 'Jose Reyes' } });
-  fireEvent.change(within(dialog).getByLabelText(/Mobile number/), { target: { value: '0917' } });
-  await within(dialog).findByRole('option', { name: 'Dr. Ben Cruz' });
-  await within(dialog).findByRole('option', { name: 'Dental Cleaning (30 min)' });
-  fireEvent.change(within(dialog).getByLabelText(/Dentist/), { target: { value: '2' } });
-  fireEvent.change(within(dialog).getByLabelText(/Service/), { target: { value: '4' } });
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Choose time' }));
-
-  fireEvent.click(await screen.findByRole('button', { name: 'Pick slot' }));
-  await waitFor(() =>
-    expect(api.bookForPatient).toHaveBeenCalledWith('7', { patient_id: 77, service_rate_id: 4, dentist_id: 2, branch_id: 1, starts_at: '2026-11-02 15:00', walk_in: true })
-  );
-  expect(api.registerPatient).toHaveBeenCalledWith('7', { full_name: 'Jose Reyes', phone: '0917' });
-  expect(await screen.findByRole('dialog', { name: 'Walk-in booked' })).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Open appointment' })).toHaveAttribute('href', '/clinic/7/appointments/90');
+  expect(screen.getByRole('link', { name: 'Walk-in' })).toHaveAttribute('href', '/clinic/7/appointments/walk-in');
 });
 
 test('owner dashboard details: branches, alerts and CSV export stay under the new sections', async () => {

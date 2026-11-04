@@ -176,15 +176,15 @@ function StockHistoryModal({ onClose }) {
                 <tbody>
                   {items.map((m) => (
                     <tr key={m.id}>
-                      <td>{formatDateTime(m.at)}</td>
-                      <td>{m.item}</td>
-                      <td>
+                      <td data-label="When">{formatDateTime(m.at)}</td>
+                      <td data-label="Item">{m.item}</td>
+                      <td data-label="Change">
                         {MOVEMENT_LABELS[m.type] ?? m.type} {m.quantity > 0 ? '+' : ''}
                         {m.quantity} {m.unit}
                       </td>
-                      <td>{m.balance_after}</td>
-                      <td>{m.performed_by ?? '—'}</td>
-                      <td>{m.reason || '—'}</td>
+                      <td data-label="Balance">{m.balance_after}</td>
+                      <td data-label="By">{m.performed_by ?? '—'}</td>
+                      <td data-label="Reason">{m.reason || '—'}</td>
                     </tr>
                   ))}
                   {items.length === 0 && (
@@ -323,22 +323,22 @@ function Inventory({ showingAdd, setShowingAdd }) {
                   const stock = STOCK_LABELS[stockStatus(item)];
                   return (
                     <tr key={item.id}>
-                      <td>
+                      <td data-label="Item">
                         <a href={`${getClinicHref(clinicId, 'inventory')}/${item.id}`} className="clinic-cell-title">
                           {item.name}
                         </a>
                       </td>
-                      <td>{item.category ?? '—'}</td>
-                      <td>{item.brand ?? '—'}</td>
-                      <td>
+                      <td data-label="Category">{item.category ?? '—'}</td>
+                      <td data-label="Brand">{item.brand ?? '—'}</td>
+                      <td data-label="Qty">
                         <strong className={`clinic-stock-qty is-${stock.tone}`}>{item.quantity_usable}</strong>
                       </td>
-                      <td>{item.unit}</td>
-                      <td>{item.minimum_stock}</td>
-                      <td>{expiryLabel(item.next_expiry)}</td>
-                      <td>{item.unit_cost == null ? '—' : peso(item.unit_cost)}</td>
-                      <td>{item.is_active ? <Pill tone={stock.tone}>{stock.label}</Pill> : <Pill>Archived</Pill>}</td>
-                      <td className="is-end">
+                      <td data-label="Unit">{item.unit}</td>
+                      <td data-label="Min.Stock">{item.minimum_stock}</td>
+                      <td data-label="Expiry">{expiryLabel(item.next_expiry)}</td>
+                      <td data-label="Unit Cost">{item.unit_cost == null ? '—' : peso(item.unit_cost)}</td>
+                      <td data-label="Status">{item.is_active ? <Pill tone={stock.tone}>{stock.label}</Pill> : <Pill>Archived</Pill>}</td>
+                      <td data-label="" className="is-end">
                         {canManage && (
                           <div className="clinic-row-actions">
                             <button type="button" className="clinic-icon-action" aria-label={`Edit ${item.name}`} onClick={() => setEditing(item)}>

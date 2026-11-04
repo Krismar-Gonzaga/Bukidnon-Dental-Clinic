@@ -2,7 +2,7 @@ import { createContext, useContext } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import ClinicShell from './ClinicShell';
 import Icon from '../components/Icon';
-import WalkInAction from '../components/portal/WalkInAction';
+import { InitialsTile } from '../components/clinic/ClinicUi';
 import { useAuth } from '../auth/AuthContext';
 import {
   canAny,
@@ -11,8 +11,10 @@ import {
   getClinicHref,
   getClinicSections,
   isDentistMember,
+  isFrontDeskMember,
 } from '../config/clinicNavigation';
 import '../components/portal/portal.css';
+import '../pages/clinic/FrontDesk.css';
 
 const ClinicContext = createContext(null);
 
@@ -65,9 +67,21 @@ export function useClinicAccess() {
  * `subtitle`, `search`, `hideSearch`, `showWalkIn` and `headerActions`
  * customise the top bar (see ClinicShell).
  */
+function FrontDeskUserCard({ name, role }) {
+  return (
+    <div className="frontdesk-user-card">
+      <InitialsTile name={name} size="sm" tone="navy" />
+      <div>
+        <p className="frontdesk-user-name">{name}</p>
+        <p className="frontdesk-user-role">{role}</p>
+      </div>
+    </div>
+  );
+}
+
 function ClinicLayout({ section, title, subtitle, requires, search, hideSearch = false, showWalkIn = false, headerActions, children }) {
   const { clinicId } = useParams();
-  const { memberships } = useAuth();
+  const { memberships, user } = useAuth();
   const membership = memberships.find((m) => String(m.clinic_id) === String(clinicId));
 
   if (!membership) return <Navigate to={CLINIC_PORTAL_HREF} replace />;
@@ -83,10 +97,15 @@ function ClinicLayout({ section, title, subtitle, requires, search, hideSearch =
     href: getClinicHref(clinicId, item.section),
     icon: item.icon,
     group: item.group,
+    showsUnread: item.showsUnread,
   }));
+  const isFrontDesk = isFrontDeskMember(membership);
+  const isDentist = isDentistMember(membership);
+  const dentistTitle = membership.specialization ?? 'Dentist';
+  const roleName = isFrontDesk ? membership.position_label ?? 'Front Desk Staff' : isDentist ? dentistTitle : CLINIC_ROLE_LABELS[membership.role] ?? membership.role;
+  const cardRole = isDentist && membership.specialization ? `${membership.specialization} · Dentist` : roleName;
   // Pages without their own sidebar entry (e.g. appointments for dentists) highlight their alias.
   const activeSection = sections.find((item) => item.aliases?.includes(section))?.section ?? section;
-  const isDentist = isDentistMember(membership);
 
   return (
     <ClinicContext.Provider value={{ clinicId, membership, clinicName: membership.clinic_name, can }}>
@@ -97,26 +116,30 @@ function ClinicLayout({ section, title, subtitle, requires, search, hideSearch =
         subtitle={subtitle}
         navItems={navItems}
         activeHref={getClinicHref(clinicId, activeSection)}
-        scheduleHref={getClinicHref(clinicId, isDentist ? 'schedule' : 'appointments')}
-        showSignOut={isDentist}
-        grouped={!isDentist}
-        roleLabel={`${CLINIC_ROLE_LABELS[membership.role] ?? membership.role} · ${membership.clinic_name}`}
-        shortRoleLabel={CLINIC_ROLE_LABELS[membership.role] ?? membership.role}
+        scheduleHref={getClinicHref(clinicId, isDentist ? 'my-schedule' : 'appointments')}
+        grouped
+        roleLabel={isFrontDesk || isDentist ? cardRole : `${roleName} · ${membership.clinic_name}`}
+        shortRoleLabel={roleName}
         can={can}
         search={search}
-        hideSearch={hideSearch}
+        hideSearch={hideSearch || ((isDentist || isFrontDesk) && !search)}
         headerActions={
           <>
             {headerActions}
-            {showWalkIn && !isDentist && can('appointments.manage') && can('patients.view') && (
-              <WalkInAction clinicId={clinicId} can={can} className="btn btn-primary btn-sm clinic-walkin-button">
+            {showWalkIn && !isDentist && !isFrontDesk && can('appointments.manage') && can('patients.view') && (
+              <a href={`${getClinicHref(clinicId, 'appointments')}/walk-in`} className="btn btn-primary btn-sm clinic-walkin-button">
                 <Icon name="plus" size={18} />
                 Walk-in
-              </WalkInAction>
+              </a>
             )}
           </>
         }
-        sidebarExtra={<ClinicSwitcher memberships={memberships} clinicId={clinicId} />}
+        sidebarExtra={
+          <>
+            {(isFrontDesk || isDentist) && <FrontDeskUserCard name={user?.name} role={cardRole} />}
+            <ClinicSwitcher memberships={memberships} clinicId={clinicId} />
+          </>
+        }
       >
         {children}
       </ClinicShell>

@@ -36,7 +36,7 @@ import {
 import { isNetworkError } from '../../services/api';
 import { palette, radius, shadow, spacing, type } from '../../theme/tokens';
 import OfflineBanner from '../common/OfflineBanner';
-import { CLINIC_SETTINGS_SECTION, ClinicRoute, ClinicSection, drawerGroups, TAB_LIMIT, visibleSections } from '../../config/clinicSections';
+import { ClinicRoute, ClinicSection, drawerGroups, TAB_LIMIT, visibleSections } from '../../config/clinicSections';
 
 const initial = (name?: string) => (name ?? '').trim().charAt(0).toUpperCase() || '?';
 const DRAWER_WIDTH = Math.min(320, Dimensions.get('window').width * 0.82);
@@ -75,6 +75,8 @@ export const useOpenSection = (active?: ClinicRoute) => {
 };
 
 function DrawerItem({ section, active, onPress }: { section: ClinicSection; active: boolean; onPress: () => void }) {
+  const { unreadCount } = useClinicPortal();
+  const badge = section.route === 'ClinicNotifications' && unreadCount > 0 ? unreadCount : null;
   return (
     <TouchableOpacity
       style={[styles.drawerItem, active && styles.drawerItemActive]}
@@ -84,14 +86,14 @@ function DrawerItem({ section, active, onPress }: { section: ClinicSection; acti
     >
       <Icon name={active ? section.icon : `${section.icon}-outline`} size={22} color={active ? palette.onPrimary : palette.onSurfaceVariant} />
       <Text style={[styles.drawerItemText, active && styles.drawerItemTextActive]}>{section.label}</Text>
+      {badge != null && (
+        <View style={styles.drawerBadge}>
+          <Text style={styles.bellBadgeText}>{badge > 9 ? '9+' : badge}</Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
-
-const ACCOUNT_LINKS: ClinicSection[] = [
-  { route: 'ClinicNotifications', label: 'Notifications', icon: 'notifications', anyOf: [] },
-  { route: 'ClinicAccount', label: 'My Profile', icon: 'person-circle', anyOf: [] },
-];
 
 // ---------------------------------------------------------------- Left drawer
 function ClinicDrawer({ visible, onClose, active }: { visible: boolean; onClose: () => void; active?: ClinicRoute }) {
@@ -99,8 +101,17 @@ function ClinicDrawer({ visible, onClose, active }: { visible: boolean; onClose:
   const { memberships, membership, selectClinic } = useClinicPortal();
   const sections = useSections();
   const open = useOpenSection(active);
-  const canSettings = can(membership, ...CLINIC_SETTINGS_SECTION.anyOf);
   const isDentist = membership?.role === 'dentist';
+  const isFrontDesk = membership?.role === 'staff';
+  // Their design's own flat menu, with a card for who is signed in.
+  const hasOwnMenu = isFrontDesk || isDentist;
+  const roleLabel = isFrontDesk
+    ? membership?.position_label ?? 'Front Desk Staff'
+    : isDentist
+      ? [membership?.specialization, 'Dentist'].filter(Boolean).join(' · ')
+      : membership
+        ? CLINIC_ROLE_LABELS[membership.role]
+        : '';
 
   const go = (route: ClinicRoute) => {
     onClose();
@@ -138,17 +149,21 @@ function ClinicDrawer({ visible, onClose, active }: { visible: boolean; onClose:
             </View>
           )}
 
+          {hasOwnMenu && (
+            <View style={styles.drawerStaffCard}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initial(user?.name)}</Text>
+              </View>
+              <View style={styles.flex}>
+                <Text style={styles.drawerUserName} numberOfLines={1}>{user?.name}</Text>
+                <Text style={styles.drawerUserRole} numberOfLines={1}>{roleLabel}</Text>
+              </View>
+            </View>
+          )}
+
           <ScrollView style={styles.drawerNav} accessibilityRole="menu">
-            {isDentist ? (
-              <>
-                {sections.map((s) => (
-                  <DrawerItem key={s.route} section={s} active={s.route === active} onPress={() => go(s.route)} />
-                ))}
-                <View style={styles.drawerDivider} />
-                {canSettings && (
-                  <DrawerItem section={CLINIC_SETTINGS_SECTION} active={active === CLINIC_SETTINGS_SECTION.route} onPress={() => go(CLINIC_SETTINGS_SECTION.route)} />
-                )}
-              </>
+            {hasOwnMenu ? (
+              sections.map((s) => <DrawerItem key={s.route} section={s} active={s.route === active} onPress={() => go(s.route)} />)
             ) : (
               <>
                 {sections.filter((s) => s.route === 'ClinicDashboard').map((s) => (
@@ -164,10 +179,6 @@ function ClinicDrawer({ visible, onClose, active }: { visible: boolean; onClose:
                 ))}
               </>
             )}
-            {/* Clinic admin design: these are in the top bar and the profile menu instead. */}
-            {isDentist && ACCOUNT_LINKS.map((s) => (
-              <DrawerItem key={s.route} section={s} active={s.route === active} onPress={() => go(s.route)} />
-            ))}
           </ScrollView>
 
           <View style={styles.drawerFooter}>
@@ -178,7 +189,7 @@ function ClinicDrawer({ visible, onClose, active }: { visible: boolean; onClose:
               <View style={styles.flex}>
                 <Text style={styles.drawerUserName} numberOfLines={1}>{user?.name}</Text>
                 <Text style={styles.drawerUserRole} numberOfLines={1}>
-                  {membership ? CLINIC_ROLE_LABELS[membership.role] : ''}
+                  {roleLabel}
                 </Text>
               </View>
             </View>
@@ -244,7 +255,19 @@ function ProfileMenu({ visible, onClose }: { visible: boolean; onClose: () => vo
                 <Text style={styles.menuItemText}>Notifications</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.menuItem} onPress={() => openAccount('password')} accessibilityRole="menuitem">
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                // The clinic's Settings page for those who may open it, otherwise their own password page.
+                if (can(membership, 'clinic.settings.manage', 'clinic.permissions.manage', 'clinic.audit.view')) {
+                  onClose();
+                  navigation.navigate('ClinicAdminSettings');
+                } else {
+                  openAccount('password');
+                }
+              }}
+              accessibilityRole="menuitem"
+            >
               <Icon name={isDentist ? 'key-outline' : 'settings-outline'} size={18} color={palette.onSurface} />
               <Text style={styles.menuItemText}>{isDentist ? 'Change Password' : 'Settings'}</Text>
             </TouchableOpacity>
@@ -521,19 +544,9 @@ function ClinicTopBar({
         )}
         <View style={styles.topBarText}>
           <Text style={styles.clinicName} numberOfLines={1}>{membership?.clinic_name ?? 'Clinic'}</Text>
-          <Text style={[styles.pageTitle, back && styles.pageTitleSmall]} numberOfLines={1}>{title}</Text>
+          <Text style={[styles.pageTitle, styles.pageTitleSmall]} numberOfLines={1}>{title}</Text>
         </View>
         <Bell />
-        {membership?.role !== 'dentist' && (
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => navigation.navigate('ClinicAccount', { tab: 'password' })}
-            accessibilityRole="button"
-            accessibilityLabel="Settings"
-          >
-            <Icon name="settings-outline" size={24} color={palette.onSurfaceVariant} />
-          </TouchableOpacity>
-        )}
         <TouchableOpacity
           style={styles.avatarButton}
           onPress={() => setMenuOpen(true)}
@@ -546,7 +559,7 @@ function ClinicTopBar({
           <Icon name="chevron-down" size={14} color={palette.onSurfaceVariant} />
         </TouchableOpacity>
       </View>
-      {search && <GlobalSearch />}
+      {search && membership?.role !== 'staff' && membership?.role !== 'dentist' && <GlobalSearch />}
       <OfflineBanner />
       <ProfileMenu visible={menuOpen} onClose={() => setMenuOpen(false)} />
     </>
@@ -622,6 +635,7 @@ const styles = StyleSheet.create({
   pageTitle: { ...type.headlineMd, color: palette.primary, fontWeight: '700' },
   pageTitleSmall: { ...type.titleLg, fontWeight: '700' },
   bellBadge: { position: 'absolute', top: 6, right: 4, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: palette.error, alignItems: 'center', justifyContent: 'center' },
+  drawerBadge: { marginLeft: 'auto', minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.error },
   bellBadgeText: { color: palette.onPrimary, fontSize: 10, fontWeight: '700' },
   avatarButton: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44 },
   avatar: { width: 40, height: 40, borderRadius: radius.full, backgroundColor: palette.primaryContainer, alignItems: 'center', justifyContent: 'center' },
@@ -673,6 +687,7 @@ const styles = StyleSheet.create({
   drawerClinicOptionActive: { backgroundColor: palette.primaryFixed },
   drawerClinicOptionText: { ...type.bodyMd, color: palette.onSurface, flex: 1 },
   drawerNav: { flex: 1, paddingHorizontal: spacing.base },
+  drawerStaffCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.base, marginBottom: spacing.md, padding: spacing.sm, borderRadius: radius.xl, backgroundColor: palette.primaryFixed },
   drawerItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 48, paddingHorizontal: spacing.md, marginVertical: 2, borderRadius: radius.lg },
   drawerItemActive: { backgroundColor: palette.primaryContainer },
   drawerItemText: { ...type.bodyMd, color: palette.onSurfaceVariant },

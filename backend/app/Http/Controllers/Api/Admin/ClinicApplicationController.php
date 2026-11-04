@@ -28,6 +28,7 @@ class ClinicApplicationController extends Controller
         'clinic_application.note_added',
         'clinic_application.approved',
         'clinic_application.rejected',
+        'clinic_application.documents_requested',
     ];
 
     public function __construct(
@@ -97,7 +98,7 @@ class ClinicApplicationController extends Controller
             'decisions_last_30_days' => $hours->count(),
             'oldest_open_id' => $oldest,
             'attention_days' => self::ATTENTION_DAYS,
-            'required_documents' => ClinicApplication::REQUIRED_DOCUMENTS,
+            'required_documents' => ClinicApplication::requiredDocuments(),
         ]);
     }
 
@@ -160,7 +161,7 @@ class ClinicApplicationController extends Controller
     /** True when a registration lacks one of the required document types. */
     private function missingDocumentsSql(): array
     {
-        $required = ClinicApplication::REQUIRED_DOCUMENTS;
+        $required = ClinicApplication::requiredDocuments();
 
         return [
             '(SELECT COUNT(DISTINCT document_type) FROM verification_documents WHERE verification_documents.clinic_application_id = clinic_applications.id AND document_type IN ('
@@ -180,10 +181,12 @@ class ClinicApplicationController extends Controller
         return [
             ...$data,
             'reference' => sprintf('REG-%05d', $application->id),
+            'documents_required' => count(ClinicApplication::requiredDocuments()),
+            'documents_submitted' => count(ClinicApplication::requiredDocuments()) - count($missing),
             'clinic_status' => $application->clinic?->status,
             'document_status' => match (true) {
                 $application->status === ClinicApplication::APPROVED => $application->clinic?->status === 'suspended' ? 'suspended' : 'verified',
-                $application->status === ClinicApplication::REJECTED => 'returned',
+                $application->status === ClinicApplication::REJECTED => $application->documents_requested_at ? 'documents_requested' : 'returned',
                 $missing !== [] => 'missing_info',
                 default => $application->status,
             },
@@ -258,6 +261,15 @@ class ClinicApplicationController extends Controller
         $application = $this->applications->reject($this->find($id), $request->user(), $data['notes']);
 
         return $this->ok((new ClinicApplicationResource($application->load(['applicant', 'documents'])))->resolve(), 'Application returned to the applicant');
+    }
+
+    /** Ask for more documents; the applicant adds them and resubmits. */
+    public function requestDocuments(Request $request, int $id)
+    {
+        $data = $request->validate(['notes' => ['required', 'string', 'max:2000']]);
+        $application = $this->applications->requestDocuments($this->find($id), $request->user(), $data['notes']);
+
+        return $this->ok((new ClinicApplicationResource($application->load(['applicant', 'documents'])))->resolve(), 'More documents requested');
     }
 
     public function documentLink(Request $request, int $id, int $documentId)

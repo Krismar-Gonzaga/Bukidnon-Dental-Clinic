@@ -3,11 +3,17 @@
 // role on every call.
 export type AdminRoute =
   | 'AdminDashboard'
+  | 'AdminClinics'
+  | 'AdminClinicDetail'
+  | 'AdminUsers'
   | 'AdminApplications'
   | 'AdminApplicationDetail'
-  | 'AdminClinics'
-  | 'AdminUsers'
+  | 'AdminSubscriptions'
+  | 'AdminSubscriptionDetail'
+  | 'AdminReports'
   | 'AdminReviews'
+  | 'AdminAnnouncements'
+  | 'AdminAnnouncementForm'
   | 'AdminAuditLog'
   | 'AdminSettings'
   | 'AdminNotifications'
@@ -17,12 +23,15 @@ export type AdminSection = { route: AdminRoute; label: string; icon: string; tab
 
 export const ADMIN_SECTIONS: AdminSection[] = [
   { route: 'AdminDashboard', label: 'Dashboard', icon: 'grid', tab: 'Home' },
-  { route: 'AdminApplications', label: 'Registration Queue', icon: 'person-add', tab: 'Queue' },
-  { route: 'AdminClinics', label: 'Verification', icon: 'shield-checkmark', tab: 'Verify' },
-  { route: 'AdminAuditLog', label: 'Audit Logs', icon: 'document-text', tab: 'Audit' },
-  { route: 'AdminUsers', label: 'Users', icon: 'people' },
+  { route: 'AdminClinics', label: 'Clinic Management', icon: 'business', tab: 'Clinics' },
+  { route: 'AdminApplications', label: 'Clinic Verification', icon: 'shield-checkmark', tab: 'Verify' },
+  { route: 'AdminSubscriptions', label: 'Subscriptions', icon: 'card', tab: 'Plans' },
+  { route: 'AdminUsers', label: 'User Management', icon: 'people' },
+  { route: 'AdminReports', label: 'Reports & Analytics', icon: 'bar-chart' },
   { route: 'AdminReviews', label: 'Review Moderation', icon: 'star' },
-  { route: 'AdminSettings', label: 'Settings', icon: 'settings' },
+  { route: 'AdminAnnouncements', label: 'System Notifications', icon: 'megaphone' },
+  { route: 'AdminAuditLog', label: 'Audit Logs', icon: 'document-text' },
+  { route: 'AdminSettings', label: 'System Settings', icon: 'settings' },
 ];
 
 /** Bottom tabs: the first four sections, then "More" (the drawer). */

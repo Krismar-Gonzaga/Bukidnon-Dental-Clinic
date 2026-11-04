@@ -1,8 +1,9 @@
-import { BRAND_NAME } from '../config/app';
+import { useBrandName } from '../services/platformStore';
 import { FOOTER_CONTACT, FOOTER_LINK_GROUPS, FOOTER_TAGLINE } from '../config/footer';
 import './SiteFooter.css';
 
 function SiteFooter() {
+  const brand = useBrandName();
   const currentYear = new Date().getFullYear();
 
   return (
@@ -10,7 +11,7 @@ function SiteFooter() {
       <div className="site-footer-inner">
         <div className="site-footer-brand-col">
           <a href="/" className="site-footer-brand">
-            {BRAND_NAME}
+            {brand}
           </a>
           <p className="site-footer-tagline">{FOOTER_TAGLINE}</p>
         </div>
@@ -45,7 +46,7 @@ function SiteFooter() {
 
       <div className="site-footer-bottom">
         <p className="site-footer-bottom-inner">
-          &copy; {currentYear} {BRAND_NAME}. All rights reserved.
+          &copy; {currentYear} {brand}. All rights reserved.
         </p>
       </div>
     </footer>

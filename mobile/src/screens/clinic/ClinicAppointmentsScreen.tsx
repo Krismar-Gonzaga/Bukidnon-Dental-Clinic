@@ -8,6 +8,7 @@ import { ClinicScreen } from '../../components/clinic/ClinicChrome';
 import { useClinicPortal } from '../../components/clinic/ClinicPortalContext';
 import { Badge, Chips, EmptyState, LoadState, Pager, SearchBox, SelectField, ui, useLoader, useRefreshOnFocus } from '../../components/clinic/ClinicUi';
 import { DateField } from '../../components/clinic/DateField';
+import FrontDeskAppointments from './FrontDeskAppointments';
 import {
   can,
   CLINIC_APPOINTMENT_STATUSES,
@@ -43,7 +44,7 @@ function useDebounced<T>(value: T, ms = 350) {
 
 type Props = { route?: { params?: { status?: string; date?: string } } };
 
-const ClinicAppointmentsScreen = ({ route }: Props) => {
+const ManagerAppointments = ({ route }: Props) => {
   const navigation = useNavigation<any>();
   const { membership } = useClinicPortal();
   const clinicId = membership?.clinic_id ?? 0;
@@ -155,5 +156,11 @@ const styles = StyleSheet.create({
   },
   when: { ...type.labelMd, color: palette.primary },
 });
+
+// Clinic staff work from their own list (front desk design).
+const ClinicAppointmentsScreen = ({ route }: Props) => {
+  const { membership } = useClinicPortal();
+  return membership?.role === 'staff' ? <FrontDeskAppointments date={route?.params?.date} /> : <ManagerAppointments route={route} />;
+};
 
 export default ClinicAppointmentsScreen;

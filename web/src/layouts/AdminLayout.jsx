@@ -1,78 +1,96 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import Icon from '../components/Icon';
 import AccountMenu from '../components/AccountMenu';
 import NotificationBell from '../components/NotificationBell';
-import AdminGlobalSearch from '../components/admin/AdminGlobalSearch';
 import { AdminSecurityProvider } from '../components/admin/AdminSecurity';
-import { BRAND_NAME } from '../config/app';
+import { Initials } from '../components/admin/AdminData';
+import { useAuth } from '../auth/AuthContext';
 import {
-  ADMIN_AUDIT_HREF,
   ADMIN_DASHBOARD_HREF,
   ADMIN_NAV_ITEMS,
   ADMIN_NOTIFICATIONS_HREF,
   ADMIN_PROFILE_HREF,
   ADMIN_SETTINGS_HREF,
 } from '../config/adminNavigation';
-import { getSystemHealth } from '../services/adminApi';
+import { useBrandName } from '../services/platformStore';
+import { SignOutLink, readCollapsed, saveCollapsed } from './ClinicShell';
 import '../components/portal/portal.css';
+import '../components/clinic/ClinicAdminUi.css';
 import './ClinicShell.css';
+import './ClinicShellGrouped.css';
 import './AdminLayout.css';
 
-const ROLE_LABEL = 'System Administrator';
-const HEALTH_LABELS = { healthy: 'Healthy', degraded: 'Needs attention', down: 'Service down' };
-const HEALTH_TONES = { healthy: 'ok', degraded: 'warn', down: 'fail' };
+const ROLE_LABEL = 'System Admin';
 
-/** Live platform health (sidebar card); details on the Settings page. */
-export function useSystemHealth() {
-  return useQuery({ queryKey: ['admin', 'health'], queryFn: getSystemHealth, staleTime: 60000, retry: false });
-}
-
-function SystemStatusCard() {
-  const health = useSystemHealth();
-  const status = health.data?.status;
-  const label = health.isPending ? 'Checking…' : health.isError ? 'Unavailable' : HEALTH_LABELS[status] ?? status;
-  const tone = health.isError ? 'fail' : HEALTH_TONES[status] ?? 'pending';
-
-  return (
-    <div className="admin-status-card">
-      <p className="admin-status-line" role="status">
-        <span className={`admin-status-dot is-${tone}`} aria-hidden="true" />
-        System Status: {label}
-      </p>
-      <a href={ADMIN_SETTINGS_HREF} className="admin-status-button">
-        View Health Logs
-      </a>
-    </div>
-  );
-}
-
-const TOP_LINKS = [
-  { label: 'Platform Health', href: ADMIN_SETTINGS_HREF },
-  { label: 'Audit Logs', href: ADMIN_AUDIT_HREF },
-];
+/** "Rhea Delos Reyes" -> "R. Delos Reyes" (top bar and sidebar footer of the design). */
+const shortName = (name = '') => {
+  const [first, ...rest] = name.trim().split(/\s+/);
+  return rest.length ? `${first.charAt(0)}. ${rest.join(' ')}` : first ?? '';
+};
 
 /**
- * System administrator portal frame (admin portal design): sidebar with the
- * sections and live system status; top bar with search across clinics,
- * applications and users, Platform Health / Audit Logs links, notifications,
- * settings and the account menu. Uses the clinic portal's color roles
- * (ClinicShell.css), which match this design. High-impact actions inside
- * ask for the password again (AdminSecurityProvider).
+ * System administrator frame: the clinic admin's white sidebar and blue theme, with the
+ * sections of the system admin design. `title`, `subtitle` and `headerActions` fill the top
+ * bar. High-impact actions inside ask for the password again (AdminSecurityProvider).
  */
-function AdminLayout({ title, activeHref, children }) {
+function AdminLayout({ title, subtitle, activeHref, headerActions, children }) {
+  const { user } = useAuth();
+  const brand = useBrandName();
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const name = user?.name ?? '';
+  const isCollapsed = collapsed && !drawerOpen;
+
+  useEffect(() => {
+    if (!drawerOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setDrawerOpen(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [drawerOpen]);
+
+  const toggleCollapsed = () => {
+    setCollapsed((current) => {
+      saveCollapsed(!current);
+      return !current;
+    });
+  };
+
   return (
     <AdminSecurityProvider>
-      <div className="clinic-shell admin-shell">
+      <div className={`clinic-shell admin-shell is-grouped${isCollapsed ? ' is-collapsed' : ''}${drawerOpen ? ' is-drawer-open' : ''}`}>
+        {drawerOpen && <button type="button" className="clinic-drawer-backdrop" aria-label="Close menu" onClick={() => setDrawerOpen(false)} />}
         <aside className="clinic-sidebar">
-          <a href={ADMIN_DASHBOARD_HREF} className="admin-brand">
-            <span className="admin-brand-mark" aria-hidden="true">
-              <Icon name="tooth" size={24} />
-            </span>
-            <span>
-              <span className="admin-brand-name">Admin Portal</span>
-              <span className="admin-brand-role">{ROLE_LABEL}</span>
-            </span>
-          </a>
+          <div className="clinic-sidebar-brand clinic-sidebar-logo">
+            {!isCollapsed && (
+              <a href={ADMIN_DASHBOARD_HREF} className="clinic-sidebar-name">
+                {brand}
+              </a>
+            )}
+            <button
+              type="button"
+              className="clinic-sidebar-toggle"
+              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-expanded={!isCollapsed}
+              onClick={toggleCollapsed}
+            >
+              <Icon name={isCollapsed ? 'chevronRight' : 'chevronLeft'} size={18} />
+            </button>
+            <button type="button" className="clinic-drawer-close" aria-label="Close menu" onClick={() => setDrawerOpen(false)}>
+              <Icon name="close" size={20} />
+            </button>
+          </div>
+
+          {!isCollapsed && (
+            <div className="admin-sidebar-card">
+              <Initials name={name} tone="primary" />
+              <div className="admin-sidebar-card-text">
+                <p className="admin-sidebar-card-name">{name}</p>
+                <p className="admin-sidebar-card-role">{ROLE_LABEL}</p>
+              </div>
+            </div>
+          )}
 
           <nav className="clinic-sidebar-nav" aria-label="Administration">
             <ul>
@@ -80,9 +98,14 @@ function AdminLayout({ title, activeHref, children }) {
                 const isActive = href === activeHref;
                 return (
                   <li key={href}>
-                    <a href={href} className={`clinic-nav-link${isActive ? ' is-active' : ''}`} aria-current={isActive ? 'page' : undefined}>
+                    <a
+                      href={href}
+                      className={`clinic-nav-link${isActive ? ' is-active' : ''}`}
+                      aria-current={isActive ? 'page' : undefined}
+                      title={isCollapsed ? label : undefined}
+                    >
                       <Icon name={icon} size={20} />
-                      {label}
+                      <span className="clinic-nav-label">{label}</span>
                     </a>
                   </li>
                 );
@@ -90,34 +113,48 @@ function AdminLayout({ title, activeHref, children }) {
             </ul>
           </nav>
 
-          <SystemStatusCard />
+          <div className="clinic-sidebar-footer">
+            <div className="clinic-sidebar-user">
+              <Initials name={name} tone="primary" />
+              {!isCollapsed && (
+                <div className="clinic-sidebar-user-text">
+                  <p className="clinic-sidebar-user-name">{shortName(name)}</p>
+                  <p className="clinic-sidebar-user-role">{ROLE_LABEL}</p>
+                </div>
+              )}
+              <SignOutLink iconOnly message="You will need to sign in again to open the admin portal." />
+            </div>
+          </div>
         </aside>
 
         <div className="clinic-main">
-          <header className="clinic-topbar admin-topbar">
-            <span className="admin-topbar-brand">{BRAND_NAME} Admin</span>
-            <AdminGlobalSearch />
-            <nav className="admin-topbar-links" aria-label="Platform">
-              {TOP_LINKS.map(({ label, href }) => (
-                <a key={label} href={href} className={href === activeHref ? 'is-active' : undefined} aria-current={href === activeHref ? 'page' : undefined}>
-                  {label}
-                </a>
-              ))}
-            </nav>
+          <header className="clinic-topbar">
+            <button type="button" className="clinic-menu-button" aria-label="Open menu" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}>
+              <Icon name="menu" size={22} />
+            </button>
+            <div className="clinic-topbar-heading">
+              <h1 className="clinic-topbar-title">{title}</h1>
+              {subtitle && <p className="clinic-topbar-subtitle">{subtitle}</p>}
+            </div>
+            <div className="clinic-topbar-page-actions">{headerActions}</div>
             <div className="clinic-topbar-actions">
               <NotificationBell allHref={ADMIN_NOTIFICATIONS_HREF} isCurrentPage={activeHref === ADMIN_NOTIFICATIONS_HREF} />
-              <a href={ADMIN_SETTINGS_HREF} className="clinic-topbar-icon" aria-label="Settings">
-                <Icon name="settings" size={22} />
-              </a>
-              <AccountMenu profileHref={ADMIN_PROFILE_HREF} roleLabel={ROLE_LABEL} />
+              <div className="clinic-topbar-user">
+                <p className="clinic-topbar-user-name">{shortName(name)}</p>
+                <p className="clinic-topbar-user-role">{ROLE_LABEL}</p>
+              </div>
+              <AccountMenu
+                roleLabel={ROLE_LABEL}
+                links={[
+                  { label: 'My Profile', href: ADMIN_PROFILE_HREF, icon: 'user' },
+                  { label: 'Notifications', href: ADMIN_NOTIFICATIONS_HREF, icon: 'bell' },
+                  { label: 'System Settings', href: ADMIN_SETTINGS_HREF, icon: 'settings' },
+                ]}
+              />
             </div>
           </header>
 
-          <main className="clinic-content">
-            {/* Pages without a title render their own header (PageHeader in components/admin/AdminData). */}
-            {title && <h1 className="admin-page-title">{title}</h1>}
-            {children}
-          </main>
+          <main className="clinic-content admin-content">{children}</main>
         </div>
       </div>
     </AdminSecurityProvider>

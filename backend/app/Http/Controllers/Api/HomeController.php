@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\PlatformSettings;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\BranchResource;
 use App\Http\Resources\ClinicSummaryResource;
@@ -240,6 +241,12 @@ class HomeController extends Controller
         return $this->ok(
             Specialization::where('is_active', true)->select('id', 'name', 'description', 'icon')->get()
         );
+    }
+
+    /** Platform name, support email and whether sign-up and the platform itself are open. */
+    public function platform()
+    {
+        return response()->json(['success' => true, 'data' => PlatformSettings::publicValues()]);
     }
 
     public function getCities()

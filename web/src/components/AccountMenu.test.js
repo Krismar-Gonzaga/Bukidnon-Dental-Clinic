@@ -54,6 +54,27 @@ test('patient portal: the sidebar has every page and Log Out; the avatar menu al
   expect(await screen.findByText('Navigated away')).toBeInTheDocument();
 });
 
+test('the public header returns to Login and Register after logging out', async () => {
+  renderWithProviders(<SiteHeader />, { user: PATIENT_USER });
+  expect(screen.queryByRole('link', { name: 'Login' })).not.toBeInTheDocument();
+
+  fireEvent.click(within(openMenu('Juan Dela Cruz')).getByRole('button', { name: 'Log Out' }));
+
+  await waitFor(() => expect(logout).toHaveBeenCalled());
+  expect(await screen.findByRole('link', { name: 'Login' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Account menu for Juan Dela Cruz' })).not.toBeInTheDocument();
+});
+
+test('a failed logout says so and keeps the person signed in', async () => {
+  logout.mockRejectedValue(new Error('offline'));
+  renderWithProviders(<SiteHeader />, { user: PATIENT_USER });
+
+  fireEvent.click(within(openMenu('Juan Dela Cruz')).getByRole('button', { name: 'Log Out' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('You are still signed in.');
+  expect(screen.getByRole('button', { name: 'Account menu for Juan Dela Cruz' })).toBeInTheDocument();
+});
+
 test('Escape and outside clicks close the menu', () => {
   renderWithProviders(
     <PatientLayout title="Dashboard" activeHref="/patient/dashboard">
@@ -95,13 +116,13 @@ test('admin and clinic portals link My Profile to their own profile pages', () =
     </ClinicLayout>,
     { user: clinicUser(['clinic.view']), route: '/clinic/7/dashboard', path: '/clinic/:clinicId/dashboard' }
   );
-  // Clinic sidebar: no account items. They are in the top bar and the avatar menu.
+  // Clinic sidebar: the design's System group. Settings needs a clinic permission.
   const clinicNav = screen.getByRole('navigation', { name: 'Clinic' });
-  ['Notifications', 'Settings', 'Change Password'].forEach((label) =>
+  expect(within(clinicNav).getByRole('link', { name: 'Notifications' })).toHaveAttribute('href', '/clinic/7/notifications');
+  ['Settings', 'Change Password'].forEach((label) =>
     expect(within(clinicNav).queryByRole('link', { name: label })).not.toBeInTheDocument()
   );
   expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/clinic/7/password');
   const menu = openMenu('Ana Reyes');
   expect(within(menu).getByRole('link', { name: 'My Profile' })).toHaveAttribute('href', '/clinic/7/profile');
   expect(within(menu).getByRole('link', { name: 'Notifications' })).toHaveAttribute('href', '/clinic/7/notifications');

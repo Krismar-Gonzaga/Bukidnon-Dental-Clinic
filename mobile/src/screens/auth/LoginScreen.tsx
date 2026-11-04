@@ -28,6 +28,8 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [needsCode, setNeedsCode] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
 
@@ -45,10 +47,14 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
     }
 
     setLoading(true);
-    const result = await login(email, password);
+    const result = needsCode ? await login(email, password, twoFactorCode.trim()) : await login(email, password);
     setLoading(false);
 
     if (!result.success) {
+      if (result.needsTwoFactor) {
+        setNeedsCode(true);
+        return;
+      }
       Alert.alert('Login Failed', (result.error as string) || 'Invalid credentials');
     }
   };
@@ -169,6 +175,29 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
                   <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                 </TouchableOpacity>
               </View>
+
+              {needsCode && (
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.inputLabel}>Authentication Code</Text>
+                  <View style={styles.inputContainer}>
+                    <Icon name="shield-checkmark-outline" size={20} color="#727784" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="123456"
+                      placeholderTextColor="#a0aec0"
+                      value={twoFactorCode}
+                      onChangeText={setTwoFactorCode}
+                      autoCapitalize="none"
+                      autoComplete="one-time-code"
+                      textContentType="oneTimeCode"
+                      accessibilityLabel="Authentication Code"
+                      returnKeyType="done"
+                      onSubmitEditing={handleLogin}
+                    />
+                  </View>
+                  <Text style={styles.forgotPasswordText}>Enter the 6-digit code from your authenticator app, or a recovery code.</Text>
+                </View>
+              )}
 
               {/* Login Button */}
               <TouchableOpacity

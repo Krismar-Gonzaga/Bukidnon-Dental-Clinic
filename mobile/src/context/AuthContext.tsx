@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import api, { API_BASE_URL, isNetworkError } from '../services/api';
 import { setSessionExpiredHandler } from '../services/http';
@@ -11,13 +12,16 @@ export type User = {
   [key: string]: unknown;
 };
 
-type AuthResult = { success: true } | { success: false; error?: any };
+// What this phone is called in the list of signed-in devices.
+const DEVICE_NAME = Platform.OS === 'ios' ? 'iPhone or iPad app' : Platform.OS === 'android' ? 'Android app' : 'Mobile app';
+
+type AuthResult = { success: true } | { success: false; error?: any; needsTwoFactor?: boolean };
 
 type AuthContextType = {
   user: User | null;
   loading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<AuthResult>;
+  login: (email: string, password: string, twoFactorCode?: string) => Promise<AuthResult>;
   register: (userData: Record<string, unknown>) => Promise<AuthResult>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<boolean>;
@@ -58,9 +62,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Login/register don't touch `loading`: it only covers restoring the saved session
   // on launch. Toggling it would unmount the navigator mid-login and, on failure,
   // drop the user back on the guest home instead of the login form.
-  const login = async (email: string, password: string): Promise<AuthResult> => {
+  const login = async (email: string, password: string, twoFactorCode?: string): Promise<AuthResult> => {
     try {
-      const response = await api.post('/login', { email, password });
+      const response = await api.post('/login', { email, password, device_name: DEVICE_NAME, ...(twoFactorCode ? { two_factor_code: twoFactorCode } : {}) });
       const { user: loggedInUser, token } = response.data.data;
 
       await saveToken(token);
@@ -70,6 +74,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setError(null);
       return { success: true };
     } catch (err) {
+      // 423: the password was right and this account needs an authenticator code.
+      if ((err as { response?: { status?: number } })?.response?.status === 423) {
+        return { success: false, needsTwoFactor: true };
+      }
       const message = getErrorMessage(err, 'Login failed');
       setError(message);
       return { success: false, error: message };

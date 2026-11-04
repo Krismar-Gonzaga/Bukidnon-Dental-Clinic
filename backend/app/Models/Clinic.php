@@ -5,8 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Clinic extends Model
 {
@@ -43,7 +45,34 @@ class Clinic extends Model
         'latitude' => 'float',
         'longitude' => 'float',
         'suspended_at' => 'datetime',
+        'settings' => 'array',
     ];
+
+    public const SLOT_OPTIONS = [15, 20, 30, 45, 60];
+
+    /** Behaviour until the clinic changes it: the same as before settings existed. */
+    private const SETTINGS_DEFAULTS = [
+        'allow_online_booking' => true,
+        'require_approval' => true,
+        'send_reminders' => true,
+        'allow_patient_cancel' => true,
+    ];
+
+    public function settingsValues(): array
+    {
+        return [
+            'slot_minutes' => (int) config('booking.slot_minutes'),
+            ...self::SETTINGS_DEFAULTS,
+            ...array_diff_key($this->settings ?? [], ['position_modules' => true]),
+        ];
+    }
+
+    /** Modules a staff position may open at this clinic. */
+    public function positionModules(string $position): array
+    {
+        return $this->settings['position_modules'][$position]
+            ?? config("permissions.staff_positions.{$position}.modules", []);
+    }
 
     /** Clinics shown in the public directory. */
     public function scopePubliclyListed(Builder $query): Builder
@@ -59,6 +88,26 @@ class Clinic extends Model
     }
 
     // Relationships
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    public function subscription(): HasOne
+    {
+        return $this->hasOne(Subscription::class);
+    }
+
+    public function latestPayment(): HasOne
+    {
+        return $this->hasOne(SubscriptionPayment::class)->latestOfMany();
+    }
+
+    public function application(): HasOne
+    {
+        return $this->hasOne(ClinicApplication::class)->latestOfMany();
+    }
+
     public function branches(): HasMany
     {
         return $this->hasMany(ClinicBranch::class);

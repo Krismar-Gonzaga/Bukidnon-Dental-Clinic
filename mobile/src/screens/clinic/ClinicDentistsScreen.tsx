@@ -3,9 +3,12 @@
 // branch. Bookings are offered only inside these hours and branch hours.
 import React, { useState } from 'react';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
-import { ClinicScreen, useOpenSection } from '../../components/clinic/ClinicChrome';
+import { useNavigation } from '@react-navigation/native';
+import { ClinicScreen } from '../../components/clinic/ClinicChrome';
+import ScheduleApprovals from '../../components/clinic/ScheduleApprovals';
+import { InitialsTile, InviteSheet } from '../../components/clinic/ClinicAdminKit';
 import { useClinicPortal } from '../../components/clinic/ClinicPortalContext';
-import { Badge, Button, Chips, EmptyState, Field, FormError, LoadState, SelectField, Sheet, Toggle, ui, useLoader } from '../../components/clinic/ClinicUi';
+import { Badge, Button, Chips, EmptyState, Field, FormError, LoadState, SearchBox, SelectField, Sheet, Toggle, ui, useLoader, useRefreshOnFocus } from '../../components/clinic/ClinicUi';
 import { hoursAreValid, WeeklyHours, WeeklyHoursEditor } from '../../components/clinic/WeeklyHoursEditor';
 import {
   can,
@@ -33,11 +36,13 @@ const summarize = (schedules: DentistSchedule[], branches: ClinicBranch[]) =>
     .filter(Boolean)
     .join('\n') || 'No schedule — not bookable';
 
-function ProfileSheet({ clinicId, dentist, onClose, onSaved }: { clinicId: number; dentist: ClinicDentist; onClose: () => void; onSaved: () => void }) {
+export function ProfileSheet({ clinicId, dentist, onClose, onSaved }: { clinicId: number; dentist: ClinicDentist; onClose: () => void; onSaved: () => void }) {
   const specializations = useLoader(() => fetchSpecializationOptions(), []);
   const [specializationId, setSpecializationId] = useState<number>(dentist.specialization_id ?? 0);
   const [form, setForm] = useState({
     license_number: dentist.license_number ?? '',
+    ptr_number: dentist.ptr_number ?? '',
+    s2_number: dentist.s2_number ?? '',
     years_experience: String(dentist.years_experience ?? 0),
     qualifications: dentist.qualifications ?? '',
     bio: dentist.bio ?? '',
@@ -74,6 +79,8 @@ function ProfileSheet({ clinicId, dentist, onClose, onSaved }: { clinicId: numbe
         options={[{ id: 0, label: 'General' }, ...(specializations.data ?? []).map((s) => ({ id: s.id, label: s.name }))]}
       />
       <Field label="PRC license number" {...bind('license_number')} />
+      <Field label="PTR number" maxLength={50} {...bind('ptr_number')} />
+      <Field label="S2 number" maxLength={50} {...bind('s2_number')} />
       <Field label="Years of experience" keyboardType="number-pad" {...bind('years_experience')} />
       <Field label="Qualifications" multiline {...bind('qualifications')} />
       <Field label="Public bio" multiline {...bind('bio')} />
@@ -84,7 +91,7 @@ function ProfileSheet({ clinicId, dentist, onClose, onSaved }: { clinicId: numbe
   );
 }
 
-function ScheduleSheet({ clinicId, dentist, branches, onClose, onSaved }: { clinicId: number; dentist: ClinicDentist; branches: ClinicBranch[]; onClose: () => void; onSaved: () => void }) {
+export function ScheduleSheet({ clinicId, dentist, branches, onClose, onSaved }: { clinicId: number; dentist: ClinicDentist; branches: ClinicBranch[]; onClose: () => void; onSaved: () => void }) {
   const [branchId, setBranchId] = useState<number>(branches[0]?.id ?? 0);
   const [byBranch, setByBranch] = useState<Record<number, WeeklyHours>>(() => {
     const initial: Record<number, WeeklyHours> = {};
@@ -129,14 +136,19 @@ function ScheduleSheet({ clinicId, dentist, branches, onClose, onSaved }: { clin
 
 const ClinicDentistsScreen = () => {
   const { membership } = useClinicPortal();
-  const open = useOpenSection('ClinicDentists');
+  const navigation = useNavigation<any>();
   const clinicId = membership?.clinic_id ?? 0;
   const data = useLoader(() => Promise.all([fetchDentists(clinicId), fetchClinicBranches(clinicId)]), [clinicId], 'Dentists could not be loaded.');
+  useRefreshOnFocus(data.sync);
   const [sheet, setSheet] = useState<{ type: 'profile' | 'schedule'; dentist: ClinicDentist } | null>(null);
-  const [dentists, branches] = data.data ?? [[], []];
+  const [inviting, setInviting] = useState(false);
+  const [search, setSearch] = useState('');
+  const [all, branches] = data.data ?? [[], []];
+  const term = search.trim().toLowerCase();
+  const dentists = all.filter((d) => !term || `${d.name} ${d.email ?? ''} ${d.specialization ?? ''}`.toLowerCase().includes(term));
 
   return (
-    <ClinicScreen title="Dentists & Schedules" active="ClinicDentists">
+    <ClinicScreen title="Dentist Management" active="ClinicDentists">
       <FlatList
         data={dentists}
         keyExtractor={(d) => String(d.id)}
@@ -144,28 +156,33 @@ const ClinicDentistsScreen = () => {
         refreshControl={<RefreshControl refreshing={data.refreshing} onRefresh={data.refresh} colors={[palette.primary]} />}
         ListHeaderComponent={
           <View style={ui.stack}>
-            <View style={ui.between}>
-              <View style={ui.flex}>
-                <Text style={ui.heading}>Dentists</Text>
-                <Text style={ui.muted}>Dentists join through Staff (role: Dentist). Set their profile and weekly hours here.</Text>
+            <Text style={ui.muted}>{all.length} {all.length === 1 ? 'dentist' : 'dentists'} registered</Text>
+            {can(membership, 'clinic.staff.manage') && (
+              <View style={ui.rowWrap}>
+                <Button small variant="outline" icon="mail-outline" label="Invite by Email" onPress={() => setInviting(true)} />
+                <Button small icon="person-add-outline" label="Add Dentist" onPress={() => navigation.navigate('ClinicAddDentist')} />
               </View>
-              {can(membership, 'clinic.staff.manage') && <Button small variant="tonal" icon="person-add-outline" label="Add" onPress={() => open('ClinicStaff')} />}
-            </View>
+            )}
+            <SearchBox value={search} onChangeText={setSearch} placeholder="Search dentists..." />
             <LoadState loading={data.loading} error={data.data ? null : data.error} onRetry={data.reload} />
+            {can(membership, 'clinic.schedules.manage') && <ScheduleApprovals clinicId={clinicId} onDecided={data.sync} />}
           </View>
         }
         ListEmptyComponent={data.loading || data.error ? undefined : <EmptyState icon="medkit-outline" text="No dentists yet." />}
         renderItem={({ item: d }) => (
           <View style={ui.listItem}>
-            <View style={ui.between}>
-              <Text style={[ui.title, ui.flex]}>{d.name}</Text>
-              <Badge tone={d.is_active ? 'success' : 'neutral'} label={d.is_active ? 'Accepting bookings' : 'Inactive'} />
+            <View style={ui.row}>
+              <InitialsTile name={d.name} />
+              <View style={ui.flex}>
+                <Text style={ui.title}>{d.name}</Text>
+                <Text style={ui.small}>{d.specialization ?? 'General Dentist'}</Text>
+              </View>
+              <Badge tone={d.is_active ? 'success' : 'neutral'} label={d.is_active ? 'Active' : 'Inactive'} />
             </View>
-            <Text style={ui.muted}>
-              {d.specialization ?? 'General'} · {d.years_experience ?? 0} yrs{d.license_number ? ` · PRC ${d.license_number}` : ''}
-            </Text>
+            <Text style={ui.muted}>{d.appointments_today ?? 0} today · {d.years_experience ?? 0} yrs experience</Text>
             <Text style={ui.small}>{summarize(d.schedules ?? [], branches)}</Text>
             <View style={ui.rowWrap}>
+              <Button small label="View Profile" onPress={() => navigation.navigate('ClinicDentistProfile', { dentistId: d.id })} />
               {can(membership, 'clinic.dentists.manage') && <Button small variant="outline" label="Edit profile" onPress={() => setSheet({ type: 'profile', dentist: d })} />}
               {can(membership, 'clinic.schedules.manage') && (
                 <Button small variant="outline" label="Edit schedule" disabled={branches.length === 0} onPress={() => setSheet({ type: 'schedule', dentist: d })} />
@@ -174,6 +191,7 @@ const ClinicDentistsScreen = () => {
           </View>
         )}
       />
+      {inviting && <InviteSheet clinicId={clinicId} clinicName={membership?.clinic_name} role="dentist" title="Invite Dentist by Email" onClose={() => setInviting(false)} onSent={data.sync} />}
       {sheet?.type === 'profile' && (
         <ProfileSheet clinicId={clinicId} dentist={sheet.dentist} onClose={() => setSheet(null)} onSaved={() => { setSheet(null); data.sync(); }} />
       )}

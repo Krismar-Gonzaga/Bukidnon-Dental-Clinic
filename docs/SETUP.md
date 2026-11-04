@@ -42,7 +42,7 @@ php artisan app:create-system-admin admin@example.com --name="Platform Admin"   
 php artisan serve                         # http://127.0.0.1:8000
 ```
 
-The scheduler sends appointment reminders and inventory alerts. The queue sends notification emails. Run both in separate terminals while you develop:
+The scheduler sends appointment reminders, front desk check-in alerts (`BOOKING_CHECK_IN_ALERT_MINUTES`, default 20) and inventory alerts. The queue sends notification emails. Run both in separate terminals while you develop:
 
 ```bash
 php artisan schedule:work
@@ -137,3 +137,16 @@ Contact form messages go to `MAIL_CONTACT_ADDRESS`, or to `MAIL_FROM_ADDRESS` wh
 | Requests take 1–3 seconds | Normal against a remote Supabase pooler from a local machine. |
 | `php artisan migrate` fails with `SQLSTATE[25P02] current transaction is aborted` | Postgres aborted the migration's transaction part-way (seen intermittently through the Supabase pooler). Each migration is rolled back as a unit, so run `php artisan migrate` again; it continues from the first pending one. Running migrations through session mode (`DB_PORT=5432 php artisan migrate` in Git Bash) avoids the transaction pooler on port 6543. |
 | `could not find driver` | Enable `pdo_pgsql` in `php.ini`. |
+
+## Subscription payment details
+
+Clinics pay by manual transfer and upload proof. Set the receiving accounts in `backend/.env`; the plan price and features are provisional values in `backend/config/subscriptions.php`.
+
+| Variable | Meaning |
+| --- | --- |
+| `PAYMENT_GCASH_NUMBER` | GCash number shown to clinics |
+| `PAYMENT_MAYA_NUMBER` | Maya number shown to clinics |
+| `PAYMENT_BANK_ACCOUNT` | Bank account shown to clinics |
+| `PAYMENT_ACCOUNT_NAME` | Account name shown with each of them |
+
+`APP_KEY` also encrypts two-factor secrets and recovery codes and patient health details. If it is replaced, those can no longer be read, so back it up and do not rotate it casually.

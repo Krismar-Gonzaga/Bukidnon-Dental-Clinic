@@ -36,7 +36,7 @@ export const LEGAL_PAGES: Record<LegalPageKey, LegalPage> = {
       {
         heading: 'Who can see it',
         body: [
-          'Only the clinics you book with or are registered with. Each clinic sees only its own patients. Clinic staff see what their role requires; for example receptionists do not see clinical notes.',
+          'Only the clinics you book with or are registered with. Each clinic sees only its own patients. Clinic staff see what their role requires: dentists and clinic administrators can read clinical records, and every view is logged. Front desk staff see only allergy and condition alerts for safe scheduling and check-in, which are also logged, and cannot read clinical notes or records.',
           'Platform administrators manage accounts and clinic verification and do not routinely access clinical records.',
           'We do not sell your information. Your location is used only on your device to open directions when you ask, and is not stored.',
         ],

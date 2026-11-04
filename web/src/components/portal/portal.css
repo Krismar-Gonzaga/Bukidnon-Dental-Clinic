@@ -62,6 +62,7 @@
 
 /* Tables scroll sideways on narrow screens instead of the page. */
 .portal-table-wrap {
+  position: relative;
   overflow-x: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);

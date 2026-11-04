@@ -27,7 +27,8 @@ import { formatClockTime } from '../../services/booking';
 import { palette, radius, shadow, spacing, type } from '../../theme/tokens';
 import { ClinicRoute } from '../../config/clinicSections';
 import { ClinicAdminOverview } from './ClinicAdminOverview';
-import DentistOverview from './DentistOverview';
+import DentistHome from './dentist/DentistHome';
+import FrontDeskOverview from './FrontDeskOverview';
 
 type Metric = {
   key: string;
@@ -459,10 +460,17 @@ const OperationsDashboard = () => {
 // Dentists get their own overview (dentist design); other roles the operations dashboard.
 const ClinicDashboardScreen = () => {
   const { membership } = useClinicPortal();
+  if (membership?.role === 'staff') {
+    return (
+      <ClinicScreen title="Dashboard" active="ClinicDashboard">
+        <FrontDeskOverview />
+      </ClinicScreen>
+    );
+  }
   if (membership?.role !== 'dentist') return <OperationsDashboard />;
   return (
-    <ClinicScreen title="Overview" active="ClinicDashboard">
-      <DentistOverview />
+    <ClinicScreen title="Dashboard" active="ClinicDashboard">
+      <DentistHome />
     </ClinicScreen>
   );
 };

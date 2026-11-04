@@ -29,6 +29,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
 
         $middleware->appendToGroup('api', \App\Http\Middleware\SecurityHeaders::class);
+        $middleware->appendToGroup('api', \App\Http\Middleware\BlockDuringMaintenance::class);
+
+        // Before the session starts: the Session Timeout setting sets its lifetime.
+        $middleware->prepend(\App\Http\Middleware\ApplyPlatformSettings::class);
 
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,

@@ -7,8 +7,7 @@ import { AdminScreen } from '../../components/admin/AdminChrome';
 import { actionError, PasswordPrompt, useSensitiveAction } from '../../components/admin/AdminSecurity';
 import { Badge, Button, Chips, EmptyState, Field, FormError, LoadState, Pager, SearchBox, SelectField, Sheet, ui, useLoader, useRefreshOnFocus } from '../../components/clinic/ClinicUi';
 import { useAuth } from '../../context/AuthContext';
-import { AdminUser, describeUserChange, fetchUsers, updateUser, USER_ROLE_LABELS, UserRole } from '../../services/admin';
-import { formatDateTime } from '../../services/clinicPortal';
+import { AdminUser, describeUserChange, fetchUsers, formatMonthYear, updateUser, USER_ROLE_LABELS, UserRole } from '../../services/admin';
 
 const Separator = () => <View style={ui.stackItem} />;
 
@@ -28,9 +27,9 @@ function useDebounced(value: string, ms = 350) {
   return debounced;
 }
 
-function ManageSheet({ user, onClose, onDone }: { user: AdminUser; onClose: () => void; onDone: () => void }) {
+function ManageSheet({ user, status, onClose, onDone }: { user: AdminUser; status?: string; onClose: () => void; onDone: () => void }) {
   const sensitive = useSensitiveAction();
-  const [form, setForm] = useState({ role: user.role, status: user.status as string, reason: '' });
+  const [form, setForm] = useState({ role: user.role, status: status ?? (user.status as string), reason: '' });
   const [reviewing, setReviewing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +61,7 @@ function ManageSheet({ user, onClose, onDone }: { user: AdminUser; onClose: () =
           <SelectField label="Account type" options={ROLE_OPTIONS} value={form.role} onChange={(role) => setForm((f) => ({ ...f, role }))} />
           <Text style={ui.small}>Changing to System Admin grants platform administration.</Text>
           <Text style={[ui.small, ui.spacedTop]}>Status</Text>
-          <Chips options={STATUS_FILTERS.slice(1)} value={form.status} onChange={(status) => setForm((f) => ({ ...f, status }))} scroll={false} />
+          <Chips options={STATUS_FILTERS.slice(1)} value={form.status} onChange={(next) => setForm((f) => ({ ...f, status: next }))} scroll={false} />
           {needsReason && (
             <Field label="Reason (recorded in the audit log)" required multiline maxLength={500} value={form.reason} onChangeText={(reason) => setForm((f) => ({ ...f, reason }))} />
           )}
@@ -94,7 +93,7 @@ const AdminUsersScreen = ({ route }: { route?: { params?: { search?: string; sta
   const [status, setStatus] = useState(route?.params?.status ?? '');
   const [role, setRole] = useState<string>('');
   const [page, setPage] = useState(1);
-  const [managing, setManaging] = useState<AdminUser | null>(null);
+  const [managing, setManaging] = useState<{ user: AdminUser; status?: string } | null>(null);
   const term = useDebounced(search.trim());
   const list = useLoader(
     () => fetchUsers({ search: term || undefined, status: status || undefined, role: role || undefined, page }),
@@ -108,7 +107,7 @@ const AdminUsersScreen = ({ route }: { route?: { params?: { search?: string; sta
   };
 
   return (
-    <AdminScreen title="Users" active="AdminUsers">
+    <AdminScreen title="User Management" active="AdminUsers">
       <FlatList
         data={list.data?.items ?? []}
         keyExtractor={(u) => String(u.id)}
@@ -129,31 +128,43 @@ const AdminUsersScreen = ({ route }: { route?: { params?: { search?: string; sta
         renderItem={({ item: u }) => {
           const isMe = u.id === me?.id;
           return (
-            <TouchableOpacity
-              style={ui.listItem}
-              disabled={isMe}
-              onPress={() => setManaging(u)}
-              accessibilityRole="button"
-              accessibilityLabel={isMe ? `${u.name} (you)` : `Manage ${u.name}`}
-            >
+            <View style={ui.listItem}>
+              <TouchableOpacity
+                disabled={isMe}
+                onPress={() => setManaging({ user: u })}
+                accessibilityRole="button"
+                accessibilityLabel={isMe ? `${u.name} (you)` : `Change account type of ${u.name}`}
+              >
               <View style={ui.between}>
                 <Text style={[ui.title, ui.flex]} numberOfLines={1}>
                   {u.name}
                   {isMe ? ' (you)' : ''}
                 </Text>
-                <Badge status={u.status} label={u.status === 'active' ? 'Active' : 'Suspended'} />
+                <Badge tone={u.status === 'active' ? 'success' : 'warning'} label={u.status === 'active' ? 'Active' : 'Suspended'} />
               </View>
               <Text style={ui.muted} numberOfLines={1}>{u.email}</Text>
               <Text style={ui.small}>
-                {USER_ROLE_LABELS[u.role] ?? u.role} · {u.clinic_memberships} clinic{u.clinic_memberships === 1 ? '' : 's'} · joined {formatDateTime(u.created_at)}
+                {[USER_ROLE_LABELS[u.role] ?? u.role, u.clinic_name, `joined ${formatMonthYear(u.created_at)}`].filter(Boolean).join(' · ')}
               </Text>
-            </TouchableOpacity>
+              </TouchableOpacity>
+              {!isMe && (
+                <View style={ui.rowWrap}>
+                  <Button
+                    small
+                    variant={u.status === 'active' ? 'danger' : 'tonal'}
+                    label={u.status === 'active' ? 'Suspend' : 'Reactivate'}
+                    onPress={() => setManaging({ user: u, status: u.status === 'active' ? 'suspended' : 'active' })}
+                  />
+                </View>
+              )}
+            </View>
           );
         }}
       />
       {managing && (
         <ManageSheet
-          user={managing}
+          user={managing.user}
+          status={managing.status}
           onClose={() => setManaging(null)}
           onDone={() => {
             setManaging(null);

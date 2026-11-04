@@ -1,5 +1,5 @@
 /**
- * Dentist portal logic: the overview's day summary, the schedule's calendar
+ * Dentist portal logic: the schedule's calendar
  * ranges and the clinical record request body.
  */
 jest.mock('expo-constants', () => ({ __esModule: true, default: { expoConfig: { extra: {} } } }));
@@ -10,35 +10,8 @@ jest.mock('@react-navigation/native', () => ({ useNavigation: () => ({ navigate:
 jest.mock('../src/context/AuthContext', () => ({ useAuth: () => ({}) }));
 jest.mock('../src/components/clinic/ClinicChrome', () => ({ ClinicScreen: () => null, useOpenSection: () => jest.fn() }));
 
-const { daySummary } = require('../src/screens/clinic/DentistOverview');
 const { viewRange } = require('../src/screens/clinic/ClinicScheduleScreen');
 const { blankRecord, recordBody } = require('../src/components/clinic/RecordSheet');
-
-const visit = (id: number, status: string, startsAt: string, name = 'Juan Dela Cruz') => ({
-  id,
-  status,
-  starts_at: startsAt,
-  patient: { id, name },
-});
-
-describe('daySummary', () => {
-  const now = new Date('2026-11-03T08:45:00+08:00');
-
-  test('counts scheduled visits and says when the first one starts', () => {
-    const today = [visit(1, 'confirmed', '2026-11-03T09:00:00+08:00'), visit(2, 'cancelled', '2026-11-03T10:00:00+08:00')];
-    expect(daySummary(today, now)).toBe('You have 1 appointment scheduled for today. The first one starts in 15 minutes.');
-  });
-
-  test('mentions a visit in progress, or that nothing is waiting', () => {
-    expect(daySummary([visit(1, 'in_progress', '2026-11-03T08:30:00+08:00')], now)).toMatch(/visit with Juan Dela Cruz is in progress/);
-    expect(daySummary([visit(1, 'completed', '2026-11-03T08:00:00+08:00')], now)).toMatch(/No more visits are waiting today/);
-    expect(daySummary([], now)).toBe('You have no appointments scheduled for today.');
-  });
-
-  test('gives a clock time for visits more than an hour away', () => {
-    expect(daySummary([visit(1, 'confirmed', '2026-11-03T14:30:00+08:00')], now)).toMatch(/starts at 2:30 PM\.$/);
-  });
-});
 
 test('calendar ranges: Monday-first weeks and whole weeks around a month', () => {
   expect(viewRange('day', '2026-11-04')).toEqual({ from: '2026-11-04', to: '2026-11-04', days: ['2026-11-04'] });

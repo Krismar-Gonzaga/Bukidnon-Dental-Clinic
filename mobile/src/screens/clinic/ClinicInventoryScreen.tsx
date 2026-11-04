@@ -16,14 +16,20 @@ import {
   Field,
   FormError,
   LoadState,
+  Pager,
   SearchBox,
   SelectField,
   Sheet,
+  StatGrid,
   ui,
   useLoader,
   useRefreshOnFocus,
 } from '../../components/clinic/ClinicUi';
 import {
+  fetchStockHistory,
+  formatDateTime,
+  formatPeso,
+  stockStatus,
   can,
   createInventoryCategory,
   createInventoryItem,
@@ -135,7 +141,7 @@ const ClinicInventoryScreen = ({ route }: { route?: { params?: { lowStock?: bool
   const [status, setStatus] = useState(route?.params?.lowStock ? 'low_stock' : '');
   const [search, setSearch] = useState('');
   const [term, setTerm] = useState('');
-  const [sheet, setSheet] = useState<'item' | 'supplier' | null>(route?.params?.addItem ? 'item' : null);
+  const [sheet, setSheet] = useState<'item' | 'supplier' | 'history' | null>(route?.params?.addItem ? 'item' : null);
 
   useEffect(() => {
     const timer = setTimeout(() => setTerm(search.trim()), 350);
@@ -163,6 +169,17 @@ const ClinicInventoryScreen = ({ route }: { route?: { params?: { lowStock?: bool
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={items.refreshing} onRefresh={() => { items.refresh(); alerts.sync(); suppliers.sync(); }} colors={[palette.primary]} />}
       >
+        {items.data && (
+          <StatGrid
+            stats={[
+              { label: 'Total Items', value: items.data.length, icon: 'cube-outline' },
+              { label: 'Low Stock', value: items.data.filter((i) => stockStatus(i) === 'low').length, icon: 'warning-outline' },
+              { label: 'Critical', value: items.data.filter((i) => stockStatus(i) === 'critical').length, icon: 'alert-circle-outline' },
+              { label: 'Total Value', value: formatPeso(items.data.reduce((sum, i) => sum + i.quantity_usable * Number(i.unit_cost ?? 0), 0)), icon: 'cash-outline' },
+            ]}
+          />
+        )}
+        <Button small variant="outline" icon="time-outline" label="Stock History" onPress={() => setSheet('history')} />
         <Card title="Needs attention" subtitle="Low stock counts only usable (unexpired) stock.">
           <LoadState loading={alerts.loading} error={alerts.error} onRetry={alerts.reload} />
           {a && attention === 0 && <Text style={ui.muted}>Nothing needs attention.</Text>}
@@ -226,6 +243,7 @@ const ClinicInventoryScreen = ({ route }: { route?: { params?: { lowStock?: bool
           }}
         />
       )}
+      {sheet === 'history' && <StockHistorySheet clinicId={clinicId} onClose={() => setSheet(null)} />}
       {sheet === 'supplier' && (
         <AddSupplierSheet
           clinicId={clinicId}
@@ -239,6 +257,31 @@ const ClinicInventoryScreen = ({ route }: { route?: { params?: { lowStock?: bool
     </ClinicScreen>
   );
 };
+
+function StockHistorySheet({ clinicId, onClose }: { clinicId: number; onClose: () => void }) {
+  const [page, setPage] = useState(1);
+  const history = useLoader(() => fetchStockHistory(clinicId, page), [clinicId, page], 'Stock history could not be loaded.');
+  return (
+    <Sheet title="Stock History" onClose={onClose}>
+      <LoadState loading={history.loading} error={history.data ? null : history.error} onRetry={history.reload} />
+      {history.data?.items.length === 0 && <EmptyState icon="time-outline" text="No stock changes yet." />}
+      {history.data?.items.map((row) => (
+        <View key={row.id} style={[ui.listItem, ui.spacedTop]}>
+          <View style={ui.between}>
+            <Text style={[ui.title, ui.flex]}>{row.item_name ?? row.item ?? 'Item'}</Text>
+            <Text style={ui.title}>
+              {row.quantity > 0 ? '+' : ''}
+              {row.quantity}
+            </Text>
+          </View>
+          <Text style={ui.muted}>Balance {row.balance_after}{row.reason ? ` · ${row.reason}` : ''}</Text>
+          <Text style={ui.small}>{[formatDateTime(row.at), row.performed_by].filter(Boolean).join(' · ')}</Text>
+        </View>
+      ))}
+      {history.data && <Pager page={page} lastPage={history.data.meta.last_page} onChange={setPage} />}
+    </Sheet>
+  );
+}
 
 function AlertRow({ tone, label, title, detail, onPress }: { tone: 'danger' | 'warning'; label: string; title: string; detail: string; onPress: () => void }) {
   return (

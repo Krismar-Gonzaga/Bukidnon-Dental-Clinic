@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { ClinicScreen } from '../../components/clinic/ClinicChrome';
+import { ClinicProfileTabs } from '../../components/clinic/ClinicAdminKit';
 import { useClinicPortal } from '../../components/clinic/ClinicPortalContext';
 import { Badge, Button, Card, Field, FormError, LoadState, ui, useLoader } from '../../components/clinic/ClinicUi';
 import { ClinicProfile, fetchClinicProfile, fetchSpecializationOptions, serverMessage, setClinicPublished, updateClinicProfile } from '../../services/clinicPortal';
@@ -151,6 +152,7 @@ const ClinicSettingsScreen = () => {
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={clinic.refreshing} onRefresh={clinic.refresh} colors={[palette.primary]} />}
       >
+        <ClinicProfileTabs active="ClinicSettings" />
         <LoadState loading={clinic.loading} error={clinic.data ? null : clinic.error} onRetry={clinic.reload} />
         {clinic.data && (
           <>

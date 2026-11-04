@@ -1,5 +1,5 @@
 import Icon from '../Icon';
-import { BRAND_NAME } from '../../config/app';
+import { useBrandName } from '../../services/platformStore';
 import './WhyBookSection.css';
 
 // PROVISIONAL marketing copy from the design. "SMS" from the design is left
@@ -26,11 +26,12 @@ const BENEFITS = [
 ];
 
 function WhyBookSection() {
+  const brand = useBrandName();
   return (
     <section className="why-book" aria-labelledby="why-book-title">
       <div className="why-book-inner">
         <h2 id="why-book-title" className="why-book-title">
-          Why Book Through {BRAND_NAME}?
+          Why Book Through {brand}?
         </h2>
 
         <ul className="why-book-grid">

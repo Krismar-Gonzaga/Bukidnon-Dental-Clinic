@@ -41,6 +41,7 @@ class ClinicApplicationResource extends JsonResource
                 'uploaded_at' => BusinessTime::iso($d->created_at),
             ])),
             'missing_documents' => $this->missingDocuments(),
+            'documents_requested' => $this->documents_requested_at !== null,
             'submitted_at' => BusinessTime::iso($this->submitted_at),
             'reviewed_at' => BusinessTime::iso($this->reviewed_at),
             'created_at' => BusinessTime::iso($this->created_at),

@@ -46,13 +46,12 @@ test('insights and calendar come from the clinic-scoped endpoints', async () => 
 test('drawer groups only list what the member may open', () => {
   const member = (permissions: string[]) => ({ clinic_id: 1, clinic_name: 'Demo', role: 'staff', permissions });
   const admin = drawerGroups(member(['clinic.view', 'clinic.profile.manage', 'clinic.services.manage', 'clinic.branches.manage', 'clinic.dentists.manage', 'clinic.staff.manage', 'appointments.view_all', 'patients.view', 'inventory.view', 'reports.view', 'feedback.view']));
-  expect(admin.map((g: { label: string }) => g.label)).toEqual(['Clinic', 'Team', 'Operations', 'Business']);
-  expect(admin[0].sections.map((s: { label: string }) => s.label)).toEqual(['Clinic Profile', 'Services & Prices', 'Branches & Hours']);
-  // Notifications and Settings live in the top bar and the profile menu, not the drawer.
-  const drawerLabels = admin.flatMap((g: { sections: { label: string }[] }) => g.sections.map((s) => s.label));
-  expect(drawerLabels).not.toContain('Notifications');
-  expect(drawerLabels).not.toContain('Settings');
+  expect(admin.map((g: { label: string }) => g.label)).toEqual(['Clinic', 'Team', 'Operations', 'Business', 'System']);
+  expect(admin[0].sections.map((s: { label: string }) => s.label)).toEqual(['Clinic Profile']);
+  // The design's System group; Settings and Subscription need their own permissions.
+  const system = admin[4].sections.map((s: { label: string }) => s.label);
+  expect(system).toEqual(['Notifications']);
 
   const receptionist = drawerGroups(member(['clinic.view', 'appointments.view_all', 'patients.view']));
-  expect(receptionist.map((g: { label: string }) => g.label)).toEqual(['Operations']);
+  expect(receptionist.map((g: { label: string }) => g.label)).toEqual(['Operations', 'System']);
 });

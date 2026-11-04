@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\PatientRecord;
 use App\Support\BusinessTime;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -32,6 +33,12 @@ class PatientRecordResource extends JsonResource
             'record_type' => $this->record_type,
             'chief_complaint' => $this->chief_complaint,
             'findings' => $this->findings,
+            'diagnosis' => $this->diagnosis,
+            'treatment_plan' => $this->treatment_plan,
+            'follow_up_recommendations' => $this->follow_up_recommendations,
+            'materials_used' => $this->materials_used,
+            'performed_on' => $this->performed_on?->toDateString(),
+            'status' => $this->status ?? PatientRecord::FINAL,
             'procedures' => $this->procedures,
             'tooth_numbers' => $this->tooth_numbers,
             'notes' => $this->notes,

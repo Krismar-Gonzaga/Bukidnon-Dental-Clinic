@@ -17,8 +17,10 @@ class ServiceRateResource extends JsonResource
             'name' => $this->service_name,
             'description' => $this->description,
             'price' => $this->price,
+            'price_max' => $this->price_max,
             'currency' => $this->currency,
             'duration_minutes' => $this->duration_minutes,
+            'duration_max' => $this->duration_max,
             'is_available' => $this->is_available,
         ];
     }

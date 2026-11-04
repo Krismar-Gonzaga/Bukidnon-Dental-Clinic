@@ -1,6 +1,7 @@
 // Change the account password. The server signs out every other device afterwards.
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { AccountSecurity } from '../../components/AccountSecurity';
 import Icon from 'react-native-vector-icons/Ionicons';
 import PatientShell from '../../components/patient/PatientShell';
 import { BackLink, Notice, SuccessCard } from '../../components/patient/PatientUi';
@@ -106,6 +107,7 @@ const ChangePasswordScreen = ({ navigation }: { navigation: any }) => {
               </View>
             </Card>
           )}
+          <AccountSecurity />
         </ScrollView>
       </KeyboardAvoidingView>
     </PatientShell>

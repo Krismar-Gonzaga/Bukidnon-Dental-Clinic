@@ -18,9 +18,19 @@ class AppointmentResource extends JsonResource
 {
     public bool $forClinic = false;
 
+    public bool $withTreatmentNotes = false;
+
     public function clinicView(): static
     {
         $this->forClinic = true;
+
+        return $this;
+    }
+
+    /** The dentist's note on the visit is clinical: only for those who may read records. */
+    public function withTreatmentNotes(bool $allowed = true): static
+    {
+        $this->withTreatmentNotes = $allowed;
 
         return $this;
     }
@@ -70,7 +80,10 @@ class AppointmentResource extends JsonResource
                 'email' => $this->patient_email,
                 'phone' => $this->patient_phone,
                 'age' => $this->relationLoaded('patient') ? $this->patient?->birth_date?->age : null,
+                'gender' => $this->relationLoaded('patient') ? $this->patient?->gender : null,
             ]),
+            'front_desk_notes' => $this->when($this->forClinic, fn () => $this->front_desk_notes),
+            'treatment_notes' => $this->when($this->withTreatmentNotes, fn () => $this->treatment_notes),
             // Online: the patient booked it themselves. Walk-in: the clinic booked it for them.
             'type' => $this->when($this->forClinic && $this->relationLoaded('patient'), fn () => $this->created_by !== null && $this->created_by !== $this->patient?->user_id ? 'walk_in' : 'online'),
             'has_review' => $this->whenLoaded('review', fn () => $this->review !== null),

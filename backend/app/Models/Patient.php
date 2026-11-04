@@ -106,6 +106,26 @@ class Patient extends Model
     }
 
     /** Make the patient known to a clinic (idempotent). */
+    /**
+     * What this clinic recorded, plus what the patient reports only if they agreed to share
+     * it. A walk-in has no account, so their blood type is what the clinic itself entered.
+     */
+    public function medicalSummaryAt(Clinic $clinic): array
+    {
+        $latest = PatientMedicalHistory::where('patient_id', $this->id)
+            ->where('clinic_id', $clinic->id)
+            ->latest('created_at')->latest('id')
+            ->first();
+        $shared = $this->consentValues()['share_medical_history'];
+
+        return [
+            'blood_type' => ($shared || ! $this->user_id) ? $this->blood_type : null,
+            'conditions' => $latest?->conditions,
+            'allergies' => $latest?->allergies,
+            'medications' => $latest?->medications,
+        ];
+    }
+
     public function registerWith(Clinic|int $clinic, ?User $registeredBy = null): void
     {
         $clinicId = $clinic instanceof Clinic ? $clinic->id : $clinic;

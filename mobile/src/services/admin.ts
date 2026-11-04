@@ -29,7 +29,7 @@ export type ActivityItem = {
 };
 
 export type AdminDashboard = {
-  clinics: { total: number; listed: number; suspended: number; new_this_month: number };
+  clinics: { total: number; listed: number; verified: number; suspended: number; new_this_month: number };
   applications: { pending: number; under_review: number; approved: number; rejected: number };
   queue: QueueItem[];
   users: Record<string, number>;
@@ -37,6 +37,12 @@ export type AdminDashboard = {
   security: { failed_logins_24h: number; blocked_logins_24h: number; failed_password_confirmations_24h: number; suspended_users: number };
   activity_by_day: { date: string; total: number }[];
   recent_activity: ActivityItem[];
+  total_appointments: number;
+  active_subscriptions: number;
+  active_announcements: number;
+  pending_payments: { total: number; items: { id: number; clinic_id: number; clinic_name: string | null; submitted_at: string }[] };
+  platform_growth: { month: string; label: string; total: number }[];
+  recent_audit: { id: number; label: string; module: string | null; outcome: string; user_name: string | null; subject_label: string | null; created_at: string }[];
 };
 
 export type ApplicationStatus = 'pending' | 'under_review' | 'approved' | 'rejected';
@@ -55,6 +61,9 @@ export type ClinicApplication = QueueItem & {
   applicant?: { id: number; name: string; email: string } | null;
   documents: { id: number; document_type: string; original_name: string; mime_type: string; size: number | null; uploaded_at: string }[];
   missing_documents: string[];
+  documents_requested?: boolean;
+  documents_required?: number;
+  documents_submitted?: number;
   reviewed_at: string | null;
   history?: HistoryEntry[];
   // Admin lists (Verification): REG-00012, document status and review priority.
@@ -64,7 +73,7 @@ export type ClinicApplication = QueueItem & {
   clinic_status?: string | null;
 };
 
-export type DocumentStatus = 'verified' | 'under_review' | 'pending' | 'missing_info' | 'returned' | 'suspended';
+export type DocumentStatus = 'verified' | 'under_review' | 'pending' | 'missing_info' | 'returned' | 'documents_requested' | 'suspended';
 
 export type ApplicationSummary = {
   pending: number;
@@ -122,6 +131,7 @@ export type AdminUser = {
   role: UserRole;
   status: 'active' | 'suspended';
   clinic_memberships: number;
+  clinic_name: string | null;
   created_at: string | null;
   suspended_at: string | null;
 };
@@ -132,7 +142,8 @@ export type AuditEntry = {
   action: string;
   label: string;
   category: string | null;
-  outcome: 'success' | 'failed' | 'blocked';
+  module: string | null;
+  outcome: 'success' | 'pending' | 'failed' | 'blocked';
   user_id: number | null;
   user_name: string | null;
   user_role: UserRole | null;
@@ -161,19 +172,161 @@ export type ModerationReview = {
   moderation_note?: string | null;
 };
 
-export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
-  pending: 'Pending',
-  under_review: 'Reviewing',
-  approved: 'Approved',
-  rejected: 'Returned',
+export type DirectoryRow = {
+  kind: 'clinic' | 'application';
+  id: number;
+  name: string;
+  city: string | null;
+  status: string;
+  admin: string | null;
+  plan: string | null;
+  application_id: number | null;
+  missing_documents?: number;
 };
 
+export type AdminClinicDetail = {
+  id: number;
+  name: string;
+  city: string | null;
+  status: string;
+  admin: string | null;
+  plan: string;
+  since: string | null;
+  renews_at: string | null;
+  subscription_status: string;
+  application_id: number | null;
+  suspension_reason: string | null;
+  activity: { id: number; label: string; at: string }[];
+};
+
+export type SubscriptionRow = {
+  clinic_id: number;
+  clinic_name: string;
+  plan_key: string;
+  plan: string;
+  amount: number;
+  due_at: string | null;
+  status: string;
+  payment_status: string | null;
+  payment_id: number | null;
+};
+
+export type SubscriptionDetail = SubscriptionRow & {
+  payment: {
+    id: number;
+    status: string;
+    amount: number;
+    method: string;
+    reference: string | null;
+    submitted_by: string | null;
+    submitted_at: string;
+    review_note: string | null;
+    invoice_number: string | null;
+  } | null;
+  history: { id: number; status: string; amount: number; method: string; submitted_at: string; invoice_number: string | null }[];
+  plans: { key: string; name: string; price: number }[];
+};
+
+export type ReportRow = { metric: string; current: number; previous: number; change: number };
+export type PlatformReports = {
+  month: string;
+  month_label: string;
+  previous_label: string;
+  overview: { clinic_growth: { month: string; label: string; total: number }[]; plans: { key: string; name: string; total: number }[] };
+  clinics: ReportRow[];
+  users: ReportRow[];
+  subscriptions: ReportRow[];
+};
+
+export type Announcement = {
+  id: number;
+  title: string;
+  content: string;
+  audience: string;
+  status: 'draft' | 'published' | 'archived';
+  published_at: string | null;
+  created_at: string;
+};
+
+export type PlatformSettings = {
+  platform_name: string;
+  support_email: string;
+  maintenance_mode: boolean;
+  allow_self_registration: boolean;
+  session_timeout_minutes: number;
+  require_verification: boolean;
+  required_documents: string[];
+  payment_grace_days: number;
+  document_types: string[];
+  plans: { key: string; name: string; price: number; limits: string | null }[];
+};
+
+type Tone = 'success' | 'info' | 'neutral' | 'danger' | 'warning';
+
+export const CLINIC_STATUS: Record<string, { label: string; tone: Tone }> = {
+  approved: { label: 'Verified', tone: 'success' },
+  suspended: { label: 'Suspended', tone: 'danger' },
+  pending: { label: 'Pending', tone: 'warning' },
+  under_review: { label: 'Under-Review', tone: 'warning' },
+  rejected: { label: 'Rejected', tone: 'danger' },
+};
+
+export const CLINIC_STATUS_FILTERS = [
+  { id: '', label: 'All' },
+  { id: 'approved', label: 'Verified' },
+  { id: 'pending', label: 'Pending' },
+  { id: 'under_review', label: 'Under-Review' },
+  { id: 'rejected', label: 'Rejected' },
+  { id: 'suspended', label: 'Suspended' },
+];
+
+export const SUBSCRIPTION_STATUS: Record<string, { label: string; tone: Tone }> = {
+  active: { label: 'Active', tone: 'success' },
+  pending_payment: { label: 'Pending-Payment', tone: 'warning' },
+  grace: { label: 'In Grace Period', tone: 'warning' },
+  expired: { label: 'Expired', tone: 'danger' },
+  none: { label: 'No Payment Yet', tone: 'neutral' },
+};
+
+export const PAYMENT_STATUS: Record<string, { label: string; tone: Tone }> = {
+  pending: { label: 'Submitted', tone: 'warning' },
+  verified: { label: 'Verified', tone: 'success' },
+  rejected: { label: 'Rejected', tone: 'danger' },
+};
+export const NO_PAYMENT = { label: 'None', tone: 'neutral' as Tone };
+
+export const ANNOUNCEMENT_AUDIENCES = [
+  { id: 'all', label: 'All Users' },
+  { id: 'patients', label: 'Patients' },
+  { id: 'dentists', label: 'Dentists' },
+  { id: 'staff', label: 'Clinic Staff' },
+  { id: 'clinic_admins', label: 'Clinic Admins' },
+];
+
+export const ANNOUNCEMENT_STATUS: Record<string, { label: string; tone: Tone }> = {
+  published: { label: 'Published', tone: 'success' },
+  draft: { label: 'Draft', tone: 'warning' },
+  archived: { label: 'Archived', tone: 'neutral' },
+};
+
+export const formatMonthly = (amount: number) => `₱${Number(amount ?? 0).toLocaleString('en-PH')}/mo`;
+
+const MONTH_YEAR = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric', timeZone: 'Asia/Manila' });
+export const formatMonthYear = (iso?: string | null) => (iso ? MONTH_YEAR.format(new Date(iso)) : '—');
+
+/** "2026-11" moved by whole months. */
+export function shiftMonth(month: string, by: number): string {
+  const [year, number] = month.split('-').map(Number);
+  const next = new Date(Date.UTC(year, number - 1 + by, 1));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 export const DOCUMENT_LABELS: Record<string, string> = {
-  business_permit: "Mayor's / business permit",
-  doh_license: 'DOH license to operate',
-  prc_id: "Dentist's PRC ID",
-  bir_registration: 'BIR registration',
-  other: 'Other supporting document',
+  business_permit: 'Business Permit',
+  doh_license: 'DOH License to Operate',
+  prc_id: 'PRC License',
+  bir_registration: 'BIR Registration',
+  other: 'Other Supporting Document',
 };
 
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
@@ -184,38 +337,24 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
   system_admin: 'System Admin',
 };
 
-export const DOCUMENT_STATUS: Record<DocumentStatus, { label: string; tone: 'success' | 'info' | 'neutral' | 'danger' | 'warning' }> = {
-  verified: { label: 'Verified', tone: 'success' },
-  under_review: { label: 'Under review', tone: 'info' },
-  pending: { label: 'Pending', tone: 'neutral' },
-  missing_info: { label: 'Missing info', tone: 'danger' },
-  returned: { label: 'More info requested', tone: 'warning' },
-  suspended: { label: 'Suspended', tone: 'danger' },
-};
-
-export const PRIORITY_LABELS = { high: 'High priority', medium: 'Medium priority', standard: 'Standard' } as const;
-
-export const AUDIT_RANGES = [
-  { id: '24h', label: 'Last 24 hours' },
-  { id: '7d', label: 'Last 7 days' },
-  { id: '30d', label: 'Last 30 days' },
-  { id: 'all', label: 'All time' },
-];
-
 export const AUDIT_CATEGORIES = [
-  { id: '', label: 'All actions' },
+  { id: '', label: 'All' },
   { id: 'security', label: 'Security / Sign-in' },
-  { id: 'verification', label: 'Clinic verification' },
-  { id: 'clinics', label: 'Clinic management' },
-  { id: 'accounts', label: 'Account administration' },
-  { id: 'records', label: 'Patient records' },
+  { id: 'verification', label: 'Clinic Verification' },
+  { id: 'clinics', label: 'Clinic Management' },
+  { id: 'accounts', label: 'User Management' },
+  { id: 'subscription', label: 'Subscriptions' },
+  { id: 'notifications', label: 'System Notifications' },
+  { id: 'settings', label: 'System Settings' },
+  { id: 'records', label: 'Patient Records' },
   { id: 'appointments', label: 'Appointments' },
   { id: 'reviews', label: 'Reviews' },
-  { id: 'audit', label: 'Audit log' },
+  { id: 'audit', label: 'Audit Log' },
 ];
 
 export const AUDIT_OUTCOMES = {
   success: { label: 'Success', tone: 'success' },
+  pending: { label: 'Pending', tone: 'warning' },
   failed: { label: 'Failed', tone: 'danger' },
   blocked: { label: 'Blocked', tone: 'danger' },
 } as const;
@@ -243,6 +382,7 @@ export const fetchApplication = (id: number) => getData<ClinicApplication>(`/adm
 export const startReview = (id: number) => api.post(`/admin/clinic-applications/${id}/start-review`);
 export const approveApplication = (id: number, notes?: string) => api.post(`/admin/clinic-applications/${id}/approve`, { notes });
 export const returnApplication = (id: number, notes: string) => api.post(`/admin/clinic-applications/${id}/reject`, { notes });
+export const requestDocuments = (id: number, notes: string) => api.post(`/admin/clinic-applications/${id}/request-documents`, { notes });
 export const addApplicationNote = async (id: number, note: string): Promise<HistoryEntry[]> =>
   (await api.post(`/admin/clinic-applications/${id}/notes`, { note })).data?.data ?? [];
 
@@ -255,15 +395,39 @@ export const documentUrl = async (applicationId: number, documentId: number, dow
   return `${API_BASE_URL.replace(/\/api\/?$/, '')}${url}`;
 };
 
-export const fetchAdminClinics = (params: Record<string, unknown>) => getPage<AdminClinic>('/admin/clinics', params);
+export const fetchClinicDirectory = (params: Record<string, unknown>) => getPage<DirectoryRow>('/admin/clinics/directory', params);
+export const fetchAdminClinic = (id: number) => getData<AdminClinicDetail>(`/admin/clinics/${id}`);
 export const suspendClinic = (id: number, reason: string) => api.post(`/admin/clinics/${id}/suspend`, { reason });
 export const reactivateClinic = (id: number) => api.post(`/admin/clinics/${id}/reactivate`);
 
 export const fetchUsers = (params: Record<string, unknown>) => getPage<AdminUser>('/admin/users', params);
 export const updateUser = (id: number, body: { role?: UserRole; status?: string; reason?: string }) => api.put(`/admin/users/${id}`, body);
 
+export const fetchSubscriptions = (params: Record<string, unknown>) => getPage<SubscriptionRow>('/admin/subscriptions', params);
+export const fetchSubscription = (clinicId: number) => getData<SubscriptionDetail>(`/admin/subscriptions/${clinicId}`);
+export const changePlan = (clinicId: number, plan: string) => api.put(`/admin/subscriptions/${clinicId}/plan`, { plan });
+export const verifyPayment = (id: number) => api.post(`/admin/subscription-payments/${id}/verify`);
+export const rejectPayment = (id: number, note: string) => api.post(`/admin/subscription-payments/${id}/reject`, { note });
+/** Full URL of a 5-minute signed link to a payment proof. */
+export const proofUrl = async (paymentId: number) => {
+  const { url } = await getData<{ url: string }>(`/admin/subscription-payments/${paymentId}/proof-link`);
+  return `${API_BASE_URL.replace(/\/api\/?$/, '')}${url}`;
+};
+
+export const fetchReports = (month?: string) => getData<PlatformReports>('/admin/reports', { month });
+export const exportReportCsv = (params: Record<string, unknown>) => fetchCsv('/admin/reports/export', params);
+
+export const fetchAnnouncements = (params: Record<string, unknown>) => getPage<Announcement>('/admin/announcements', params);
+export const fetchAnnouncement = (id: number) => getData<Announcement>(`/admin/announcements/${id}`);
+export const saveAnnouncement = (id: number | null, body: { title: string; content: string; audience: string; publish: boolean }) =>
+  id ? api.put(`/admin/announcements/${id}`, body) : api.post('/admin/announcements', body);
+export const publishAnnouncement = (id: number) => api.post(`/admin/announcements/${id}/publish`);
+export const archiveAnnouncement = (id: number) => api.post(`/admin/announcements/${id}/archive`);
+
+export const fetchPlatformSettings = () => getData<PlatformSettings>('/admin/settings');
+export const savePlatformSettings = async (body: Partial<PlatformSettings>): Promise<PlatformSettings> => (await api.put('/admin/settings', body)).data?.data;
+
 export const fetchAuditLogs = (params: Record<string, unknown>) => getPage<AuditEntry>('/admin/audit-logs', params);
-export const fetchAuditSummary = (params: Record<string, unknown>) => getData<AuditSummary>('/admin/audit-logs/summary', params);
 /** Seals new entries and re-checks the whole hash chain. */
 export const checkAuditIntegrity = async (): Promise<IntegrityReport> => (await api.post('/admin/audit-logs/integrity')).data?.data;
 export const exportAuditCsv = (params: Record<string, unknown>) => fetchCsv('/admin/audit-logs/export', params);
@@ -288,15 +452,6 @@ async function fetchCsv(url: string, params: Record<string, unknown>): Promise<s
     }
     throw error;
   }
-}
-
-/** "+20% from the previous 24 hours" for the Total Events card. */
-export function auditTrend(summary: AuditSummary, rangeLabel: string): string {
-  const { total_events: total, previous_total: previous } = summary;
-  if (previous == null) return 'All recorded events';
-  if (previous === 0) return total > 0 ? `None in the previous ${rangeLabel}` : 'No events yet';
-  const change = Math.round(((total - previous) / previous) * 100);
-  return `${change >= 0 ? '+' : ''}${change}% from the previous ${rangeLabel}`;
 }
 
 export const fetchModerationQueue = (params: Record<string, unknown>) => getPage<ModerationReview>('/admin/reviews', params);
@@ -330,7 +485,9 @@ export function activityText(item: ActivityItem) {
     case 'clinic_application.approved':
       return `${subject}: verification approved${by}.`;
     case 'clinic_application.rejected':
-      return `${subject}: returned to the applicant${by}.`;
+      return `${subject}: rejected${by}.`;
+    case 'clinic_application.documents_requested':
+      return `${subject}: more documents requested${by}.`;
     case 'clinic.suspended':
       return `${subject} suspended${by}.`;
     case 'clinic.reactivated':
@@ -342,66 +499,4 @@ export function activityText(item: ActivityItem) {
     default:
       return item.action;
   }
-}
-
-// ---------------------------------------------------------------- Summary cards
-export type MetricCardData = { label: string; value: string; note?: string; icon?: string; tone?: 'default' | 'primary' | 'danger' | 'success' };
-
-const pad = (n?: number | null) => (n == null ? '—' : String(n).padStart(2, '0'));
-
-/** The four cards of the design, from GET /admin/clinic-applications/summary. */
-export function verificationMetrics(s: ApplicationSummary | null): MetricCardData[] {
-  return [
-    {
-      label: 'Total pending',
-      value: pad(s?.pending),
-      note: s ? (s.submitted_this_week > 0 ? `+${s.submitted_this_week} submitted this week` : 'None submitted this week') : undefined,
-      icon: 'trending-up-outline',
-    },
-    {
-      label: 'In review',
-      value: pad(s?.under_review),
-      note: s ? (s.average_decision_hours == null ? 'No decisions in 30 days' : `Avg. decision: ${s.average_decision_hours} hrs`) : undefined,
-      icon: 'hourglass-outline',
-    },
-    {
-      label: 'Critical action',
-      value: pad(s?.needs_attention),
-      note: s ? `Waiting ${s.attention_days}+ days or missing documents` : undefined,
-      icon: 'warning-outline',
-      tone: s?.needs_attention ? ('danger' as const) : ('default' as const),
-    },
-    {
-      label: 'Verified today',
-      value: pad(s?.verified_today),
-      note: s ? `${s.decisions_last_30_days} decisions in 30 days` : undefined,
-      icon: 'checkmark-circle-outline',
-      tone: 'success' as const,
-    },
-  ];
-}
-
-const RANGE_WORDS: Record<string, string> = { '24h': '24 hours', '7d': '7 days', '30d': '30 days' };
-
-/** The four cards of the design, from GET /admin/audit-logs/summary. */
-export function auditMetrics(s: AuditSummary | null, range: string): MetricCardData[] {
-  const report = s?.integrity.last_report;
-  return [
-    { label: 'Total events', value: s ? s.total_events.toLocaleString() : '—', note: s ? auditTrend(s, RANGE_WORDS[range] ?? 'period') : undefined, icon: 'trending-up-outline', tone: 'primary' as const },
-    {
-      label: 'Failed logins',
-      value: s ? s.failed_logins.toLocaleString() : '—',
-      note: s ? `${s.blocked_logins} blocked · from ${s.failed_login_ips} ${s.failed_login_ips === 1 ? 'IP' : 'IPs'}` : undefined,
-      icon: 'shield-outline',
-      tone: s?.failed_logins ? ('danger' as const) : ('default' as const),
-    },
-    { label: 'Critical actions', value: s ? s.critical_actions.toLocaleString() : '—', note: 'Approvals, suspensions, role changes, exports', icon: 'information-circle-outline' },
-    {
-      label: 'Log integrity',
-      value: report ? (report.status === 'verified' ? 'Verified' : 'Problems') : 'Not checked',
-      note: s ? `${s.integrity.unsealed} awaiting seal` : undefined,
-      icon: report?.status === 'failed' ? 'warning-outline' : 'shield-checkmark-outline',
-      tone: report ? (report.status === 'verified' ? ('success' as const) : ('danger' as const)) : ('default' as const),
-    },
-  ];
 }

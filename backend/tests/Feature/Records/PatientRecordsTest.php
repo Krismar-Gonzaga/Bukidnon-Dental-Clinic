@@ -53,11 +53,11 @@ class PatientRecordsTest extends TestCase
         $this->assertTrue(AuditLog::where('action', 'records.viewed')->where('subject_id', $this->patientId)->exists());
     }
 
-    public function test_receptionist_and_clinic_admin_cannot_access_clinical_records(): void
+    public function test_receptionist_cannot_access_clinical_records(): void
     {
         $this->createRecord()->assertCreated();
 
-        foreach (['staff', 'admin'] as $who) {
+        foreach (['staff'] as $who) {
             $this->asUser($this->world[$who])->getJson($this->recordsUrl())->assertForbidden();
             $this->asUser($this->world[$who])->postJson($this->recordsUrl(), ['record_type' => 'treatment'])->assertForbidden();
             $this->asUser($this->world[$who])->getJson($this->manage($this->world, "/patients/{$this->patientId}/medical-history"))->assertForbidden();
@@ -119,7 +119,7 @@ class PatientRecordsTest extends TestCase
         $profile->save();
         $this->asUser($second)->getJson($url)->assertOk()->assertJsonCount(0, 'data');
 
-        foreach (['staff', 'admin'] as $who) {
+        foreach (['staff'] as $who) {
             $this->asUser($this->world[$who])->getJson($url)->assertForbidden();
         }
 

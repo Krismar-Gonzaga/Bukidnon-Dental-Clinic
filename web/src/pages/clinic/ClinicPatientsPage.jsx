@@ -81,7 +81,8 @@ export function ageFrom(birthDate, todayKey = businessTodayKey()) {
 }
 
 function PatientDirectory({ query, search, setSearch, status, setStatus, setPage, perPage, setPerPage }) {
-  const { clinicId } = useClinic();
+  const { clinicId, can } = useClinic();
+  const showConditions = can('records.view');
 
   return (
     <>
@@ -120,6 +121,7 @@ function PatientDirectory({ query, search, setSearch, status, setStatus, setPage
                   <th scope="col">Patient</th>
                   <th scope="col">Age/Gender</th>
                   <th scope="col">Phone</th>
+                  {showConditions && <th scope="col">Conditions</th>}
                   <th scope="col">Last Visit</th>
                   <th scope="col" className="is-center">
                     Visits
@@ -136,7 +138,7 @@ function PatientDirectory({ query, search, setSearch, status, setStatus, setPage
                   const gender = GENDER_LABELS[patient.gender];
                   return (
                     <tr key={patient.id}>
-                      <td>
+                      <td data-label="Patient">
                         <div className="clinic-cell-person">
                           <InitialsTile name={patient.name} size="sm" tone="navy" />
                           <div>
@@ -145,16 +147,17 @@ function PatientDirectory({ query, search, setSearch, status, setStatus, setPage
                           </div>
                         </div>
                       </td>
-                      <td>{[age, gender].filter((part) => part != null && part !== '').join(' · ') || '—'}</td>
-                      <td>{patient.phone || '—'}</td>
-                      <td>{patient.last_visit_at ? formatDate(patient.last_visit_at) : 'No visits yet'}</td>
-                      <td className="is-center">
+                      <td data-label="Age/Gender">{[age, gender].filter((part) => part != null && part !== '').join(' · ') || '—'}</td>
+                      <td data-label="Phone">{patient.phone || '—'}</td>
+                      {showConditions && <td data-label="Conditions">{patient.conditions ? <Pill tone="warning">{patient.conditions}</Pill> : <span className="clinic-cell-sub">None</span>}</td>}
+                      <td data-label="Last Visit">{patient.last_visit_at ? formatDate(patient.last_visit_at) : 'No visits yet'}</td>
+                      <td data-label="Visits" className="is-center">
                         <strong>{patient.visits ?? 0}</strong>
                       </td>
-                      <td>
+                      <td data-label="Status">
                         <Pill tone={patient.status === 'inactive' ? 'neutral' : 'success'}>{patient.status === 'inactive' ? 'Inactive' : 'Active'}</Pill>
                       </td>
-                      <td className="is-end">
+                      <td data-label="" className="is-end">
                         <a href={`${getClinicHref(clinicId, 'patients')}/${patient.id}`} className="clinic-mini-button is-primary" aria-label={`View ${patient.name}`}>
                           View
                         </a>
@@ -164,7 +167,7 @@ function PatientDirectory({ query, search, setSearch, status, setStatus, setPage
                 })}
                 {query.data.items.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="clinic-empty-row">
+                    <td colSpan={showConditions ? 8 : 7} className="clinic-empty-row">
                       No patients found.
                     </td>
                   </tr>

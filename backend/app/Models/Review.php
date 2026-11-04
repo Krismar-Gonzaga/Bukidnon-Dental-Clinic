@@ -19,6 +19,7 @@ class Review extends Model
 
     protected $casts = [
         'rating' => 'integer',
+        'clinic_replied_at' => 'datetime',
         'is_verified_purchase' => 'boolean',
         'moderated_at' => 'datetime',
     ];

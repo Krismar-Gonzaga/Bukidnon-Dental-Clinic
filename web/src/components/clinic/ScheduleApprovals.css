@@ -1,0 +1,81 @@
+.schedule-approvals {
+  margin-bottom: var(--space-4);
+}
+
+.schedule-approvals-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.schedule-approval {
+  padding: var(--space-4);
+  border: 1px solid #f3e3a1;
+  border-radius: 12px;
+  background-color: #fffbe8;
+}
+
+.schedule-approval-who {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.schedule-approval-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.schedule-approval-compare > div {
+  padding: var(--space-3);
+  border-radius: 10px;
+  background-color: #ffffff;
+}
+
+.schedule-approval-compare > .is-new {
+  outline: 1px solid var(--clinic-primary, #003f87);
+}
+
+.schedule-approval-compare dt {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+}
+
+.schedule-approval-compare dd {
+  margin: 2px 0 0;
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.schedule-approval-compare dd span {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+.schedule-approval-note {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.schedule-approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+@media (max-width: 560px) {
+  .schedule-approval-compare {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

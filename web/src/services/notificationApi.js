@@ -14,5 +14,6 @@ export async function getNotifications({ page = 1, perPage = 20 } = {}) {
 
 export const markNotificationRead = (id) => apiClient.post(`/notifications/${id}/read`);
 export const markAllNotificationsRead = () => apiClient.post('/notifications/read-all');
+export const getNotificationPreferences = async () => (await apiClient.get('/notification-preferences')).data.data;
 export const updateNotificationPreferences = (preferences) =>
   apiClient.put('/notification-preferences', preferences);

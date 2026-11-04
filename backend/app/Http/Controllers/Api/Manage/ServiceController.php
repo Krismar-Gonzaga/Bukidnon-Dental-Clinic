@@ -19,7 +19,7 @@ class ServiceController extends Controller
 
     public function index(Clinic $clinic)
     {
-        return $this->ok(ServiceRateResource::collection($clinic->serviceRates()->with('service')->orderBy('service_name')->get())->resolve());
+        return $this->ok(ServiceRateResource::collection($clinic->serviceRates()->whereNull('archived_at')->with('service')->orderBy('service_name')->get())->resolve());
     }
 
     public function store(Request $request, Clinic $clinic)
@@ -48,6 +48,15 @@ class ServiceController extends Controller
         return $this->ok((new ServiceRateResource($serviceRate->load('service')))->resolve(), 'Service updated');
     }
 
+    /** Past appointments still point at the service, so it is hidden rather than deleted. */
+    public function destroy(Clinic $clinic, ServiceRate $serviceRate)
+    {
+        $serviceRate->forceFill(['is_available' => false, 'archived_at' => now()])->save();
+        $this->audit->record('service.removed', $serviceRate, clinicId: $clinic->id);
+
+        return $this->ok(message: 'Service removed');
+    }
+
     private function rules(bool $creating): array
     {
         $need = $creating ? 'required' : 'sometimes';
@@ -58,6 +67,8 @@ class ServiceController extends Controller
             'description' => [$creating ? 'required' : 'sometimes', 'string', 'max:2000'],
             'price' => [$need, 'numeric', 'min:0', 'max:9999999.99', 'decimal:0,2'],
             'duration_minutes' => [$need, 'integer', 'min:5', 'max:480'],
+            'price_max' => ['sometimes', 'nullable', 'numeric', 'gte:price', 'max:9999999.99'],
+            'duration_max' => ['sometimes', 'nullable', 'integer', 'gte:duration_minutes', 'max:480'],
             'is_available' => ['sometimes', 'boolean'],
         ];
     }

@@ -26,13 +26,20 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
+
+    protected $appends = ['two_factor_enabled'];
 
     protected $casts = [
         'email_verified_at' => 'datetime',
         'suspended_at' => 'datetime',
         'password' => 'hashed',
         'notification_preferences' => 'array',
+        'two_factor_secret' => 'encrypted',
+        'two_factor_recovery_codes' => 'encrypted:array',
+        'two_factor_confirmed_at' => 'datetime',
     ];
 
     // Relationships
@@ -71,6 +78,11 @@ class User extends Authenticatable
             ->active()
             ->where('clinic_id', $clinicId)
             ->first();
+    }
+
+    public function getTwoFactorEnabledAttribute(): bool
+    {
+        return $this->two_factor_confirmed_at !== null;
     }
 
     public function hasClinicPermission(Clinic|int $clinic, string $permission): bool

@@ -90,9 +90,10 @@ test('dentists: cards, filters and confirmed deactivation', async () => {
   fireEvent.click(within(screen.getByRole('dialog', { name: 'Deactivate Dr. Maria Braganza?' })).getByRole('button', { name: 'Deactivate' }));
   await waitFor(() => expect(api.updateDentist).toHaveBeenCalledWith('7', 1, { is_active: false }));
 
-  fireEvent.click(screen.getByRole('button', { name: 'Add Dentist' }));
-  const invite = screen.getByRole('dialog', { name: 'Add dentist' });
-  expect(within(invite).getByLabelText('Role')).toHaveValue('dentist');
+  expect(screen.getByRole('link', { name: 'Add Dentist' })).toHaveAttribute('href', '/clinic/7/dentists/new');
+  expect(screen.getByRole('link', { name: 'View profile of Dr. Maria Braganza' })).toHaveAttribute('href', '/clinic/7/dentists/1');
+  fireEvent.click(screen.getByRole('button', { name: 'Invite by Email' }));
+  expect(screen.getByRole('dialog', { name: 'Invite Dentist by Email' })).toBeInTheDocument();
 });
 
 test('appointments: type, age, filters and confirm/cancel on pending ones', async () => {

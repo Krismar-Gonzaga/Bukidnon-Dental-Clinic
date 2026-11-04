@@ -3,9 +3,11 @@
 // Records are append-only; corrections are added as amendments. Viewing
 // history and records is logged by the server and needs records.view.
 import React, { useState } from 'react';
-import { Alert, Linking, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import { useNavigation } from '@react-navigation/native';
 import { ClinicScreen } from '../../components/clinic/ClinicChrome';
+import { InitialsTile, StatRow } from '../../components/clinic/ClinicAdminKit';
 import { useClinicPortal } from '../../components/clinic/ClinicPortalContext';
 import {
   Badge,
@@ -41,18 +43,149 @@ import {
   fetchDentists,
   fetchMedicalHistory,
   fetchPatient,
+  fetchPatientFiles,
   fetchRecords,
   fetchServices,
   formatDateTime,
   Membership,
+  PatientFile,
+  patientFileUrl,
   PatientRecord,
+  PatientReportedHealth,
   recordTypeLabel,
   serverMessage,
   updatePatient,
+  uploadPatientFile,
 } from '../../services/clinicPortal';
-import { palette } from '../../theme/tokens';
+import { palette, spacing } from '../../theme/tokens';
 
-type Tab = 'details' | 'appointments' | 'history' | 'records';
+type Tab = 'overview' | 'records' | 'history' | 'files';
+
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+const ageFrom = (birthDate: string | null) => {
+  if (!birthDate) return null;
+  const birth = new Date(`${birthDate}T00:00:00Z`);
+  const now = new Date(Date.now() + 8 * 3600000);
+  const hadBirthday = now.getUTCMonth() > birth.getUTCMonth() || (now.getUTCMonth() === birth.getUTCMonth() && now.getUTCDate() >= birth.getUTCDate());
+  return now.getUTCFullYear() - birth.getUTCFullYear() - (hadBirthday ? 0 : 1);
+};
+
+const dateOnly = (iso?: string | null) => formatDateTime(iso).split(',').slice(0, 2).join(',');
+const formatSize = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
+
+// ---------------------------------------------------------------- Left column of the design
+function PatientCard({ patient }: { patient: ClinicPatient }) {
+  const age = ageFrom(patient.birth_date);
+  const gender = GENDERS.find((g) => g.id === patient.gender && g.id)?.label;
+  const line = [age != null ? `${age} yrs` : null, gender].filter(Boolean).join(' · ');
+  return (
+    <Card>
+      <View style={styles.identity}>
+        <InitialsTile name={patient.name} large />
+        <Text style={ui.heading}>{patient.name}</Text>
+        {line ? <Text style={ui.muted}>{line}</Text> : null}
+        <Badge tone={patient.status === 'inactive' ? 'neutral' : 'success'} label={patient.status === 'inactive' ? 'Inactive' : 'Active'} />
+      </View>
+      {patient.phone ? <StatRow label="Phone" value={patient.phone} /> : null}
+      {patient.email ? <StatRow label="Email" value={patient.email} /> : null}
+      {patient.address ? <StatRow label="Address" value={patient.address} /> : null}
+    </Card>
+  );
+}
+
+function MedicalSummary({ patient }: { patient: ClinicPatient }) {
+  const summary = patient.medical_summary;
+  return (
+    <Card title="Medical Summary">
+      {summary ? <StatRow label="Blood Type" value={summary.blood_type} /> : null}
+      <StatRow label="Last Visit" value={patient.last_visit_at ? dateOnly(patient.last_visit_at) : 'No visits yet'} />
+      <StatRow label="Total Visits" value={patient.visits ?? 0} />
+      {summary ? (
+        <>
+          <Text style={ui.small}>Conditions</Text>
+          <Badge tone={summary.conditions ? 'warning' : 'neutral'} label={summary.conditions || 'None'} />
+          <Text style={ui.small}>Allergies</Text>
+          <Badge tone={summary.allergies ? 'warning' : 'neutral'} label={summary.allergies || 'None'} />
+        </>
+      ) : null}
+    </Card>
+  );
+}
+
+// Only present when the patient chose to share it; it is their own report, not a clinical record.
+function PatientReported({ reported }: { reported: PatientReportedHealth }) {
+  const list = <T,>(items: T[] | undefined, format: (item: T) => string) => (items?.length ? items.map(format).join('; ') : null);
+  return (
+    <>
+      <Text style={ui.title}>Reported by the patient</Text>
+      <InfoRow label="Blood type" value={reported.blood_type} />
+      <InfoRow label="Allergies" value={list(reported.allergies, (a) => `${a.name}${a.severity ? ` (${a.severity})` : ''}${a.reaction ? `: ${a.reaction}` : ''}`)} />
+      <InfoRow label="Medications" value={list(reported.medications, (m) => [m.name, m.dosage, m.purpose].filter(Boolean).join(', '))} />
+      <InfoRow label="Conditions" value={list(reported.conditions, (c) => c)} />
+      <InfoRow label="Dental anxiety" value={reported.anxiety?.level ? `Level ${reported.anxiety.level} of 5` : null} />
+      <InfoRow label="Notes for dentist" value={reported.anxiety?.notes} />
+      <View style={ui.divider} />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- Files
+function Files({ clinicId, patient, membership }: { clinicId: number; patient: ClinicPatient; membership?: Membership }) {
+  const files = useLoader(() => fetchPatientFiles(clinicId, patient.id), [clinicId, patient.id], 'Files could not be loaded.');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const upload = async () => {
+    setError(null);
+    const result = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'], copyToCacheDirectory: true });
+    if (result.canceled || !result.assets?.length) return;
+    const asset = result.assets[0];
+    if ((asset.size ?? 0) > MAX_FILE_BYTES) {
+      setError('Please choose a file of 10 MB or less.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await uploadPatientFile(clinicId, patient.id, { uri: asset.uri, name: asset.name, type: asset.mimeType ?? 'application/pdf' });
+      await files.sync();
+    } catch (err) {
+      setError(serverMessage(err, 'The file could not be uploaded.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const download = async (file: PatientFile) => {
+    setError(null);
+    try {
+      await Linking.openURL(await patientFileUrl(clinicId, patient.id, file.id));
+    } catch (err) {
+      setError(serverMessage(err, 'The file could not be opened.'));
+    }
+  };
+
+  return (
+    <Card
+      title="Uploaded Files"
+      subtitle="PDF, JPG, PNG or WEBP, up to 10 MB. Every download is logged."
+      action={can(membership, 'records.write') ? <Button small icon="cloud-upload-outline" label="Upload File" busy={busy} onPress={upload} /> : undefined}
+    >
+      <FormError message={error} />
+      <LoadState loading={files.loading} error={files.error} onRetry={files.reload} />
+      {files.data?.length === 0 && <EmptyState icon="document-text-outline" text="No files uploaded." />}
+      {(files.data ?? []).map((file) => (
+        <View key={file.id} style={ui.listItem}>
+          <Text style={ui.title}>{file.name}</Text>
+          <Text style={ui.small}>
+            {formatSize(file.size)} · {dateOnly(file.uploaded_at)}
+          </Text>
+          <Button small variant="outline" icon="download-outline" label="Download" onPress={() => download(file)} />
+        </View>
+      ))}
+    </Card>
+  );
+}
 
 // ---------------------------------------------------------------- Details
 function EditPatientSheet({ clinicId, patient, onClose, onSaved }: { clinicId: number; patient: ClinicPatient; onClose: () => void; onSaved: () => void }) {
@@ -108,7 +241,7 @@ function Details({ clinicId, patient, membership, onChanged }: { clinicId: numbe
   const gender = GENDERS.find((g) => g.id === patient.gender)?.label;
   return (
     <Card
-      title={patient.name}
+      title="Personal Information"
       subtitle={patient.has_portal_account ? 'Has a patient portal account' : 'Walk-in patient (no portal account)'}
       action={can(membership, 'patients.manage') ? <Button small variant="outline" icon="create-outline" label="Edit" onPress={() => setEditing(true)} /> : undefined}
     >
@@ -211,7 +344,7 @@ function Appointments({ clinicId, patient, membership }: { clinicId: number; pat
   const canOpen = can(membership, 'appointments.view_all', 'appointments.view_assigned');
 
   return (
-    <Card title="Appointments" action={canBook ? <Button small variant="tonal" icon="add" label="Book" onPress={() => setBooking(true)} /> : undefined}>
+    <Card title="Appointment History" action={canBook ? <Button small variant="tonal" icon="add" label="Book" onPress={() => setBooking(true)} /> : undefined}>
       <LoadState loading={list.loading} error={list.error} onRetry={list.reload} />
       {list.data && list.data.items.length === 0 && <EmptyState icon="calendar-outline" text="No appointments yet." />}
       {(list.data?.items ?? []).map((a) => (
@@ -275,11 +408,12 @@ function MedicalHistory({ clinicId, patient, membership }: { clinicId: number; p
 
   return (
     <Card
-      title="Medical history"
+      title="Medical History"
       subtitle="Each update is kept; the newest entry is current."
       action={can(membership, 'records.write') ? <Button small variant="tonal" icon="create-outline" label="Update" onPress={startEdit} /> : undefined}
     >
       <LoadState loading={history.loading} error={history.error} onRetry={history.reload} />
+      {history.data?.patient_reported ? <PatientReported reported={history.data.patient_reported} /> : null}
       {history.data &&
         (current ? (
           <>
@@ -388,16 +522,12 @@ const ClinicPatientDetailScreen = ({ route }: { route: { params: { patientId: nu
   const patient = useLoader(() => fetchPatient(clinicId, patientId), [clinicId, patientId], 'This patient could not be loaded.');
   const canRecords = can(membership, 'records.view');
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'details', label: 'Details' },
-    { id: 'appointments', label: 'Appointments' },
-    ...(canRecords
-      ? [
-          { id: 'history' as Tab, label: 'Medical history' },
-          { id: 'records' as Tab, label: 'Records' },
-        ]
-      : []),
+    { id: 'overview', label: 'Overview' },
+    ...(canRecords ? [{ id: 'records' as Tab, label: 'Dental Records' }] : []),
+    ...(can(membership, 'appointments.view_all', 'appointments.view_assigned') ? [{ id: 'history' as Tab, label: 'Appt. History' }] : []),
+    ...(canRecords ? [{ id: 'files' as Tab, label: 'Files' }] : []),
   ];
-  const [tab, setTab] = useState<Tab>('details');
+  const [tab, setTab] = useState<Tab>('overview');
   const p = patient.data;
 
   return (
@@ -410,16 +540,27 @@ const ClinicPatientDetailScreen = ({ route }: { route: { params: { patientId: nu
         <LoadState loading={patient.loading} error={p ? null : patient.error} onRetry={patient.reload} />
         {p && (
           <>
+            <PatientCard patient={p} />
+            <MedicalSummary patient={p} />
             <Chips options={tabs} value={tab} onChange={setTab} />
-            {tab === 'details' && <Details clinicId={clinicId} patient={p} membership={membership} onChanged={patient.sync} />}
-            {tab === 'appointments' && <Appointments clinicId={clinicId} patient={p} membership={membership} />}
-            {tab === 'history' && <MedicalHistory clinicId={clinicId} patient={p} membership={membership} />}
-            {tab === 'records' && <Records clinicId={clinicId} patient={p} membership={membership} />}
+            {tab === 'overview' && <Details clinicId={clinicId} patient={p} membership={membership} onChanged={patient.sync} />}
+            {tab === 'records' && (
+              <>
+                <Records clinicId={clinicId} patient={p} membership={membership} />
+                <MedicalHistory clinicId={clinicId} patient={p} membership={membership} />
+              </>
+            )}
+            {tab === 'history' && <Appointments clinicId={clinicId} patient={p} membership={membership} />}
+            {tab === 'files' && <Files clinicId={clinicId} patient={p} membership={membership} />}
           </>
         )}
       </ScrollView>
     </ClinicScreen>
   );
 };
+
+const styles = StyleSheet.create({
+  identity: { alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
+});
 
 export default ClinicPatientDetailScreen;

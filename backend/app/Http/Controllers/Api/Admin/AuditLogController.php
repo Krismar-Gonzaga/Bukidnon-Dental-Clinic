@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Clinic;
 use App\Models\User;
 use App\Services\AuditChain;
 use App\Services\AuditLogger;
@@ -129,6 +130,7 @@ class AuditLogController extends Controller
     private function filters(Request $request): array
     {
         return $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
             'action' => ['nullable', 'string', 'max:100'],
             'category' => ['nullable', Rule::in(array_keys(AuditPresenter::CATEGORIES))],
             'role' => ['nullable', Rule::in(self::ROLES)],
@@ -144,6 +146,14 @@ class AuditLogController extends Controller
     private function query(array $filters): Builder
     {
         return AuditLog::query()
+            ->when($filters['search'] ?? null, function ($q, $search) {
+                $term = '%'.mb_strtolower($search).'%';
+                $q->where(fn ($w) => $w
+                    ->whereRaw('LOWER(action) LIKE ?', [$term])
+                    ->orWhereIn('action', AuditPresenter::actionsMatching($search))
+                    ->orWhereIn('user_id', User::whereRaw('LOWER(name) LIKE ?', [$term])->select('id'))
+                    ->orWhereIn('clinic_id', Clinic::whereRaw('LOWER(name) LIKE ?', [$term])->select('id')));
+            })
             ->when($filters['action'] ?? null, fn ($q, $action) => $q->where('action', 'like', $action.'%'))
             ->when($filters['category'] ?? null, fn ($q, $category) => AuditPresenter::whereCategory($q, $category))
             ->when($filters['role'] ?? null, fn ($q, $role) => $role === 'none'

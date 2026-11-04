@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Api\Manage;
 
+use Carbon\CarbonImmutable;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AppointmentResource;
 use App\Models\Appointment;
 use App\Models\Clinic;
+use App\Models\ClinicMembership;
+use App\Models\PatientMedicalHistory;
 use App\Services\AppointmentService;
 use App\Services\AuditLogger;
 use App\Support\BusinessTime;
@@ -19,11 +22,12 @@ use Illuminate\Http\Request;
  *   is "not found".
  * - appointments.manage: confirm/reject/reschedule/cancel/check in, and
  *   book on behalf of a registered patient.
+ * - appointments.review_assigned (dentists): confirm or decline requests made to them.
  * - appointments.progress (dentists): start/complete/no-show their own.
  */
 class AppointmentController extends Controller
 {
-    private const RELATIONS = ['clinic', 'branch', 'dentist.user', 'serviceRate', 'patient:id,user_id,birth_date'];
+    private const RELATIONS = ['clinic', 'branch', 'dentist.user', 'serviceRate', 'patient:id,user_id,birth_date,gender'];
 
     public function __construct(
         private readonly AppointmentService $appointments,
@@ -67,9 +71,14 @@ class AppointmentController extends Controller
                 ->orWhereHas('serviceRate', fn ($s) => $s->whereRaw('LOWER(service_name) LIKE ?', [$term])));
         }
 
+        $readsRecords = $this->membership($request)->grants('records.view');
+        if ($readsRecords) {
+            $this->audit->record('records.visit_notes_listed', null, ['page' => (int) $request->query('page', 1)], $clinic->id);
+        }
+
         return $this->paginated(
             $query->paginate($this->perPage($request, 50)),
-            fn ($a) => (new AppointmentResource($a))->clinicView()->resolve()
+            fn ($a) => (new AppointmentResource($a))->clinicView()->withTreatmentNotes($readsRecords)->resolve()
         );
     }
 
@@ -98,7 +107,71 @@ class AppointmentController extends Controller
     {
         $appointment = $this->visible($request, $clinic)->with([...self::RELATIONS, 'statusHistory'])->findOrFail($appointmentId);
 
-        return $this->ok((new AppointmentResource($appointment))->clinicView()->resolve());
+        $readsRecords = $this->membership($request)->grants('records.view');
+        if ($readsRecords && $appointment->patient_id) {
+            // The medical summary needs more of the patient than the list does.
+            $appointment->load('patient');
+            $this->audit->record('records.summary_viewed', $appointment, ['patient_id' => $appointment->patient_id], $clinic->id);
+        }
+
+        return $this->ok([
+            ...(new AppointmentResource($appointment))->clinicView()->withTreatmentNotes($readsRecords)->resolve(),
+            'medical_flags' => $this->medicalFlags($request, $clinic, $appointment),
+            'patient_last_visit_at' => BusinessTime::iso($this->lastVisit($clinic, $appointment)),
+            'patient_snapshot' => $readsRecords && $appointment->patient ? [
+                ...$appointment->patient->medicalSummaryAt($clinic),
+                'visits' => $clinic->appointments()->where('patient_id', $appointment->patient_id)->where('status', Appointment::COMPLETED)->count(),
+            ] : null,
+        ]);
+    }
+
+    /** Give the appointment to another dentist at the same time, if they are free. */
+    public function reassign(Request $request, Clinic $clinic, int $appointmentId)
+    {
+        $data = $request->validate(['dentist_id' => ['required', 'integer']]);
+
+        $appointment = $this->visible($request, $clinic)->findOrFail($appointmentId);
+        $appointment = $this->appointments->reschedule(
+            $appointment,
+            BusinessTime::iso($appointment->starts_at),
+            $request->user(),
+            'Reassigned to another dentist',
+            $data['dentist_id'],
+        );
+
+        return $this->ok((new AppointmentResource($appointment->fresh(self::RELATIONS)))->clinicView()->resolve(), 'Dentist reassigned');
+    }
+
+    private function lastVisit(Clinic $clinic, Appointment $appointment): ?CarbonImmutable
+    {
+        $last = $appointment->patient_id
+            ? $clinic->appointments()->where('patient_id', $appointment->patient_id)->where('status', Appointment::COMPLETED)->max('starts_at')
+            : null;
+
+        return $last ? CarbonImmutable::parse($last, 'UTC') : null;
+    }
+
+    /**
+     * Conditions and allergies the clinic recorded, for those who may read clinical data or
+     * see these alerts (front desk). Clinical notes are never included, and every view is logged.
+     */
+    private function medicalFlags(Request $request, Clinic $clinic, Appointment $appointment): array
+    {
+        $membership = $request->attributes->get('clinicMembership');
+        if (! ($membership?->grants('records.view') || $membership?->grants('patients.medical_alerts')) || ! $appointment->patient_id) {
+            return [];
+        }
+
+        $latest = PatientMedicalHistory::where('clinic_id', $clinic->id)
+            ->where('patient_id', $appointment->patient_id)
+            ->latest()->latest('id')
+            ->first();
+
+        if ($latest && ($latest->conditions || $latest->allergies)) {
+            $this->audit->record('records.alerts_viewed', $appointment, ['patient_id' => $appointment->patient_id], $clinic->id);
+        }
+
+        return collect([$latest?->conditions ? "Conditions: {$latest->conditions}" : null, $latest?->allergies ? "Allergies: {$latest->allergies}" : null])->filter()->values()->all();
     }
 
     /**
@@ -153,9 +226,35 @@ class AppointmentController extends Controller
         return $this->move($request, $clinic, $appointmentId, Appointment::CHECKED_IN, 'Patient checked in');
     }
 
+    /**
+     * Begin the visit. A dentist can start a confirmed visit of today directly: at a clinic
+     * with no front desk nobody else would check the patient in. Both steps stay on record.
+     */
     public function start(Request $request, Clinic $clinic, int $appointmentId)
     {
+        $appointment = $this->visible($request, $clinic)->findOrFail($appointmentId);
+
+        if ($appointment->status === Appointment::CONFIRMED && $this->membership($request)->role === ClinicMembership::ROLE_DENTIST) {
+            if (BusinessTime::local($appointment->starts_at)->toDateString() !== BusinessTime::today()->toDateString()) {
+                return $this->fail('This visit can only be started on the day of the appointment.', 422);
+            }
+            $this->appointments->transition($appointment, Appointment::CHECKED_IN, $request->user());
+        }
+
         return $this->move($request, $clinic, $appointmentId, Appointment::IN_PROGRESS, 'Appointment started');
+    }
+
+    /** The dentist's note on this visit. Clinical: full records stay in clinical notes. */
+    public function saveTreatmentNotes(Request $request, Clinic $clinic, int $appointmentId)
+    {
+        $data = $request->validate(['notes' => ['present', 'nullable', 'string', 'max:5000']]);
+
+        $appointment = $this->visible($request, $clinic)->findOrFail($appointmentId);
+        $appointment->forceFill(['treatment_notes' => $data['notes']])->save();
+        // Only that it changed: the note itself is clinical and stays out of the audit log.
+        $this->audit->record('records.visit_notes_updated', $appointment, ['patient_id' => $appointment->patient_id], $clinic->id);
+
+        return $this->ok((new AppointmentResource($appointment->fresh(self::RELATIONS)))->clinicView()->withTreatmentNotes()->resolve(), 'Notes saved');
     }
 
     public function complete(Request $request, Clinic $clinic, int $appointmentId)

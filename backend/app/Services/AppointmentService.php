@@ -12,6 +12,7 @@ use App\Models\ServiceRate;
 use App\Models\User;
 use App\Notifications\AppointmentUpdated;
 use App\Notifications\ClinicAppointmentActivity;
+use App\Notifications\PortalNotice;
 use App\Support\BusinessTime;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
@@ -56,6 +57,14 @@ class AppointmentService
             throw new UnprocessableEntityHttpException('This clinic is not accepting appointments.');
         }
 
+        $settings = $clinic->settingsValues();
+        // The clinic can still book for a patient; these settings are about online requests.
+        $selfBooked = $patient->user_id !== null && $patient->user_id === $actor->id;
+        if ($selfBooked && ! $settings['allow_online_booking']) {
+            throw new UnprocessableEntityHttpException('This clinic is not taking online bookings right now. Please contact the clinic.');
+        }
+        $initialStatus = $selfBooked && ! $settings['require_approval'] ? Appointment::CONFIRMED : Appointment::PENDING;
+
         [$service, $dentist, $branch] = $this->resolveBookingTargets($clinic, $data);
         $start = BusinessTime::parse($data['starts_at']);
         $end = $start->addMinutes($service->duration_minutes);
@@ -64,7 +73,9 @@ class AppointmentService
             throw new ConflictHttpException('That time is no longer available. Please choose another slot.');
         }
 
-        $appointment = $this->withOverlapGuard(function () use ($clinic, $patient, $data, $actor, $idempotencyKey, $service, $dentist, $branch, $start, $end) {
+        $isNewToDentist = ! Appointment::where('clinic_id', $clinic->id)->where('patient_id', $patient->id)->where('dentist_id', $dentist->id)->exists();
+
+        $appointment = $this->withOverlapGuard(function () use ($clinic, $patient, $data, $actor, $idempotencyKey, $service, $dentist, $branch, $start, $end, $initialStatus) {
             Dentist::whereKey($dentist->id)->lockForUpdate()->first();
             $this->assertNoOverlap($dentist, $patient, $start, $end);
 
@@ -81,7 +92,7 @@ class AppointmentService
             $appointment->patient_name = $patient->display_name ?? 'Patient';
             $appointment->patient_email = $patient->contact_email ?? '';
             $appointment->patient_phone = $patient->phone ?? '';
-            $appointment->status = Appointment::PENDING;
+            $appointment->status = $initialStatus;
             $appointment->status_changed_at = now();
             $appointment->idempotency_key = $idempotencyKey;
             $appointment->created_by = $actor->id;
@@ -90,7 +101,7 @@ class AppointmentService
 
             $appointment->statusHistory()->create([
                 'from_status' => null,
-                'to_status' => Appointment::PENDING,
+                'to_status' => $initialStatus,
                 'changed_by' => $actor->id,
             ]);
 
@@ -102,6 +113,15 @@ class AppointmentService
         $this->audit->record('appointment.created', $appointment, clinicId: $clinic->id);
         $this->notifyPatient($appointment, 'requested');
         $this->notifyClinic($appointment, 'requested');
+        if ($isNewToDentist) {
+            $dentist->user?->notify(new PortalNotice(
+                'patient',
+                'New Patient Assigned',
+                "{$appointment->patient_name} has been assigned to your caseload.",
+                'appointment_requests',
+                ['type' => 'clinic_patient', 'id' => $patient->id, 'clinic_id' => $clinic->id],
+            ));
+        }
 
         return $appointment->load(['clinic', 'branch', 'dentist.user', 'serviceRate']);
     }
@@ -259,6 +279,9 @@ class AppointmentService
 
     public function cancelByPatient(Appointment $appointment, User $actor, ?string $reason): Appointment
     {
+        if (! $appointment->clinic->settingsValues()['allow_patient_cancel']) {
+            throw new ConflictHttpException('This clinic does not take cancellations online. Please contact the clinic.');
+        }
         $this->assertPatientCanChange($appointment);
 
         return $this->transition($appointment, Appointment::CANCELLED, $actor, $reason ?? 'Cancelled by patient', byPatient: true);
@@ -350,6 +373,12 @@ class AppointmentService
             ->whereIn('role', [ClinicMembership::ROLE_CLINIC_ADMIN, ClinicMembership::ROLE_STAFF]))
             ->where('status', User::STATUS_ACTIVE)
             ->get();
+
+        // And the dentist whose patient it is.
+        $dentist = $appointment->dentist()->with('user')->first()?->user;
+        if ($dentist?->status === User::STATUS_ACTIVE) {
+            $recipients = $recipients->push($dentist)->unique('id');
+        }
 
         Notification::send($recipients, new ClinicAppointmentActivity($appointment, $event));
     }

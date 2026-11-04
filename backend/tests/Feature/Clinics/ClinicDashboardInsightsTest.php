@@ -205,7 +205,7 @@ class ClinicDashboardInsightsTest extends TestCase
         $this->asUser($world['admin'])->postJson($this->manage($world, '/appointments'), array_merge($body, ['starts_at' => '2026-11-02 16:00']))
             ->assertCreated()->assertJsonPath('data.status', Appointment::PENDING);
 
-        // Registering is not clinical access.
-        $this->asUser($world['admin'])->getJson($this->manage($world, "/patients/{$patientId}/records"))->assertForbidden();
+        // Registering is not clinical access: a receptionist still cannot read records.
+        $this->asUser($world['staff'])->getJson($this->manage($world, "/patients/{$patientId}/records"))->assertForbidden();
     }
 }

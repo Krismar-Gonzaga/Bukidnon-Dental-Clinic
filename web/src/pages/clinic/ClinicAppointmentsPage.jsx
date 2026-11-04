@@ -5,10 +5,11 @@ import ClinicLayout, { useClinic, useClinicAccess } from '../../layouts/ClinicLa
 import { TableFooter } from '../../components/admin/AdminData';
 import { AppointmentDecision, FilterSelect, Pill, SearchInput } from '../../components/clinic/ClinicUi';
 import { ErrorState, LoadingState } from '../../components/StatusMessage';
-import { CLINIC_APPOINTMENT_STATUSES, getClinicHref, getClinicStatusLabel } from '../../config/clinicNavigation';
+import { CLINIC_APPOINTMENT_STATUSES, getClinicHref, getClinicStatusLabel, isFrontDeskMember } from '../../config/clinicNavigation';
 import { getClinicAppointments, getClinicDentists } from '../../services/clinicPortalApi';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { businessTodayKey, formatDate, formatTime } from '../../utils/dateTime';
+import FrontDeskAppointments from './FrontDeskAppointments';
 import { Schedule } from './ClinicSchedulePage';
 import './ClinicAppointmentsPage.css';
 
@@ -105,21 +106,21 @@ function AppointmentTable() {
               <tbody>
                 {query.data.appointments.map((a) => (
                   <tr key={a.id}>
-                    <td>
+                    <td data-label="Patient">
                       <span className="clinic-cell-title">{a.patient?.name}</span>
                       {a.patient?.age != null && <span className="clinic-cell-sub">Age: {a.patient.age}</span>}
                     </td>
-                    <td>{a.service}</td>
-                    <td>{a.dentist}</td>
-                    <td>
+                    <td data-label="Service">{a.service}</td>
+                    <td data-label="Dentist">{a.dentist}</td>
+                    <td data-label="Date &amp; Time">
                       <span className="clinic-appointment-date">{formatDate(a.startsAt)}</span>
                       <span className="clinic-cell-sub">{formatTime(a.startsAt)}</span>
                     </td>
-                    <td>{a.type === 'walk_in' ? <Pill tone="purple">Walk-in</Pill> : <Pill tone="warning">Online</Pill>}</td>
-                    <td>
+                    <td data-label="Type">{a.type === 'walk_in' ? <Pill tone="purple">Walk-in</Pill> : <Pill tone="warning">Online</Pill>}</td>
+                    <td data-label="Status">
                       <Pill tone={STATUS_TONES[a.backendStatus]}>{getClinicStatusLabel(a.backendStatus)}</Pill>
                     </td>
-                    <td className="is-end">
+                    <td data-label="" className="is-end">
                       <div className="clinic-row-actions">
                         <a href={`${getClinicHref(clinicId, 'appointments')}/${a.id}`} className="clinic-mini-button is-primary" aria-label={`View appointment of ${a.patient?.name}`}>
                           View
@@ -166,7 +167,7 @@ function AppointmentTable() {
   );
 }
 
-function ClinicAppointmentsPage() {
+function ManagerAppointments() {
   const { can } = useClinicAccess();
   const [view, setView] = useState('table');
 
@@ -191,6 +192,12 @@ function ClinicAppointmentsPage() {
       {view === 'table' ? <AppointmentTable /> : <Schedule />}
     </ClinicLayout>
   );
+}
+
+// Clinic staff work from their own list (front desk design).
+function ClinicAppointmentsPage() {
+  const { membership } = useClinicAccess();
+  return isFrontDeskMember(membership) ? <FrontDeskAppointments /> : <ManagerAppointments />;
 }
 
 export default ClinicAppointmentsPage;

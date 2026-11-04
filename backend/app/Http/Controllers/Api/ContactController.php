@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Notifications\ContactMessageReceived;
 use App\Services\AuditLogger;
+use App\Support\PlatformSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
@@ -41,7 +42,7 @@ class ContactController extends Controller
         }
 
         try {
-            Notification::route('mail', config('mail.contact_address'))->notifyNow(new ContactMessageReceived($data));
+            Notification::route('mail', PlatformSettings::get('support_email') ?: config('mail.contact_address'))->notifyNow(new ContactMessageReceived($data));
         } catch (Throwable $e) {
             report($e);
 
